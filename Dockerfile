@@ -20,6 +20,8 @@ WORKDIR /app
 
 COPY . .
 
+RUN chmod +x /app/config.py /app/discord-web.py /app/downloadVid.sh /app/getJson.py /app/runDownload.sh /app/getVids.sh
+
 RUN pip install --no-cache-dir -r requirements.txt
 
 #RUN crontab crontab
