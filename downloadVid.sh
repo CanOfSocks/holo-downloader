@@ -48,8 +48,8 @@ if [ "$success" = "true" ]; then
     outfolder="${donedir}/${partialoutput%%/*}"
     mkdir -p "${donedir}/${partialoutput%/*}"
     sleep 10
-    mv -f "${tempfolder}" "${outfolder}"
-    python /app/discord-web.py "$1" "done"
+    mv -f "${tempfolder}" "${outfolder}" && python /app/discord-web.py "$1" "done" || python /app/discord-web.py "$1" "error"
+    
     #Give API some time to update after a success
     sleep 50
 fi
