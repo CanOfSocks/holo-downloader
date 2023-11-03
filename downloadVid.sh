@@ -28,7 +28,7 @@ output="$tempdir/$partialoutput"
                 mv "$output.live_chat.json.part" "$output.live_chat.json"
         fi
         # Compress the live_chat.json file, this can save 80-90% of the space usually taken by these files
-        zip -9 -m "$(printf '%s\n' '$output.live_chat.json' | sed 's/\.json//').zip" "$output.live_chat.json"  || echo "Error compressing chat for $1"
+        zip -9 -m "$output.live_chat.zip" "$output.live_chat.json"  || echo "Error compressing chat for $1"
 } &
 # Download the metadata (.info.json) and thumbnail in parallel
 {
