@@ -20,10 +20,10 @@ WORKDIR /app
 
 COPY . .
 
-RUN chmod +x *.py *.sh
+#RUN chmod +x *.py *.sh
 
 RUN pip install --no-cache-dir -r requirements.txt
 
 #RUN crontab crontab
 
-ENTRYPOINT /app/runDownload.sh
+ENTRYPOINT ["/app/runDownload.sh"]
