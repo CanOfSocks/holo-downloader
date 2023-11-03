@@ -20,8 +20,8 @@ python /app/discord-web.py "$1" "recording"
 output="$tempdir/$partialoutput"
 # Begin downloading live chat for the stream once it begins in parallel
 {
-        chat_downloader --cookies /app/cookies.txt -o "$output.live_chat.json" "https://www.youtube.com/watch?v=$1" || \
-chat_downloader -o "$output.live_chat.json" "https://www.youtube.com/watch?v=$1"
+        chat_downloader --cookies /app/cookies.txt --logging warning -o "$output.live_chat.json" "https://www.youtube.com/watch?v=$1" || \
+chat_downloader --logging warning -o "$output.live_chat.json" "https://www.youtube.com/watch?v=$1"
 yt-dlp --cookies /app/cookies.txt --wait-for-video 1-15 --write-sub --sub-lang "live_chat" --sub-format "json" --live-from-start --skip-download -o "$output" "$1" \
 || echo "Error downloading chat for $1"
         # If the stream is privated at the end (or some other event cuts your access to the stream),
