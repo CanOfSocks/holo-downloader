@@ -26,4 +26,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 #RUN crontab crontab
 
-ENTRYPOINT /app/runDownload.sh
+ENTRYPOINT ["sh", "/app/runDownload.sh"]
