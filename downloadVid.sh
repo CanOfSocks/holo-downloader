@@ -43,9 +43,17 @@ yt-dlp --cookies /app/cookies.txt --wait-for-video 1-15 --write-sub --sub-lang "
         yt-dlp --cookies /app/cookies.txt --wait-for-video 1-15 -R 25 --live-from-start --write-info-json --write-thumbnail --convert-thumbnails png --write-description --skip-download -o "$output" "$1" \
 && perl -pi -e "s/((?:[0-9]{1,3}\.){3}[0-9]{1,3})|((?:[a-f0-9]{1,4}:){7}[a-f0-9]{1,4})/0\.0\.0\.0/g" "$output.info.json" || echo "Error gathering video data (e.g. info.json) chat for $1"
 } &
+mux_file=$(python -c 'from config import mux_file
+print(mux_file)')
 # Download the video/audio (from the start), preferring VP9 codec
-ytarchive --cookies /app/cookies.txt -t --vp9 --retry-stream 15 --threads 4 --no-frag-files --output "$output" "https://www.youtube.com/watch?v=$1" "best" \
+if [[ "$mux_file" == "False" ]]; then
+    ytarchive --cookies /app/cookies.txt -t --vp9 --retry-stream 15 --threads 4 --no-frag-files --write-mux-file --output "$output" "https://www.youtube.com/watch?v=$1" "best" \
 && success="true" || (python /app/discord-web.py "$1" "error" ; exit 1)
+else
+    ytarchive --cookies /app/cookies.txt -t --vp9 --retry-stream 15 --threads 4 --no-frag-files --output "$output" "https://www.youtube.com/watch?v=$1" "best" \
+&& success="true" || (python /app/discord-web.py "$1" "error" ; exit 1)
+fi
+
 # Wait for all above processes to complete
 wait
 
