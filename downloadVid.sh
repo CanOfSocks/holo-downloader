@@ -6,6 +6,11 @@ if pgrep -f "$script_name $*" | grep -v $$; then
     echo "Downloader for $1 is already running, exiting..."
     exit
 fi
+#Traps
+trap "exit" INT TERM
+trap "kill 0" EXIT
+
+
 
 success="false"
 
@@ -40,7 +45,7 @@ yt-dlp --cookies /app/cookies.txt --wait-for-video 1-15 --write-sub --sub-lang "
 } &
 # Download the video/audio (from the start), preferring VP9 codec
 ytarchive --cookies /app/cookies.txt -t --vp9 --retry-stream 15 --threads 4 --no-frag-files --output "$output" "https://www.youtube.com/watch?v=$1" "best" \
-&& success="true" || python /app/discord-web.py "$1" "error"
+&& success="true" || (python /app/discord-web.py "$1" "error" ; exit 1)
 # Wait for all above processes to complete
 wait
 
