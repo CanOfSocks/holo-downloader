@@ -8,3 +8,5 @@ channel_ids_to_match = {
 }
 
 webhook_url = "https://discord.com/api/webhooks/xxxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyyyyyyy"
+
+mux_file = True
