@@ -67,6 +67,7 @@ if [ "$success" = "true" ]; then
     #Make parent folder
     mkdir -p $(dirname "${outfolder}"
     sleep 10
+    echo "Moving ${tempfolder} to ${outfolder}"
     mv -f "${tempfolder}" "${outfolder}" && python /app/discord-web.py "$1" "done" || python /app/discord-web.py "$1" "error"
     
     #Give API some time to update after a success
