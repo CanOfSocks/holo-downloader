@@ -46,6 +46,27 @@ def send_webhook(url, type, id="Unknown"):
         webhook.add_embed(embed)
 
         webhook_response = webhook.execute()
+    else:
+        webhook = DiscordWebhook(url, rate_limit_retry=True)
+        match type:
+            case "recording":
+                title = "Recording"
+                color="0011ff"
+            case "waiting":
+                title = "Waiting"
+                color="ffff00"
+            case "error":
+                title = "Error"
+                color="ff0000"
+            case "done":
+                title = "Done"
+                color="00ff00"
+                
+        embed = DiscordEmbed(title, description="Video https://youtu.be/{1} is not accessible, perhaps it has been privated".format(data.get('title'),id), color=color)
+        
+        webhook.add_embed(embed)
+
+        webhook_response = webhook.execute()
 
 id = sys.argv[1]
 status = sys.argv[2]
