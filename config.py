@@ -7,7 +7,7 @@ channel_ids_to_match = {
     # Add more channels as needed
 }
 
-webhook_url = "https://discord.com/api/webhooks/xxxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyyyyyyy"
+webhook_url = "https://discord.com/api/webhooks/1005627351402557532/j5Y_HkD5OlOnRtCSuwnOLEc9drkqhKI7S5PZcAg-7N1xCmqeC5RepkTIE1qFSuiXyIXa"
 
 mux_file = True
 
