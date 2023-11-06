@@ -56,6 +56,8 @@ if response.status_code == 200:
                 
                 if(live.platform == "youtube"):
                     #print(time_difference)
+                    if(look_ahead is None):
+                        look_ahead = 24
                     if(live.time_until_start() <= look_ahead * 3600):
                         matching_streams.append(live.video_id)
 
