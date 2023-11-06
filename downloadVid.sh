@@ -60,12 +60,12 @@ fi
 wait
 
 
-tempfolder=$(dirname "${tempdir}/${partialoutput}"
+tempfolder=$(dirname "${tempdir}/${partialoutput}")
 if [ "$success" = "true" ]; then
 #    tempfolder="${tempdir}/${partialoutput%/*}"
-    outfolder=$(dirname "${donedir}/${partialoutput}"
+    outfolder=$(dirname "${donedir}/${partialoutput}")
     #Make parent folder
-    mkdir -p $(dirname "${outfolder}"
+    mkdir -p $(dirname "${outfolder}")
     sleep 10
     echo "Moving ${tempfolder} to ${outfolder}"
     mv -f "${tempfolder}" "${outfolder}" && python /app/discord-web.py "$1" "done" || python /app/discord-web.py "$1" "error"
