@@ -10,3 +10,6 @@ channel_ids_to_match = {
 webhook_url = "https://discord.com/api/webhooks/xxxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyyyyyyy"
 
 mux_file = True
+
+#Hours to start waiting for video to go live, otherwise ignore
+look_ahead = 48
