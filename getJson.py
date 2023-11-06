@@ -1,6 +1,6 @@
 import requests
 import json
-from datetime import datetime
+from datetime import datetime,timezone
 from config import channel_ids_to_match
 
 url = "https://holo.dev/api/v1/lives/open"
@@ -30,7 +30,7 @@ if response.status_code == 200:
                 if(live.get('platform') == "youtube"):
                     date_format = "%Y-%m-%dT%H:%M:%S.%fZ"
                     parsed_date = datetime.strptime(live.get('start_at'), date_format)
-                    current_datetime = datetime.utcnow()
+                    current_datetime = datetime.now(timezone.utc)
                     time_difference = parsed_date - current_datetime 
                     #print(time_difference)
                     if(time_difference.total_seconds() <= 48 * 3600):
