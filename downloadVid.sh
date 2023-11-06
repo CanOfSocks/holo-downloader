@@ -49,10 +49,10 @@ mux_file=$(python -c 'from config import mux_file
 print(mux_file)')
 # Download the video/audio (from the start), preferring VP9 codec
 if [[ "$mux_file" == "False" ]]; then
-    ytarchive --cookies /app/cookies.txt -t --vp9 --retry-stream 15 --threads 4 --no-frag-files --write-mux-file --output "$output" "https://www.youtube.com/watch?v=$1" "best" \
+    ytarchive --cookies /app/cookies.txt -t --vp9 --retry-stream 15 --threads 4 --no-frag-files --write-mux-file --error --output "$output" "https://www.youtube.com/watch?v=$1" "best" \
 && success="true" || (python /app/discord-web.py "$1" "error" ; exit 1)
 else
-    ytarchive --cookies /app/cookies.txt -t --vp9 --retry-stream 15 --threads 4 --no-frag-files --output "$output" "https://www.youtube.com/watch?v=$1" "best" \
+    ytarchive --cookies /app/cookies.txt -t --vp9 --retry-stream 15 --threads 4 --no-frag-files --error --output "$output" "https://www.youtube.com/watch?v=$1" "best" \
 && success="true" || (python /app/discord-web.py "$1" "error" ; kill -2 $chat_pid $info_pid)
 fi
 
