@@ -65,7 +65,8 @@ if [ "$success" = "true" ]; then
 #    tempfolder="${tempdir}/${partialoutput%/*}"
     outfolder=$(dirname "${donedir}/${partialoutput}")
     #Make parent folder
-    mkdir -p $(dirname "${outfolder}")
+    parent=$(dirname "${outfolder}")
+    mkdir -p "$parent"
     sleep 10
     echo "Moving ${tempfolder} to ${outfolder}"
     mv -f "${tempfolder}" "${outfolder}" && python /app/discord-web.py "$1" "done" || python /app/discord-web.py "$1" "error"
