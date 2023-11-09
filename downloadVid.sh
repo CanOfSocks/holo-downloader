@@ -2,8 +2,8 @@
 script_name="$0"
 
 # Check if a process with the same script name is already running
-if pgrep -f "$script_name $*" | grep -v $$; then
-    echo "Downloader for $1 is already running, exiting..."
+if (pgrep -f "$script_name $*" | grep -v $$) > /dev/null; then
+    #echo "Downloader for $1 is already running, exiting..."
     exit
 fi
 #Traps
