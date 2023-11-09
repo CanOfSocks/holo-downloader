@@ -5,6 +5,7 @@ from discord_webhook import DiscordWebhook, DiscordEmbed
 from config import webhook_url 
 
 def send_webhook(url, type, id="Unknown"):
+    webhook = DiscordWebhook(url, rate_limit_retry=True)
     if(type == "starting"):
         title="Starting"
         color="fc8803"
@@ -15,9 +16,7 @@ def send_webhook(url, type, id="Unknown"):
     
     response = requests.get("https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v={0}".format(id))
     
-    color="03b2f8"
-
-    webhook = DiscordWebhook(url, rate_limit_retry=True)
+    color="03b2f8"   
 
     # create embed object for webhook
     # you can set the color as a decimal (color=242424) or hex (color="03b2f8") number
