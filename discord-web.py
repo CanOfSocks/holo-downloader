@@ -6,6 +6,7 @@ from config import webhook_url
 
 def send_webhook(url, type, id="Unknown"):
     if(type == "starting"):
+        title="Starting"
         color="fc8803"
         embed = DiscordEmbed(title, description="Starting holo-downloader", color=color)
         webhook.add_embed(embed)
