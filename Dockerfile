@@ -25,6 +25,7 @@ RUN chmod +x *.py *.sh
 RUN pip install --no-cache-dir -r requirements.txt
 
 #Setup Crontab
-RUN echo "*/2 * * * * /app/getVids.sh > /proc/1/fd/1 2>/proc/1/fd/2" >> /etc/crontab
+RUN chown -R root /app/crontab && chmod -R 0644 /app/crontab
+RUN crontab /app/crontab
 
 ENTRYPOINT [ "cron", "-f" ]
