@@ -55,7 +55,7 @@ if [[ "$mux_file" == "False" ]]; then
 && success="true" || (python /app/discord-web.py "$1" "error" ; kill -2 $chat_pid $info_pid)
 else
     ytarchive --cookies /app/cookies.txt -t --vp9 --retry-stream 15 --threads 4 --add-metadata --no-frag-files --error --output "$output" "https://www.youtube.com/watch?v=$1" "best" \
-&& success="true" || (python /app/discord-web.py "$1" "error" ; kill -2 $chat_pid $info_pid)
+&& success="True" || (python /app/discord-web.py "$1" "error" ; kill -2 $chat_pid $info_pid)
 fi
 
 # Wait for all above processes to complete
@@ -63,7 +63,7 @@ wait
 
 
 tempfolder=$(dirname "${tempdir}/${partialoutput}")
-if [ "$success" = "true" ]; then
+if [[ "$success" == "True" ]]; then
 #    tempfolder="${tempdir}/${partialoutput%/*}"
     outfolder=$(dirname "${donedir}/${partialoutput}")
     #Make parent folder
