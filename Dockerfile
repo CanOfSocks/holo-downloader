@@ -8,11 +8,11 @@ RUN mkdir -p /app/Done
 
 RUN apt-get update && apt-get install --no-install-recommends sed bash wget zip unzip xz-utils procps cron -y -qq && apt clean -y
 
-RUN wget https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz && \
+RUN wget -q https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz && \
          tar -C /usr/bin -xvf ffmpeg-master-latest-linux64-gpl.tar.xz --wildcards ffmpeg-master-latest-linux64-gpl/bin/* --strip-components 2 && \
          rm ffmpeg-master-latest-linux64-gpl.tar.xz
 
-RUN wget https://github.com/Kethsar/ytarchive/releases/download/v0.4.0/ytarchive_linux_amd64.zip && \
+RUN wget -q https://github.com/Kethsar/ytarchive/releases/download/v0.4.0/ytarchive_linux_amd64.zip && \
          unzip ytarchive_linux_amd64.zip -d /usr/bin && \
          rm ytarchive_linux_amd64.zip
 
