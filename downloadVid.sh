@@ -1,11 +1,13 @@
 #!/bin/bash
-script_name="$0"
-
+PROCESS_NAME=$(basename "$0")
 # Check if a process with the same script name is already running
-if (pgrep -f "$script_name $*" | grep -v $$) > /dev/null; then
-    #echo "Downloader for $1 is already running, exiting..."
+COUNT=$(pgrep -c -f "$PROCESS_NAME $1")
+#If more than one instance of script, it is already running so exit
+if [ "$COUNT" -gt 1 ]; then
+    echo "Downloader for $1 is already running, exiting...      Count=$COUNT"
     exit
 fi
+
 #Traps
 trap "exit" INT TERM
 trap "kill 0" EXIT
