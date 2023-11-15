@@ -6,7 +6,7 @@ RUN mkdir -p /app/temp
 
 RUN mkdir -p /app/Done
 
-RUN apt-get update && apt-get install --no-install-recommends sed bash wget zip unzip xz-utils procps -y && apt clean -y
+RUN apt-get update && apt-get install --no-install-recommends sed bash wget zip unzip xz-utils procps cron -y -qq && apt clean -y
 
 RUN wget https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz && \
          tar -C /usr/bin -xvf ffmpeg-master-latest-linux64-gpl.tar.xz --wildcards ffmpeg-master-latest-linux64-gpl/bin/* --strip-components 2 && \
@@ -24,6 +24,7 @@ RUN chmod +x *.py *.sh
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-#RUN crontab crontab
+#Setup Crontab
+RUN echo "*/2 * * * * /app/getVids.sh > /proc/1/fd/1 2>/proc/1/fd/2" >> /etc/crontab
 
-ENTRYPOINT ["/app/runDownload.sh"]
+ENTRYPOINT [ "cron", "-f" ]
