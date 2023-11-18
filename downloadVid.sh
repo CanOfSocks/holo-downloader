@@ -47,8 +47,7 @@ chat_pid=$!
 && perl -pi -e "s/((?:[0-9]{1,3}\.){3}[0-9]{1,3})|((?:[a-f0-9]{1,4}:){7}[a-f0-9]{1,4})/0\.0\.0\.0/g" "$output.info.json" || echo "Error gathering video data (e.g. info.json) chat for $1"
 } &
 info_pid=$!
-mux_file=$(python -c 'from config import mux_file
-print(mux_file)')
+mux_file=$(python /app/getMux.py)
 # Download the video/audio (from the start), preferring VP9 codec
 if [[ "$mux_file" == "False" ]]; then
     ytarchive --cookies /app/cookies.txt -t --vp9 --retry-stream 15 --threads 4 --add-metadata --no-frag-files --write-mux-file --error --output "$output" "https://www.youtube.com/watch?v=$1" "best" \
