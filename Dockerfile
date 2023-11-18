@@ -22,7 +22,7 @@ COPY . .
 
 RUN chmod +x *.py *.sh
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install -q --no-cache-dir -r requirements.txt
 
 #Setup Crontab
 RUN chown -R root /app/crontab && chmod -R 0644 /app/crontab
