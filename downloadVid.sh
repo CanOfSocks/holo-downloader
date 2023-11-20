@@ -24,7 +24,7 @@ python /app/discord-web.py "$1" "waiting"
 ytdlpOptions=$(python /app/getConfig.py "yt-dlp_options")
 # Waits for the stream to begin and creates a variable with the stream title and ID
 partialoutput=$(yt-dlp --wait-for-video 1-300 -R 25 --skip-download $ytdlpOptions --print "%(filename)s" --no-warnings "$1" 2>&1 | tail -n 1) || (python /app/discord-web.py "$1" && exit)
-
+echo "$partialoutput"
 python /app/discord-web.py "$1" "recording"
 output="$tempdir/$partialoutput"
 
