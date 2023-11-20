@@ -15,6 +15,30 @@ def getCookiesOptions():
         
     return out
 
+
+#For waiter
+def get_ytdlp_output():
+    out = ""
+    #Cookies
+    #out += getCookiesOptions()
+        
+    # Output file(s)
+    try:
+        output_folder = config.output_folder
+    except AttributeError:
+        output_folder = "%(fulltitle)s"
+    # Output folder is empty, add default
+    if not output_folder:
+        output_folder = "%(fulltitle)s"
+        
+    # duplicate path if depth is 1 (or less)
+    if(len(Path(output_folder).parents) <= 1):
+        output_folder = str(PurePath(output_folder,output_folder))
+    
+    out += "output_folder"
+    
+    return out
+
 #For waiter
 def get_ytdlp():
     out = ""
