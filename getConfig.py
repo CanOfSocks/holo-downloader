@@ -31,7 +31,6 @@ def get_ytdlp():
         output_folder = "%(fulltitle)s"
         
     # duplicate path if depth is 1 (or less)
-    print(len(Path(output_folder).parents))
     if(len(Path(output_folder).parents) <= 1):
         output_folder = str(PurePath(output_folder,output_folder))
     
