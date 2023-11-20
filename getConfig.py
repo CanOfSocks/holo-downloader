@@ -3,7 +3,8 @@ import config
 from pathlib import Path,PurePath
 
 #For general cookies
-def getCookiesOptions():
+#def getCookiesOptions():
+def getCookiesFile():
     out = ""
     try:
         cookies = config.cookies_file
@@ -11,39 +12,15 @@ def getCookiesOptions():
         cookies = None
         
     if cookies is not None:
-        out += " --cookies {0}".format(config.cookies_file)
-        
-    return out
-
-
-#For waiter
-def get_ytdlp_output():
-    out = ""
-    #Cookies
-    #out += getCookiesOptions()
-        
-    # Output file(s)
-    try:
-        output_folder = config.output_folder
-    except AttributeError:
-        output_folder = "%(fulltitle)s"
-    # Output folder is empty, add default
-    if not output_folder:
-        output_folder = "%(fulltitle)s"
-        
-    # duplicate path if depth is 1 (or less)
-    if(len(Path(output_folder).parents) <= 1):
-        output_folder = str(PurePath(output_folder,output_folder))
-    
-    out += output_folder
-    
+#        out += " --cookies {0}".format(config.cookies_file)
+        out += config.cookies_file
     return out
 
 #For waiter
 def get_ytdlp():
     out = ""
     #Cookies
-    out += getCookiesOptions()
+#    out += getCookiesOptions()
         
     # Output file(s)
     try:
@@ -58,8 +35,8 @@ def get_ytdlp():
     if(len(Path(output_folder).parents) <= 1):
         output_folder = str(PurePath(output_folder,output_folder))
     
-    out += ' -o "{0}"'.format(output_folder)
-    
+    #out += " -o {0}".format(output_folder)
+    out += output_folder
     return out
 
 #Check if vidOnly
@@ -112,7 +89,7 @@ def getInfo():
     if description:
         out += " --write-description"
         
-    out += getCookiesOptions()
+    #out += getCookiesOptions()
     
     return out
         
@@ -151,7 +128,7 @@ def getYtarchiveOptions():
     if not getMux():
         out += " --write-mux-file"
        
-    out += getCookiesOptions()
+    #out += getCookiesOptions()
         
     return out   
 
@@ -168,9 +145,10 @@ function = argv[1]
 
 match function:
     case "cookies":
-        print(getCookiesOptions())
+        #print(getCookiesOptions())
+        print(getCookiesFile())
     case "yt-dlp_options":
-        print(get_ytdlp_output())
+        print(get_ytdlp())
     case "info_options":
         print(getInfo())
     case "get_chat":
