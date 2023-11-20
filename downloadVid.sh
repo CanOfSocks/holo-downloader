@@ -29,7 +29,7 @@ python /app/discord-web.py "$1" "recording"
 output="$tempdir/$partialoutput"
 
 getChat=$(python /app/getConfig.py "get_chat")
-if [[ "$getChat" == "True" ]]
+if [[ "$getChat" == "True" ]]; then
         # Begin downloading live chat for the stream once it begins in parallel
         {
                 cookies=$(python /app/getConfig.py "cookies")
