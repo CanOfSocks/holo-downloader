@@ -12,9 +12,9 @@ RUN wget -q https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpe
          tar -C /usr/bin -xvf ffmpeg-master-latest-linux64-gpl.tar.xz --wildcards ffmpeg-master-latest-linux64-gpl/bin/* --strip-components 2 && \
          rm ffmpeg-master-latest-linux64-gpl.tar.xz && chmod +x /usr/bin/ff*
 
-ENV yta-version="latest"
+ARG yta-version=latest
 
-RUN wget -q "https://github.com/Kethsar/ytarchive/releases/download//$yta-version/ytarchive_linux_amd64.zip" && \
+RUN wget -q "https://github.com/Kethsar/ytarchive/releases/download/${yta-version}/ytarchive_linux_amd64.zip" && \
          unzip ytarchive_linux_amd64.zip -d /usr/bin && chmod +x /usr/bin/ytarchive && \
          rm ytarchive_linux_amd64.zip
 
