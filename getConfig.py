@@ -170,7 +170,7 @@ match function:
     case "cookies":
         print(getCookiesOptions())
     case "yt-dlp_options":
-        print(get_ytdlp())
+        print(get_ytdlp_output())
     case "info_options":
         print(getInfo())
     case "get_chat":
