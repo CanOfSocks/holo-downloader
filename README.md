@@ -31,6 +31,7 @@ docker run -d --name='holo-downloader' --cpus=".75" -e TZ="Europe/London" -e HOS
 - [x] Options for auxillary data (thumbnails, description, info-json, chat)
 - [x] Start time look-ahead config
 - [x] Cookie file option
+- [x] Downloader options
 - [ ] Title filtering
 - [ ] Description filtering
 - [ ] Configurable checking frequency
