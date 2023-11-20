@@ -14,7 +14,7 @@ RUN wget -q https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpe
 
 ENV yta-version="latest"
 
-RUN wget -q https://github.com/Kethsar/ytarchive/releases/download/${yta-version}/ytarchive_linux_amd64.zip && \
+RUN wget -q "https://github.com/Kethsar/ytarchive/releases/download/${yta-version}/ytarchive_linux_amd64.zip" && \
          unzip ytarchive_linux_amd64.zip -d /usr/bin && chmod +x /usr/bin/ytarchive && \
          rm ytarchive_linux_amd64.zip
 
