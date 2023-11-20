@@ -56,4 +56,5 @@ def send_webhook(url, type, id="Unknown"):
 id = sys.argv[1]
 status = sys.argv[2]
 
-send_webhook(webhook_url, status, id)
+if webhook_url is not None:
+    send_webhook(webhook_url, status, id)
