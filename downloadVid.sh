@@ -49,7 +49,7 @@ yt-dlp $cookies --wait-for-video 1-15 --write-sub --sub-lang "live_chat" --sub-f
         chat_pid=$!
 fi
 infoOptions=$(python /app/getConfig.py "info_options")
-if ! [ -z "${infoOptions}"]; then
+if ! [ -z "${infoOptions}" ]; then
         # Download the metadata (.info.json) and thumbnail in parallel
         {
                 yt-dlp --wait-for-video 1-15 -R 25 --live-from-start $infoOptions --skip-download -o "$output" "$1" \
