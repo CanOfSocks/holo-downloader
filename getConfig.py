@@ -11,7 +11,7 @@ def getCookiesOptions():
         cookies = None
         
     if cookies is not None:
-        out += " --cookies {0}".format(config.cookies_file)
+        out += " --cookies '{0}'".format(config.cookies_file)
         
     return out
 
