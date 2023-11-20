@@ -13,7 +13,7 @@ RUN wget -q https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpe
          rm ffmpeg-master-latest-linux64-gpl.tar.xz && chmod +x /usr/bin/ff*
 
 RUN wget -q https://github.com/Kethsar/ytarchive/releases/download/v0.4.0/ytarchive_linux_amd64.zip && \
-         unzip ytarchive_linux_amd64.zip -d /usr/bin && chmod +x /usr/bin/ytarchive \
+         unzip ytarchive_linux_amd64.zip -d /usr/bin && chmod +x /usr/bin/ytarchive && \
          rm ytarchive_linux_amd64.zip
 
 WORKDIR /app
