@@ -17,4 +17,4 @@ jobs:
     - name: Build the Docker image
       run: docker build . --file Dockerfile --tag canofsocks/holo-downloader:latest
     - name: Push the Docker Image
-      run: docker login && docker push canofsocks/holo-downloader:latest
+      run: docker login canofsocks -p ${{ secrets.DOCKER_TOKEN }} && docker push canofsocks/holo-downloader:latest
