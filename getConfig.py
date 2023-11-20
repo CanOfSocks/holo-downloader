@@ -35,7 +35,7 @@ def get_ytdlp():
     if(len(Path(output_folder).parents) <= 1):
         output_folder = str(PurePath(output_folder,output_folder))
     
-    out += " -o \"{0}\"".format(output_folder)
+    out += " -o {0}".format(output_folder)
     
     return out
 
