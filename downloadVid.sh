@@ -36,7 +36,7 @@ if [[ "$getChat" == "True" ]]; then
                 
                 chat_downloader ${cookies:+--cookies "$cookies"} --logging critical -o "$output.live_chat.json" "https://www.youtube.com/watch?v=$1" 2>&1 > /dev/null || \
 chat_downloader --logging critical -o "$output.live_chat.json" "https://www.youtube.com/watch?v=$1" 2>&1 > /dev/null || \
-yt-dlp $cookies --wait-for-video 1-15 --write-sub --sub-lang "live_chat" --sub-format "json" --live-from-start --skip-download -o "$output" "$1" \
+yt-dlp ${cookies:+--cookies "$cookies"} --wait-for-video 1-15 --write-sub --sub-lang "live_chat" --sub-format "json" --live-from-start --skip-download -o "$output" "$1" \
 || echo "Error downloading chat for $1"
                 # If the stream is privated at the end (or some other event cuts your access to the stream),
                 # the chat file will not be closed correctly, and the .part extension can be removed
