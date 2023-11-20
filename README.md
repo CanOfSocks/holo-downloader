@@ -13,7 +13,7 @@ It also incorperates Discord Webhooks for status monitoring.
 Please check out [Hoshinova](https://github.com/HoloArchivists/hoshinova) or [auto-ytarchive-raw](https://github.com/Spicadox/auto-ytarchive-raw/) for more advanced and customisable solutions, especially if you don't need a temporary folder and/or want only the video file.
 
 ## Usage
-To use this container, you will need to have a temporary folder, a final folder and a cookie file. Currently, a cookie file is mandatory.
+To use this container, you will need to have a temporary folder, a final folder and a cookie file.
 Clone the repo and build the Docker container from within the root of the repo.
 
 If using a container, you will need to create a copy of the config.py file for a persistent configuration.
@@ -28,7 +28,9 @@ docker run -d --name='holo-downloader' --cpus=".75" -e TZ="Europe/London" -e HOS
 
 ### To-Do
 - [x] Option to mux file or not
+- [x] Options for auxillary data (thumbnails, description, info-json, chat)
 - [x] Start time look-ahead config
+- [x] Cookie file option
 - [ ] Title filtering
 - [ ] Description filtering
 - [ ] Configurable checking frequency
