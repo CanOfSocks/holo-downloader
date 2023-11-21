@@ -24,7 +24,7 @@ python /app/discord-web.py "$1" "waiting" &
 cookies=$(python /app/getConfig.py "cookies")
 ytdlpOutput=$(python /app/getConfig.py "yt-dlp_options")
 # Waits for the stream to begin and creates a variable with the stream title and ID
-partialoutput=$(yt-dlp --wait-for-video 1-300 -R 25 --skip-download ${cookies:+--cookies "$cookies"} ${ytdlpOutput:+-o "$ytdlpOutput"} --print "%(filename)s" --no-warnings "$1" 2>&1 | tail -n 1) || (python /app/discord-web.py "$1" && exit)
+partialoutput=$(yt-dlp --wait-for-video 1-300 -R 25 --skip-download ${cookies:+--cookies "$cookies"} ${ytdlpOutput:+-o "$ytdlpOutput"} --print "%(filename)s" --no-warnings "https://www.youtube.com/watch?v=$1" 2>&1 | tail -n 1) || (python /app/discord-web.py "$1" && exit)
 
 python /app/discord-web.py "$1" "recording" &
 output="$tempdir/$partialoutput"
@@ -36,7 +36,7 @@ if [[ "$getChat" == "True" ]]; then
                 
                 chat_downloader ${cookies:+--cookies "$cookies"} --logging critical -o "$output.live_chat.json" "https://www.youtube.com/watch?v=$1" 2>&1 > /dev/null || \
 chat_downloader --logging critical -o "$output.live_chat.json" "https://www.youtube.com/watch?v=$1" 2>&1 > /dev/null || \
-yt-dlp ${cookies:+--cookies "$cookies"} --wait-for-video 1-15 --write-sub --sub-lang "live_chat" --sub-format "json" --live-from-start --skip-download -o "$output" "$1" \
+yt-dlp ${cookies:+--cookies "$cookies"} --wait-for-video 1-15 --write-sub --sub-lang "live_chat" --sub-format "json" --live-from-start --skip-download -o "$output" "https://www.youtube.com/watch?v=$1" \
 || echo "Error downloading chat for $1"
                 # If the stream is privated at the end (or some other event cuts your access to the stream),
                 # the chat file will not be closed correctly, and the .part extension can be removed
@@ -53,7 +53,7 @@ infoOptions=$(python /app/getConfig.py "info_options")
 if ! [ -z "${infoOptions}" ]; then
         # Download the metadata (.info.json) and thumbnail in parallel
         {
-                yt-dlp --wait-for-video 1-15 -R 25 --live-from-start ${cookies:+--cookies "$cookies"} $infoOptions --skip-download -o "$output" "$1" \
+                yt-dlp --wait-for-video 1-15 -R 25 --live-from-start ${cookies:+--cookies "$cookies"} $infoOptions --skip-download -o "$output" "https://www.youtube.com/watch?v=$1" \
 && (test -f "$output.info.json" && perl -pi -e "s/((?:[0-9]{1,3}\.){3}[0-9]{1,3})|((?:[a-f0-9]{1,4}:){7}[a-f0-9]{1,4})/0\.0\.0\.0/g" "$output.info.json") || echo "Error gathering video data (e.g. info.json) chat for $1"
         } &
         info_pid=$!
