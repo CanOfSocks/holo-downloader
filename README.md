@@ -23,16 +23,18 @@ Example with Docker hub:
 docker pull 'canofsocks/holo-downloader:latest'
 docker run -d --name='holo-downloader' --cpus=".75" -e TZ="Europe/London" -e HOST_CONTAINERNAME="holo-downloader" -v '/mnt/holo-downloader/config/config.py':'/app/config.py':'rw' -v '/mnt/holo-downloader/temp/':'/app/temp':'rw' -v '/mnt/holo-downloader/Done/':'/app/Done':'rw' -v '/mnt/holo-downloader/config/cookies.txt':'/app/cookies.txt':'rw' --restart always 'canofsocks/holo-downloader:latest'
 ```
-
+## Configuration
 
 
 ### To-Do
+While some components have been marked as added, testing of full functionalility may be required
 - [x] Option to mux file or not
 - [x] Options for auxillary data (thumbnails, description, info-json, chat)
 - [x] Start time look-ahead config
 - [x] Cookie file option
 - [x] Downloader options
-- [ ] Title filtering
-- [ ] Description filtering
+- [x] Title filtering
+- [x] Description filtering
+- [x] Membership only filtering
 - [ ] Configurable checking frequency
 - [ ] Improve error detection
