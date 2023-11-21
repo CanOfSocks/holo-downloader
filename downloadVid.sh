@@ -69,16 +69,16 @@ ytarchive ${cookies:+--cookies "$cookies"} $ytarchiveOptions --error --output "$
 wait
 
 mux_file=$(python /app/getConfig.py "mux_file")
-tempfolder=$(dirname "${tempdir}/${partialoutput}")
+#tempfolder=$(dirname "${tempdir}/${partialoutput}")
 if [[ "$success" == "True" ]]; then
 #    tempfolder="${tempdir}/${partialoutput%/*}"
     outfolder=$(dirname "${donedir}/${partialoutput}")
     #Make parent folder
-    parent=$(dirname "${outfolder}")
-    mkdir -p "$parent"
+#    parent=$(dirname "${outfolder}")
+    mkdir -p "$outfolder"
     sleep 10
     echo "Moving ${tempfolder} to ${outfolder}"
-    mv -f "${tempfolder}" "${outfolder}" && python /app/discord-web.py "$1" "done" || python /app/discord-web.py "$1" "error"
+    mv -f "${output}*" "${outfolder}/" && python /app/discord-web.py "$1" "done" || python /app/discord-web.py "$1" "error"
     
     #Give API some time to update after a success
     sleep 50
