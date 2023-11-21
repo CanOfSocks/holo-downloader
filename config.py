@@ -7,7 +7,19 @@ channel_ids_to_match = {
     # Add more channels as needed
 }
 
-webhook_url = "https://discord.com/api/webhooks/1005627351402557532/j5Y_HkD5OlOnRtCSuwnOLEc9drkqhKI7S5PZcAg-7N1xCmqeC5RepkTIE1qFSuiXyIXa"
+title_filter = {
+    "UCoSrY_IQQVpmIRZ9Xf-y93g": "(?i).asmr|unarchive|karaoke|unarchived|no archive|WATCH-A-LONG|WATCHALONG|watch-along|birthday|offcollab|off-collab|off collab|SINGING."
+}
+
+description_filter = {
+    "UCoSrY_IQQVpmIRZ9Xf-y93g": ".Calliope."
+}
+
+members_only ={
+    "UCoSrY_IQQVpmIRZ9Xf-y93g": True
+}
+
+webhook_url = "https://discord.com/api/webhooks/xxxxxxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyy"
 
 ### Download options
 
