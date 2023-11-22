@@ -63,7 +63,7 @@ fi
 ytarchiveOptions=$(python /app/getConfig.py "ytarchive_options")
 quality=$(python /app/getConfig.py "quality")
 ytarchive ${cookies:+--cookies "$cookies"} $ytarchiveOptions --error --output "$output" "https://www.youtube.com/watch?v=$1" "$quality" \
-&& success="true" || (python /app/discord-web.py "$1" "error" ; kill -2 $chat_pid $info_pid)
+&& success="True" || (python /app/discord-web.py "$1" "error" ; kill -2 $chat_pid $info_pid)
 
 # Wait for all above processes to complete
 wait
@@ -77,7 +77,7 @@ if [[ "$success" == "True" ]]; then
 #    parent=$(dirname "${outfolder}")
     mkdir -p "$outfolder"
     sleep 10
-    echo "Moving ${tempfolder} to ${outfolder}"
+    echo "Moving ${output}* to ${outfolder}"
     mv -f "${output}*" "${outfolder}/" && python /app/discord-web.py "$1" "done" || python /app/discord-web.py "$1" "error"
     
     #Give API some time to update after a success
@@ -85,15 +85,16 @@ if [[ "$success" == "True" ]]; then
 
 #Force check for output txt file because it doesn't sometimes for some reason
 elif [ -s "$output.ffmpeg.txt" ] && [[ "$mux_file" == "False" ]]; then  
+#    tempfolder="${tempdir}/${partialoutput%/*}"
     outfolder=$(dirname "${donedir}/${partialoutput}")
     #Make parent folder
-    parent=$(dirname "${outfolder}")
-    mkdir -p "$parent"
+#    parent=$(dirname "${outfolder}")
+    mkdir -p "$outfolder"
     sleep 10
     echo "Moving ${tempfolder} to ${outfolder}"
-    mv -f "${tempfolder}" "${outfolder}" && python /app/discord-web.py "$1" "done" || python /app/discord-web.py "$1" "error"
+    mv -f "${output}*" "${outfolder}/" && python /app/discord-web.py "$1" "done" || python /app/discord-web.py "$1" "error"
     
     #Give API some time to update after a success
-    sleep 50  
+    sleep 50
 fi
 rm -R "$tempfolder"
