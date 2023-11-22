@@ -84,17 +84,17 @@ if [[ "$success" == "True" ]]; then
     sleep 50
 
 #Force check for output txt file because it doesn't sometimes for some reason
-elif [ -s "$output.ffmpeg.txt" ] && [[ "$mux_file" == "False" ]]; then  
-#    tempfolder="${tempdir}/${partialoutput%/*}"
-    outfolder=$(dirname "${donedir}/${partialoutput}")
-    #Make parent folder
-#    parent=$(dirname "${outfolder}")
-    mkdir -p "$outfolder"
-    sleep 10
-    echo "Moving ${tempfolder} to ${outfolder}"
-    mv -f "${output}*" "${outfolder}/" && python /app/discord-web.py "$1" "done" || python /app/discord-web.py "$1" "error"
+#elif [ -s "$output.ffmpeg.txt" ] && [[ "$mux_file" == "False" ]]; then  
+##    tempfolder="${tempdir}/${partialoutput%/*}"
+#    outfolder=$(dirname "${donedir}/${partialoutput}")
+#    #Make parent folder
+##    parent=$(dirname "${outfolder}")
+#    mkdir -p "$outfolder"
+#    sleep 10
+#    echo "Moving ${tempfolder} to ${outfolder}"
+#    mv -f "${output}*" "${outfolder}/" && python /app/discord-web.py "$1" "done" || python /app/discord-web.py "$1" "error"
     
-    #Give API some time to update after a success
-    sleep 50
+#    #Give API some time to update after a success
+#    sleep 50
 fi
 rm -R "$tempfolder"
