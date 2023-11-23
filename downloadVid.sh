@@ -63,7 +63,7 @@ fi
 #Download the video/audio (from the start), preferring VP9 codec
 ytarchiveOptions=$(python /app/getConfig.py "ytarchive_options")
 quality=$(python /app/getConfig.py "quality")
-ytarchive ${cookies:+--cookies "$cookies"} $ytarchiveOptions --error --output "$output" "https://www.youtube.com/watch?v=$1" "$quality" \
+ytarchive ${cookies:+--cookies "$cookies"} $ytarchiveOptions --quiet --output "$output" "https://www.youtube.com/watch?v=$1" "$quality" \
 && success="True" || (python /app/discord-web.py "$1" "error" ; kill -2 $chat_pid $info_pid)
 
 # Wait for all above processes to complete
