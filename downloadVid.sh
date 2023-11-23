@@ -79,7 +79,7 @@ if [[ "$success" == "True" ]]; then
     mkdir -p "$outfolder"
     sleep 10
     echo "Moving ${output}* to ${outfolder}"
-    mv -f "${output}*" "${outfolder}/" && python /app/discord-web.py "$1" "done" || python /app/discord-web.py "$1" "error"
+    mv -f "${output}"* "${outfolder}/" && python /app/discord-web.py "$1" "done" || python /app/discord-web.py "$1" "error"
     
     #Give API some time to update after a success
     sleep 50
