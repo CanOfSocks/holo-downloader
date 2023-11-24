@@ -1,6 +1,5 @@
 #!/usr/local/bin/python
 import yt_dlp
-import psutil
 import sys
 import threading
 import getConfig
@@ -187,24 +186,6 @@ def download_video_info(video_url):
     print("Output file: {0}".format(outputFile))
     return outputFile
 
-def is_script_running(script_name, id):
-    current = psutil.Process()
-    #print("PID: {0}, command line: {1}, argument: {2}".format(current.pid, current.cmdline(), current.cmdline()[2]))
-    current_pid = psutil.Process().pid
-    
-    for process in psutil.process_iter():
-        try:
-            process_cmdline = process.cmdline()
-            if (
-                process.pid != current_pid and
-                script_name in process_cmdline and
-                id in process_cmdline[2:]   # Needs testing on posix, ensures that path of script/python cannot be ID
-            ):
-                return True
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            pass
-    return False
-
 def main(id=None):
     script_name = sys.argv[0]
     # If id was no included as a variable, try and retrieve from sys args
@@ -216,13 +197,6 @@ def main(id=None):
     # If system args were also none, raise exception
     if id is None:
         raise Exception("No video ID provided, unable to continue")
-    
-    
-    if is_script_running(script_name, id):
-        print("{0} already running, exiting...".format(id))
-        #return 0
-        sys.exit(0)
-
     
     discord_web.main(id, "waiting")
     outputFile = download_video_info(id)
