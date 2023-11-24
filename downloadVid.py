@@ -166,6 +166,7 @@ def downloader(id,output):
     info_downloader.join()
     
     print("{0} finished successfully".format(id))
+    moveToFinal(output)
     discord_web.main(id, "done")
     return
 
