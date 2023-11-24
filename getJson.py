@@ -1,4 +1,7 @@
 import requests
+import psutil
+from sys import argv
+from subprocess import Popen
 #import json
 from datetime import datetime,timezone
 from config import channel_ids_to_match,look_ahead,title_filter,description_filter,members_only
@@ -129,39 +132,80 @@ def filtering(live):
     else:
         return False
 
-# List to store the matching live streams
-matching_streams = []
+def getStreams():
+    # List to store the matching live streams
+    matching_streams = []
 
-# Send an HTTP GET request to the URL
-response = requests.get(url)
+    # Send an HTTP GET request to the URL
+    response = requests.get(url)
 
-# Check if the request was successful (status code 200)
-if response.status_code == 200:
-    # Parse the JSON data from the response
-    data = response.json()
+    # Check if the request was successful (status code 200)
+    if response.status_code == 200:
+        # Parse the JSON data from the response
+        data = response.json()
 
-    videos = []
-    # Check if the "lives" key exists in the JSON data
-    if 'lives' in data:
-        # Add all videos to class list
-        for live in data['lives']:
-            videos.append(json_object(live))
-            
-        #Run for each class object made
-        for live in videos:            
-            # Check if the "channel_id" is in the dictionary
-            #print(live.channel_id)
-            if live.channel_id in channel_ids_to_match.values():
-                # Find the key (descriptive name) corresponding to the matched channel_id
-                #channel_name = [key for key, value in channel_ids_to_match.items() if value == channel_id][0]
+        videos = []
+        # Check if the "lives" key exists in the JSON data
+        if 'lives' in data:
+            # Add all videos to class list
+            for live in data['lives']:
+                videos.append(json_object(live))
                 
-                if(live.platform == "youtube"):
-                    #print(time_difference)
-                    if(live.time_until_start() <= look_ahead * 3600 and filtering(live) and membershipOnlyFilter(live)):
-                        matching_streams.append(live.video_id)
+            #Run for each class object made
+            for live in videos:            
+                # Check if the "channel_id" is in the dictionary
+                #print(live.channel_id)
+                if live.channel_id in channel_ids_to_match.values():
+                    # Find the key (descriptive name) corresponding to the matched channel_id
+                    #channel_name = [key for key, value in channel_ids_to_match.items() if value == channel_id][0]
+                    
+                    if(live.platform == "youtube"):
+                        #print(time_difference)
+                        if(live.time_until_start() <= look_ahead * 3600 and filtering(live) and membershipOnlyFilter(live)):
+                            matching_streams.append(live.video_id)
 
-# Print the list of matching streams as a JSON representation
-#matching_streams_json = json.dumps(matching_streams)
-bash_array = ' '.join(matching_streams)
-#print(matching_streams_json)
-print(bash_array)
+    # Print the list of matching streams as a JSON representation
+    #matching_streams_json = json.dumps(matching_streams)
+    bash_array = ' '.join(matching_streams)
+    #print(matching_streams_json)
+    #print(bash_array)
+
+    return matching_streams
+
+
+
+def isIDrunning(command_to_check):
+    for process in psutil.process_iter(['pid', 'cmdline']):
+        try:
+            process_cmdline = process.info['cmdline']
+            # Checks if downloadVid.py is running and if it is running with the same ID
+            if process_cmdline and process_cmdline[1] == command_to_check[1] and process_cmdline[2] == command_to_check[2]:
+                return True
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            pass
+    return False
+
+def main(command=None):
+    if(command == "spawn"):
+        for live in getStreams():
+            # command = ["python", "/app/downloadVid.py", live]
+            command = ["python", "A:/Users/uncle/Documents/Scripts/Holo/Python Only/downloadVid.py", live]
+            Popen(command)
+            #Popen(command, start_new_session=True)
+    elif(command == "bash"):
+        bash_array = ' '.join(getStreams())
+        print(bash_array)
+        return bash_array            
+    else:
+        streams = getStreams()
+        print(streams)
+        return streams
+
+
+if __name__ == "__main__":
+    try:
+        command = argv[1]
+    except IndexError:
+        command = None
+
+    main(command)
