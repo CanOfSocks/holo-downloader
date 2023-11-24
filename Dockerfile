@@ -1,4 +1,4 @@
-FROM python:3-slim
+FROM python:3-alpine
 
 RUN mkdir -p /app
 
@@ -6,11 +6,7 @@ RUN mkdir -p /app/temp
 
 RUN mkdir -p /app/Done
 
-RUN apt-get update && apt-get install --no-install-recommends sed bash wget zip unzip xz-utils procps cron -y -qq && apt clean -y
-
-RUN wget -q https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz && \
-         tar -C /usr/bin -xvf ffmpeg-master-latest-linux64-gpl.tar.xz --wildcards ffmpeg-master-latest-linux64-gpl/bin/* --strip-components 2 && \
-         rm ffmpeg-master-latest-linux64-gpl.tar.xz && chmod +x /usr/bin/ff*
+RUN apk add --no-cache ffmpeg unzip busybox wget bash
 
 ARG YTA_VERSION=latest
 
@@ -26,8 +22,11 @@ RUN chmod +x *.py *.sh
 
 RUN pip install -q --no-cache-dir -r requirements.txt
 
+#Remove unneeded packages
+RUN apk del unzip wget
+
 #Setup Crontab
 RUN chown -R root /app/crontab && chmod -R 0644 /app/crontab
 RUN crontab /app/crontab
 
-ENTRYPOINT [ "cron", "-f" ]
+ENTRYPOINT [ "crond", "-f" ]

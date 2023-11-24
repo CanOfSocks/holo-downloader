@@ -13,7 +13,9 @@ def getCookiesFile():
         
     if cookies is not None:
 #        out += " --cookies {0}".format(config.cookies_file)
-        out += config.cookies_file
+
+        # Get Cookies path with conversion for specific OS
+        out += str(Path(config.cookies_file))
     return out
 
 #For waiter
@@ -36,7 +38,8 @@ def get_ytdlp():
         output_folder = str(PurePath(output_folder,output_folder))
     
     #out += " -o {0}".format(output_folder)
-    out += output_folder
+    str(Path(config.cookies_file))
+    out += str(Path(output_folder))
     return out
 
 #Check if vidOnly
@@ -60,34 +63,42 @@ def getChat():
     return chat
     
 
-#Info to download
-def getInfo():
-    out = ""
-    #Check if video only
-    
-    if vid_Only():
-        return out
-    
+def getThumbnail():
     try:
         thumbnail = config.thumbnail
     except AttributeError:
         thumbnail = True
-    if thumbnail:
-        out += " --write-thumbnail --convert-thumbnails png"
-        
-    try:
-        info_json = config.info_json
-    except AttributeError:
-        info_json = True
-    if info_json:
-        out += " --write-info-json"
-        
+    return thumbnail
+def getDescription():
     try:
         description = config.description
     except AttributeError:
         description = True
-    if description:
-        out += " --write-description"
+    return description
+def getInfoJson():
+    try:
+        info_json = config.info_json
+    except AttributeError:
+        info_json = True
+    return info_json
+    
+#Info to download
+def getInfo():
+    out = []
+    #Check if video only
+    
+    if vid_Only():
+        return out    
+
+    if getThumbnail():
+        out += ["--write-thumbnail", "--convert-thumbnails", "png"]
+        
+    if getInfoJson():
+        out += ["--write-info-json"]
+        
+
+    if getDescription():
+        out += ["--write-description"]
         
     #out += getCookiesOptions()
     
@@ -102,20 +113,20 @@ def getMux():
     return mux_file
     
 def getYtarchiveOptions():
-    out = ""
+    out = []
     try:
         ytarchive_options = config.ytarchive_options
     except AttributeError:
         ytarchive_options = None
         
-    out += " " + ytarchive_options
+    out += ytarchive_options.split(' ')
     
     try:
         download_threads = config.download_threads
     except AttributeError:
         download_threads = 4
         
-    out += " --threads " + str(download_threads)
+    out += ["--threads", str(download_threads)]
     
     #Embed thumbnail?
     try:
@@ -123,10 +134,10 @@ def getYtarchiveOptions():
     except AttributeError:
         thumbnail = True
     if thumbnail:
-        out += " -t"
+        out += ["-t"]
     
     if not getMux():
-        out += " --write-mux-file"
+        out += ["--write-mux-file"]
        
     #out += getCookiesOptions()
         
@@ -141,24 +152,65 @@ def getQuality():
         pass
     return out
 
-function = argv[1]
+def getTempFolder():
+    out = "/app/temp/"  
+    try:
+        out = str(config.tempdir)
+    #Any issue, go to default of best
+    except Exception: 
+        pass
+    return out
 
-match function:
-    case "cookies":
-        #print(getCookiesOptions())
-        print(getCookiesFile())
-    case "yt-dlp_options":
-        print(get_ytdlp())
-    case "info_options":
-        print(getInfo())
-    case "get_chat":
-        print(getChat())
-    case "ytarchive_options":
-        print(getYtarchiveOptions())
-    case "mux_file":
-        print(getMux())
-    case "quality":
-        print(getQuality())
+def getDoneFolder():
+    out = "/app/Done/"   
+    try:
+        out = str(config.donedir)
+    #Any issue, go to default of best
+    except Exception: 
+        pass
+    return out
+
+def getTempOutputPath(output):
+    return Path(getTempFolder()) / Path(output)
+
+def getDoneOutputPath(output):
+    return Path(getDoneFolder()) / Path(output)
+
+def ytarchiveBuilder(id,output):
+    out = ["ytarchive", "--error"]
+    cookies = getCookiesFile()
+    if cookies:
+        out += ["--cookies", cookies]
+    outputFolder = getTempOutputPath(output)
+    out += ["--output", str(outputFolder)]
+    out.append("https://www.youtube.com/watch?v={0}".format(id))
+    out.append(getQuality())
+    return out
+
+def main(function):
+    match function:
+        case "cookies":
+            #print(getCookiesOptions())
+            print(getCookiesFile())
+        case "yt-dlp_options":
+            print(get_ytdlp())
+        case "info_options":
+            print(getInfo())
+        case "get_chat":
+            print(getChat())
+        case "ytarchive_options":
+            print(getYtarchiveOptions())
+        case "mux_file":
+            print(getMux())
+        case "quality":
+            print(getQuality())
         
+
+
+if __name__ == "__main__":
+    main(argv[1])
+
+
+
     
     
