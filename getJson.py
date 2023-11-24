@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 import requests
-import psutil
+
 from sys import argv
 from subprocess import Popen
 #import json
