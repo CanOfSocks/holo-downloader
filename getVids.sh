@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 lives=($(/app/getJson.py "bash"))
 
 echo "Getting: ${lives[*]}"
