@@ -26,7 +26,7 @@ RUN chmod +x *.py *.sh
 
 RUN pip install -q --no-cache-dir -r requirements.txt
 
-RUN apt-get purge -y wget unzip xz-utils tar perl-base gzip && apt-get autopurge -y
+RUN apt-get purge -y wget unzip xz-utils tar perl-base gzip && apt-get autopurge -y && apt clean -y
 
 #Setup Crontab
 RUN chown -R root /app/crontab && chmod -R 0644 /app/crontab
