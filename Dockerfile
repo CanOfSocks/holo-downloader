@@ -6,7 +6,7 @@ RUN mkdir -p /app/temp
 
 RUN mkdir -p /app/Done
 
-RUN apk add --no-cache ffmpeg unzip busybox wget build-base
+RUN apk add --no-cache ffmpeg unzip busybox wget build-base gcc
 
 ARG YTA_VERSION=latest
 
@@ -23,7 +23,7 @@ RUN chmod +x *.py
 RUN pip install -q --no-cache-dir -r requirements.txt
 
 #Remove unneeded packages
-RUN apk del unzip wget build-base
+RUN apk del unzip wget build-base gcc
 
 #Setup Crontab
 RUN chown -R root /app/crontab && chmod -R 0644 /app/crontab
