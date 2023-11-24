@@ -1,3 +1,4 @@
+#!/usr/local/bin/python
 import requests
 import psutil
 from sys import argv
