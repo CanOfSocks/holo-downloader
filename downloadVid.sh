@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 PROCESS_NAME=$(basename "$0")
 # Check if a process with the same script name is already running
