@@ -156,7 +156,6 @@ def downloader(id,output):
         result = subprocess.run(ytarchiveCMD, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
     except subprocess.CalledProcessError as e:
         print(e.stderr)
-        e.returncode, e.stderr
         discord_web.main(id, "error")
         raise Exception(("Error downloading video: {0}, Code: {1}".format(id, e.returncode)))
         return
@@ -177,8 +176,7 @@ def download_video_info(video_url):
         'outtmpl': getConfig.get_ytdlp(),
         'cookiefile': getConfig.getCookiesFile(),        
         'quiet': True,
-        'no_warnings': True
-        
+        'no_warnings': True       
     }
 
     with yt_dlp.YoutubeDL(options) as ydl:
