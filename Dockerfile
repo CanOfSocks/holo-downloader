@@ -20,7 +20,7 @@ WORKDIR /app
 
 COPY . .
 
-RUN chmod +x *.py *.sh
+RUN chmod +x *.py
 
 RUN pip install -q --no-cache-dir -r requirements.txt
 
