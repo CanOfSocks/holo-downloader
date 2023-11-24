@@ -30,4 +30,4 @@ RUN pip install -q --no-cache-dir -r requirements.txt
 RUN chown -R root /app/crontab && chmod -R 0644 /app/crontab
 RUN crontab /app/crontab
 
-ENTRYPOINT [ "crond", "-f" ]
+ENTRYPOINT [ "cron", "-f" ]
