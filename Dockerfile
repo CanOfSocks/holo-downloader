@@ -6,13 +6,15 @@ RUN mkdir -p /app/temp
 
 RUN mkdir -p /app/Done
 
-RUN apk add --no-cache ffmpeg unzip cron -y -qq && apt clean -y
+RUN apk add --no-cache ffmpeg unzip cron wget -y
 
 ARG YTA_VERSION=latest
 
 RUN wget -q "https://github.com/Kethsar/ytarchive/releases/download/${YTA_VERSION}/ytarchive_linux_amd64.zip" && \
          unzip ytarchive_linux_amd64.zip -d /usr/bin && chmod +x /usr/bin/ytarchive && \
          rm ytarchive_linux_amd64.zip
+
+RUN apk del unzip wget
 
 WORKDIR /app
 
