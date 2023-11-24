@@ -1,8 +1,7 @@
 PATH=/app:/usr/local/bin:/usr/bin
 SHELL=/bin/sh
 #BASH_ENV=/root/project_env.sh
-*/2 * * * * /app/getJson.py "spawn" > /proc/1/fd/1 2>/proc/1/fd/2
+*/2 * * * * /app/getVids.sh > /proc/1/fd/1 2>/proc/1/fd/2
 
 @reboot /app/discord_web.py "0" "starting"
 
-*/10 * * * * /app/cleanupZombies.sh
