@@ -33,14 +33,14 @@ def moveToFinal(output):
     # List all files in the source folder
     src_path = source.parent
     files = src_path.glob('*')
-
     for file_path in files:
+        print("Moving: {0}".format(file_path))
         # Build the destination path
         dest_file_path = dest_path / file_path.name
 
         # Move the file
         file_path.rename(dest_file_path)
-        #print(f"Moved: {file_path.name}")
+        print("Moved {0} to {1}".format(file_path.name, dest_file_path))
     #Clean empty folders
     delete_empty_folders(src_path)
 
@@ -140,7 +140,8 @@ def downloader(id,output):
     if id is None or output is None:
         raise Exception(("Unable to retrieve information about video {0}".format(id)))
     #outputFile = "{0}{1}".format(getConfig.getTempFolder(),output)
-      
+    output = str(getConfig.getTempOutputPath(output))
+    
     # Start additional information downloaders
     discord_notify = threading.Thread(target=discord_web.main, args=(id, "recording"), daemon=True)
     chat_downloader = threading.Thread(target=download_chat, args=(id,output), daemon=True)
