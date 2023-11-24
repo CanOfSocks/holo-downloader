@@ -2,9 +2,9 @@ name: Docker Image CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "alpine" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "alpine" ]
 
 jobs:
 
@@ -15,6 +15,6 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag canofsocks/holo-downloader:latest
+      run: docker build . --file Dockerfile --tag canofsocks/holo-downloader:alpine
     - name: Push the Docker Image
-      run: docker login -u canofsocks -p ${{ secrets.DOCKER_TOKEN }} && docker push canofsocks/holo-downloader:latest
+      run: docker login -u canofsocks -p ${{ secrets.DOCKER_TOKEN }} && docker push canofsocks/holo-downloader:alpine
