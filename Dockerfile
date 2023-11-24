@@ -29,4 +29,4 @@ RUN apk del unzip wget
 RUN chown -R root /app/crontab && chmod -R 0644 /app/crontab
 RUN crontab /app/crontab
 
-ENTRYPOINT [ "crond", "-f" ]
+ENTRYPOINT [ "cron", "-f" ]
