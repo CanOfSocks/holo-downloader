@@ -6,7 +6,7 @@ RUN mkdir -p /app/temp
 
 RUN mkdir -p /app/Done
 
-RUN apt-get update && apt-get install --no-install-recommends wget unzip procps cron -y -qq && apt clean -y
+RUN apt-get update && apt-get install --no-install-recommends wget unzip xz-utils procps cron -y -qq && apt clean -y
 
 RUN wget -q https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz && \
          tar -C /usr/bin -xvf ffmpeg-master-latest-linux64-gpl.tar.xz --wildcards ffmpeg-master-latest-linux64-gpl/bin/ffmpeg --strip-components 2 && \
