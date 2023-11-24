@@ -10,3 +10,4 @@ if [ "$COUNT" -gt 2 ]; then
     exit 0
 fi
 python /app/downloadVid.py "$1"
+wait
