@@ -89,7 +89,9 @@ def download_chat(id,outputFile):
                     return 0
                 except:
                     print("Compressing chat for {0} failed".format(id))
-                    return 2               
+                    return 2    
+            except:
+                print("Downloading chat for {0} failed".format(id))
     return 0
 
 def replace_ip_in_json(file_name):
