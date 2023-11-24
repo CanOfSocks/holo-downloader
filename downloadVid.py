@@ -47,15 +47,16 @@ def moveToFinal(output):
 
 def compressChat(output):
     import zipfile
-    input_path = Path("{0}.live_chat.json".format(output))
-    output_path = Path("{0}.live_chat.zip".format(output))
+    input_path = Path("{0}.live_chat.json".format(getConfig.getTempOutputPath(output)))
+    output_path = Path("{0}.live_chat.zip".format(getConfig.getTempOutputPath(output)))
 
     try:
         with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as zipf:
-            zipf.write(input_path)
+            zipf.write(input_path, arcname=input_path.name)
         input_path.unlink()
         
     except Exception as e:
+        print(e)
         raise Exception(("Unable to compress chat for id: {0}".format(id)))        
 
 def chatBuilder(id, outputFile, useCookies=True):
@@ -63,8 +64,8 @@ def chatBuilder(id, outputFile, useCookies=True):
     cookies = getConfig.getCookiesFile()
     if cookies and useCookies:
         out += ["--cookies", cookies]
-    out.append("https://www.youtube.com/watch?v={0}".format(id))
     out += ["-o", "{0}.live_chat.json".format(getConfig.getTempOutputPath(outputFile))]
+    out.append("https://www.youtube.com/watch?v={0}".format(id))
     return out
 
 def download_chat(id,outputFile):
@@ -80,7 +81,7 @@ def download_chat(id,outputFile):
         else:
             #If fail, try use without cookies
             print("Failed to run chatdownloader for {0} with cookies, trying without...".format(id))
-            chatRunner = subprocess.call(chatBuilder(id, outputFile, False))
+            chatRunner = subprocess.call(chatBuilder(id, outputFile), stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
             if(chatRunner == 0):            
                 try:
                     compressChat(outputFile)
@@ -144,8 +145,8 @@ def downloader(id,output):
       
     # Start additional information downloaders
     discord_notify = threading.Thread(target=discord_web.main, args=(id, "recording"), daemon=True)
-    chat_downloader = threading.Thread(target=download_chat, args=(id,output,), daemon=True)
-    info_downloader = threading.Thread(target=download_info, args=(id,output,), daemon=True)
+    chat_downloader = threading.Thread(target=download_chat, args=(id,output), daemon=True)
+    info_downloader = threading.Thread(target=download_info, args=(id,output), daemon=True)
     discord_notify.start()
     chat_downloader.start()
     info_downloader.start()
@@ -158,7 +159,10 @@ def downloader(id,output):
     ytarchive_return = subprocess.call(ytarchiveCMD, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     if(ytarchive_return != 0):
         discord_web.main(id, "error")
+        sleep(2)
+        discord_notify.terminate()
         raise Exception(("Error downloading video: {0}".format(id)))
+        return
     # Wait for remaining processes
     discord_notify.join()
     chat_downloader.join()
