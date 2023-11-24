@@ -191,7 +191,7 @@ def main(command=None):
         for live in getStreams():
             command = ["/app/downloadVid.py", live]
             #Popen(command)
-            Popen(command, start_new_session=True, shell=True)
+            Popen(command, start_new_session=True)
     elif(command == "bash"):
         bash_array = ' '.join(getStreams())
         print(bash_array)
