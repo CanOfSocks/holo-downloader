@@ -1,4 +1,4 @@
-#!/usr/local/bin/python
+
 import yt_dlp
 import sys
 import threading
