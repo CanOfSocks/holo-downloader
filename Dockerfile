@@ -6,7 +6,7 @@ RUN mkdir -p /app/temp
 
 RUN mkdir -p /app/Done
 
-RUN apk add --no-cache ffmpeg unzip cron wget
+RUN apk add --no-cache ffmpeg unzip busybox wget
 
 ARG YTA_VERSION=latest
 
