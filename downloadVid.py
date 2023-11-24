@@ -70,26 +70,21 @@ def download_chat(id,outputFile):
     if getConfig.getChat() and not getConfig.vid_Only():        
         try:
             chatRunner = subprocess.run(chatBuilder(id, outputFile), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
-            try:
-                compressChat(outputFile)
-                return 0
-            except:
-                print("Compressing chat for {0} failed".format(id))
-                return 2
+            
         except subprocess.CalledProcessError as e:
             print(e.stderr)
             #If fail, try use without cookies
             print("Failed to run chatdownloader for {0} with cookies, trying without...".format(id))
             try:
-                chatRunner = subprocess.run(chatBuilder(id, outputFile, False), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
-                try:
-                    compressChat(outputFile)
-                    return 0
-                except:
-                    print("Compressing chat for {0} failed".format(id))
-                    return 2    
+                chatRunner = subprocess.run(chatBuilder(id, outputFile, False), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)   
             except:
                 print("Downloading chat for {0} failed".format(id))
+        try:
+            compressChat(outputFile)
+            return 0
+        except:
+            print("Compressing chat for {0} failed".format(id))
+            return 2 
     return 0
 
 def replace_ip_in_json(file_name):
