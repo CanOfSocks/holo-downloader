@@ -17,11 +17,9 @@ def delete_empty_folders(path):
     for dir_path in path.rglob('*'):
         # Check if the current path is a directory
         if dir_path.is_dir() and not any(dir_path.iterdir()):
-            # Check if it's the top-level directory passed to the function
-            if dir_path == path:
-                dir_path.rmdir()  # Delete the top-level directory if it's empty
-            else:
-                dir_path.rmdir()  # Delete other empty directories
+            # Remove directory if empty
+            print("Removing path: {0}".format(dir_path))
+            dir_path.rmdir()
 
 def moveToFinal(output):
     source = getConfig.getTempOutputPath(output)
@@ -33,6 +31,7 @@ def moveToFinal(output):
     # List all files in the source folder
     src_path = source.parent
     files = src_path.glob('*')
+
     for file_path in files:
         print("Moving: {0}".format(file_path))
         # Build the destination path
@@ -42,7 +41,7 @@ def moveToFinal(output):
         file_path.rename(dest_file_path)
         print("Moved {0} to {1}".format(file_path.name, dest_file_path))
     #Clean empty folders
-    delete_empty_folders(src_path)
+    delete_empty_folders(Path(getConfig.getTempFolder()))
 
 def compressChat(output):
     import zipfile
