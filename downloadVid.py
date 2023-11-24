@@ -189,7 +189,7 @@ def download_video_info(video_url):
 
 def is_script_running(script_name, id):
     current = psutil.Process()
-    print("PID: {0}, command line: {1}, argument: {2}".format(current.pid, current.cmdline(), current.cmdline()[2]))
+    #print("PID: {0}, command line: {1}, argument: {2}".format(current.pid, current.cmdline(), current.cmdline()[2]))
     current_pid = psutil.Process().pid
     
     for process in psutil.process_iter():
