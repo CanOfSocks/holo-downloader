@@ -70,29 +70,26 @@ def chatBuilder(id, outputFile, useCookies=True):
 
 def download_chat(id,outputFile):
     if getConfig.getChat() and not getConfig.vid_Only():        
-        chatRunner = subprocess.call(chatBuilder(id, outputFile), stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-        if(chatRunner == 0):            
+        try:
+            chatRunner = subprocess.run(chatBuilder(id, outputFile), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
             try:
                 compressChat(outputFile)
                 return 0
             except:
                 print("Compressing chat for {0} failed".format(id))
                 return 2
-        else:
+        except subprocess.CalledProcessError as e:
+            print(e.stderr)
             #If fail, try use without cookies
             print("Failed to run chatdownloader for {0} with cookies, trying without...".format(id))
-            chatRunner = subprocess.call(chatBuilder(id, outputFile), stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-            if(chatRunner == 0):            
+            try:
+                chatRunner = subprocess.run(chatBuilder(id, outputFile, False), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
                 try:
                     compressChat(outputFile)
                     return 0
                 except:
                     print("Compressing chat for {0} failed".format(id))
-                    return 2
-            else:
-                print("Downloading chat for {0} failed".format(id))
-            return 1
-        
+                    return 2               
     return 0
 
 def replace_ip_in_json(file_name):
@@ -155,13 +152,13 @@ def downloader(id,output):
     ytarchiveCMD = getConfig.ytarchiveBuilder(id,output)
     
     print("ytarchive for {0} starting with {1}".format(id,ytarchiveCMD))
-    
-    ytarchive_return = subprocess.call(ytarchiveCMD, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-    if(ytarchive_return != 0):
+    try:
+        result = subprocess.run(ytarchiveCMD, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    except subprocess.CalledProcessError as e:
+        print(e.stderr)
+        e.returncode, e.stderr
         discord_web.main(id, "error")
-        sleep(2)
-        discord_notify.terminate()
-        raise Exception(("Error downloading video: {0}".format(id)))
+        raise Exception(("Error downloading video: {0}, Code: {1}".format(id, e.returncode)))
         return
     # Wait for remaining processes
     discord_notify.join()
