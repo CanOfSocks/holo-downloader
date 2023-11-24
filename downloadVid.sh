@@ -1,5 +1,13 @@
 #!/bin/bash
 
+cleanup_zombies() {
+    echo "Cleaning up zombies..."
+    kill -s SIGCHLD $$
+}
+
+# Register the cleanup function to be called on receiving SIGCHLD
+trap 'cleanup_zombies' SIGCHLD
+
 PROCESS_NAME=$(basename "$0")
 # Check if a process with the same script name is already running
 COUNT=$(pgrep -f "$PROCESS_NAME $1" | wc -l)
