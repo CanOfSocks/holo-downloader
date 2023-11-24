@@ -8,4 +8,4 @@ if [ "$COUNT" -gt 1 ]; then
     return 0
     exit
 fi
-/app/downloadVid.py "$1"
+python /app/downloadVid.py "$1"
