@@ -219,7 +219,7 @@ def main(id=None):
     
     if is_script_running(script_name, id):
         print("{0} already running, exiting...".format(id))
-        return 0
+        #return 0
         sys.exit(0)
 
     
