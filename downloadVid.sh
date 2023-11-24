@@ -5,7 +5,7 @@ PROCESS_NAME=$(basename "$0")
 COUNT=$(pgrep -f "$PROCESS_NAME $1" | wc -l)
 
 # If more than one instance of the script, it is already running, so exit
-if [ "$COUNT" -gt 1 ]; then
+if [ "$COUNT" -gt 2 ]; then
     echo "Downloader for $1 is already running, exiting... Count=$COUNT"
     exit 0
 fi
