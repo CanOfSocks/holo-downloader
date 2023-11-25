@@ -132,11 +132,11 @@ def download_info(id,outputFile):
             return 1
     return 0
 
-def downloader(id,output):
-    if id is None or output is None:
+def downloader(id,outputTemplate):
+    if id is None or outputTemplate is None:
         raise Exception(("Unable to retrieve information about video {0}".format(id)))
     #outputFile = "{0}{1}".format(getConfig.getTempFolder(),output)
-    output = str(getConfig.getTempOutputPath(output))
+    output = str(getConfig.getTempOutputPath(outputTemplate))
     
     # Start additional information downloaders
     discord_notify = threading.Thread(target=discord_web.main, args=(id, "recording"), daemon=True)
@@ -163,7 +163,7 @@ def downloader(id,output):
     info_downloader.join()
     
     print("{0} finished successfully".format(id))
-    moveToFinal(output)
+    moveToFinal(outputTemplate)
     discord_web.main(id, "done")
     return
 
