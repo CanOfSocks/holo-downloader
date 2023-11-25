@@ -22,6 +22,7 @@ def delete_empty_folders(path):
             dir_path.rmdir()
 
 def moveToFinal(output):
+    from shutil import move
     source = getConfig.getTempOutputPath(output)
     dest = getConfig.getDoneOutputPath(output)
     # Ensure the destination folder exists
@@ -31,15 +32,16 @@ def moveToFinal(output):
     # List all files in the source folder
     src_path = source.parent
     files = src_path.glob('*')
+    print("Moving all {0} to {1}".format(source, dest))
 
     for file_path in files:
-        print("Moving: {0}".format(file_path))
         # Build the destination path
         dest_file_path = dest_path / file_path.name
 
         # Move the file
-        file_path.rename(dest_file_path)
-        print("Moved {0} to {1}".format(file_path.name, dest_file_path))
+        #file_path.rename(dest_file_path)
+        move(file_path, dest_file_path)
+        
     #Clean empty folders
     delete_empty_folders(Path(getConfig.getTempFolder()))
 
