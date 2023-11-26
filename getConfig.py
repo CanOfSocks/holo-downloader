@@ -178,6 +178,7 @@ def getDoneOutputPath(output):
 
 def ytarchiveBuilder(id,output):
     out = ["ytarchive", "--error"]
+    out += getYtarchiveOptions()
     cookies = getCookiesFile()
     if cookies:
         out += ["--cookies", cookies]
