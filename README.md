@@ -65,17 +65,17 @@ output_folder = "%(channel)s/[%(upload_date)s] %(fulltitle)s - %(channel)s (%(id
 ```
 
 ### Other
-⋅⋅* ```webhook_url``` - Discord webhook url for Discord integration, disables if None
-⋅⋅* ```mux_file``` - Tells ytarchive whether to combine the videos with ffmpeg after downloading, or leave the ts files with the mux command saves in a txt file
-⋅⋅* ```download_threads``` - Sets the number of threads ytarchive will use to download videos
-⋅⋅* ```ytarchive_options``` - Any commands added to this string will be parsed to ytarchive at runtime
-⋅⋅* ```video_quality``` - Sets video quality
-⋅⋅* ```video_only``` - When set to true, only the video is downloaded. Any other items (chat, thumbnail etc.) will not be downloaded
-⋅⋅* ```download_chat``` - Downloads chat if True
-⋅⋅* ```thumbnail``` - Downloads thumbnail to file as PNG
-⋅⋅* ```info_json``` - Saves the info_json as a file if True
-⋅⋅* ```description``` - Writes description file if True
-⋅⋅* ```cookies_file``` - Absolute path for cookies file. This is required for membership and age-restricted streams. If you are using Docker, you should leave this as the default ```"/app/cookies.txt"``` and create a mapping for the container instead.
+* ```webhook_url``` - Discord webhook url for Discord integration, disables if None
+* ```mux_file``` - Tells ytarchive whether to combine the videos with ffmpeg after downloading, or leave the ts files with the mux command saves in a txt file
+* ```download_threads``` - Sets the number of threads ytarchive will use to download videos
+* ```ytarchive_options``` - Any commands added to this string will be parsed to ytarchive at runtime
+* ```video_quality``` - Sets video quality
+* ```video_only``` - When set to true, only the video is downloaded. Any other items (chat, thumbnail etc.) will not be downloaded
+* ```download_chat``` - Downloads chat if True
+* ```thumbnail``` - Downloads thumbnail to file as PNG
+* ```info_json``` - Saves the info_json as a file if True
+* ```description``` - Writes description file if True
+* ```cookies_file``` - Absolute path for cookies file. This is required for membership and age-restricted streams. If you are using Docker, you should leave this as the default ```"/app/cookies.txt"``` and create a mapping for the container instead.
 
 ### To-Do
 While some components have been marked as added, testing of full functionalility may be required
