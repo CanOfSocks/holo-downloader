@@ -59,15 +59,15 @@ For the output templates, consult [yt-dlp documentation](https://github.com/yt-d
 The ```output_folder``` contains the parent folder and names for children within that folder. 
 This is required to have a depth >= 2 and the parent should be an option that will be unique to the video, such as %(fulltitle)s/%(fulltitle)s. If the depth is 1, the name will be duplicated to make a parent folder, for example ```output_folder = %(fulltitle)s``` will result in a structure of ```%(fulltitle)s/%(fulltitle)s``` in the output. This allows the easy movement of all resulting files from the temporary directory to the final directory.
 
-A good example for this program is:
+A **good and recommended** example for this program is:
 ```
 output_folder = "%(channel)s/[%(upload_date)s] %(fulltitle)s - %(channel)s (%(id)s)/[%(upload_date)s] %(fulltitle)s - %(channel)s (%(id)s)"
 ```
 
 ### Other
 * ```webhook_url``` - Discord webhook url for Discord integration, disables if None
-* ```mux_file``` - Tells ytarchive whether to combine the videos with ffmpeg after downloading, or leave the ts files with the mux command saves in a txt file
-* ```download_threads``` - Sets the number of threads ytarchive will use to download videos
+* ```mux_file``` - Tells ytarchive whether to combine the videos with ffmpeg after downloading, or leave the ts files with the mux command saved in a txt file
+* ```download_threads``` - Sets the number of threads ytarchive will use to download videos. Default 4
 * ```ytarchive_options``` - Any commands added to this string will be parsed to ytarchive at runtime
 * ```video_quality``` - Sets video quality
 * ```video_only``` - When set to true, only the video is downloaded. Any other items (chat, thumbnail etc.) will not be downloaded
