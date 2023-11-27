@@ -55,5 +55,8 @@ look_ahead = 48
 
 # Cookies file location relative to inside the container
 cookies_file = "/app/cookies.txt"
-tempdir = '/app/temp'
-donedir = '/app/Done'
+
+# Temporary and final directory
+# Don't change for container version
+tempdir = '/app/temp/'
+donedir = '/app/Done/'
