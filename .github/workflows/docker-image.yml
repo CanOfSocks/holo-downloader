@@ -15,6 +15,6 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag canofsocks/holo-downloader:debian-slim
+      run: docker build . --file Dockerfile --tag canofsocks/holo-downloader:latest
     - name: Push the Docker Image
-      run: docker login -u canofsocks -p ${{ secrets.DOCKER_TOKEN }} && docker push canofsocks/holo-downloader:debian-slim
+      run: docker login -u canofsocks -p ${{ secrets.DOCKER_TOKEN }} && docker push canofsocks/holo-downloader:latest
