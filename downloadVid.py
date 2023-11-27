@@ -187,7 +187,7 @@ def download_video_info(video_url):
 
 def is_script_running(script_name, id):
     current = psutil.Process()
-    print("PID: {0}, command line: {1}, argument: {2}".format(current.pid, current.cmdline(), current.cmdline()[2:]))
+    #print("PID: {0}, command line: {1}, argument: {2}".format(current.pid, current.cmdline(), current.cmdline()[2:]))
     current_pid = psutil.Process().pid
     
     for process in psutil.process_iter():
@@ -215,7 +215,7 @@ def main(id=None):
     if id is None:
         raise Exception("No video ID provided, unable to continue")
     if is_script_running(script_name, id):
-        print("{0} already running, exiting...".format(id))
+        #print("{0} already running, exiting...".format(id))
         return 0
     
     discord_web.main(id, "waiting")
