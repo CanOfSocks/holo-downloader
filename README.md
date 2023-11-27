@@ -10,7 +10,7 @@ This program get the video, thumbnail, description, live chat and info.json file
 
 It also incorperates Discord Webhooks for status monitoring.
 
-Please check out [Hoshinova](https://github.com/HoloArchivists/hoshinova) or [auto-ytarchive-raw](https://github.com/Spicadox/auto-ytarchive-raw/) for more advanced and customisable solutions, especially if you don't need a temporary folder and/or want only the video file.
+Please check out [Hoshinova](https://github.com/HoloArchivists/hoshinova) or [auto-ytarchive-raw](https://github.com/Spicadox/auto-ytarchive-raw/) for more advanced and/or customisable solutions, especially if you don't need a temporary folder and/or want only the video file.
 
 Requires [ytarchive](https://github.com/Kethsar/ytarchive) and [ffmpeg](https://ffmpeg.org/)
 
