@@ -189,7 +189,7 @@ def isIDrunning(command_to_check):
 def main(command=None):
     if(command == "spawn"):
         for live in getStreams():
-            command = ["/app/downloadVid.py", live]
+            command = ["python", "/app/downloadVid.py", live]
             #Popen(command)
             Popen(command, start_new_session=True)
     elif(command == "bash"):
