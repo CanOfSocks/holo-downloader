@@ -48,8 +48,13 @@ def moveToFinal(output):
 
 def compressChat(output):
     import zipfile
+    partPath = Path("{0}.live_chat.json.part".format(getConfig.getTempOutputPath(output)))
     input_path = Path("{0}.live_chat.json".format(getConfig.getTempOutputPath(output)))
     output_path = Path("{0}.live_chat.zip".format(getConfig.getTempOutputPath(output)))
+
+    if partPath.exists():
+        from shutil import move
+        move(partPath,input_path)
 
     try:
         with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as zipf:
@@ -68,6 +73,25 @@ def chatBuilder(id, outputFile, useCookies=True):
     out += ["-o", "{0}.live_chat.json".format(getConfig.getTempOutputPath(outputFile))]
     out.append("https://www.youtube.com/watch?v={0}".format(id))
     return out
+    
+def download_chat_ytdlp(video_url,outputFile):    
+    options = {
+        'wait_for_video': (1,15),
+        'retries': 25,
+        'skip_download': True,
+        'outtmpl': getConfig.get_ytdlp(),
+        'cookiefile': getConfig.getCookiesFile(),        
+        'quiet': True,
+        'no_warnings': True,
+        'writesubtitles': True,
+        'subtitleslangs': ['livechat'],
+        'subtitlesformat': 'json',
+        'live_from_start': True       
+    }
+
+    with yt_dlp.YoutubeDL(options) as ydl:
+        ydl.download(url)
+    return 0
 
 def download_chat(id,outputFile):
     if getConfig.getChat() and not getConfig.vid_Only():        
@@ -81,7 +105,11 @@ def download_chat(id,outputFile):
             try:
                 chatRunner = subprocess.run(chatBuilder(id, outputFile, False), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)   
             except:
-                print("Downloading chat for {0} failed".format(id))
+                print("Downloading chat for {0} failed, trying once more with yt-dlp".format(id))
+                try:
+                    download_chat_ytdlp(video_url,outputFile)
+                except:
+                    print("Downloading chat for {0} failed".format(id))
         try:
             compressChat(outputFile)
             return 0
@@ -120,7 +148,8 @@ def download_info(id,outputFile):
         'outtmpl': str(getConfig.getTempOutputPath(outputFile)),
         'cookiefile': getConfig.getCookiesFile(),        
         'quiet': True,
-        'no_warnings': True,        
+        'no_warnings': True,
+        'live_from_start': True,
     }
     url = 'https://www.youtube.com/watch?v={0}'.format(id)
     with yt_dlp.YoutubeDL(options) as ydl:
