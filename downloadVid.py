@@ -116,6 +116,7 @@ def download_chat(id,outputFile):
                         return 2 
                 except:
                     print("Downloading chat for {0} failed".format(id))
+                    return 1
         try:
             compressChat(outputFile)
             return 0
