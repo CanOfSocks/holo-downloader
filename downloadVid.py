@@ -108,6 +108,12 @@ def download_chat(id,outputFile):
                 print("Downloading chat for {0} failed, trying once more with yt-dlp".format(id))
                 try:
                     download_chat_ytdlp(video_url,outputFile)
+                    try:
+                        compressChat(outputFile)
+                        return 0
+                    except:
+                        print("Compressing chat for {0} failed".format(id))
+                        return 2 
                 except:
                     print("Downloading chat for {0} failed".format(id))
         try:
