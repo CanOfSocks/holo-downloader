@@ -26,6 +26,9 @@ RUN chmod +x *.py
 
 RUN pip install -q --no-cache-dir -r requirements.txt
 
+#Apply chat_downloader patch
+RUN sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" /usr/local/lib/python*/site-packages/chat_downloader/sites/youtube.py
+
 RUN apt-get purge -y wget unzip xz-utils && apt-get autopurge -y && apt clean -y
 
 #Setup Crontab
