@@ -202,7 +202,7 @@ def torrentBuilder(output, folder):
         options += config.torrentOptions
     except AttributeError:
         pass
-    options += ['-o', str(output)]
+    options += ['-o', "{0}.torrent".format(str(output))]
     options += [str(folder)]
     return options
         
