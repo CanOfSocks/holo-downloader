@@ -188,6 +188,25 @@ def ytarchiveBuilder(id,output):
     out.append(getQuality())
     return out
 
+def getTorrent():
+    getTorrent = True
+    try:
+        getTorrent = config.torrent
+    except AttributeError:
+        pass
+    return getTorrent
+
+def torrentBuilder(output, folder):
+    options = ['py3createtorrent']
+    try:
+        options += config.torrentOptions
+    except AttributeError:
+        pass
+    options += ['-o', output]
+    options += folder
+    return options
+        
+
 def main(function):
     match function:
         case "cookies":

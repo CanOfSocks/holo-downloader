@@ -13,6 +13,11 @@ from time import sleep
 #id = "kJGsWORSg-4"
 #outputFile = None
 
+def createTorrent(output):
+    if not getConfig.getTorrent():
+        return
+    folder = getConfig.getTempOutputPath(output).parent
+    torrentRunner = subprocess.run(getConfig.torrentBuilder(output,folder), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
 def delete_empty_folders(path):
     # Iterate through all files and directories in the specified directory
     for dir_path in path.rglob('*'):
@@ -90,7 +95,7 @@ def download_chat_ytdlp(video_url,outputFile):
     }
 
     with yt_dlp.YoutubeDL(options) as ydl:
-        ydl.download(url)
+        ydl.download(video_url)
     return 0
 
 def download_chat(id,outputFile):
@@ -107,7 +112,7 @@ def download_chat(id,outputFile):
             except:
                 print("Downloading chat for {0} failed, trying once more with yt-dlp".format(id))
                 try:
-                    download_chat_ytdlp(video_url,outputFile)
+                    download_chat_ytdlp(id,outputFile)
                     try:
                         compressChat(outputFile)
                         return 0
@@ -200,6 +205,7 @@ def downloader(id,outputTemplate):
     info_downloader.join()
     
     print("{0} finished successfully".format(id))
+    createTorrent(outputTemplate)
     moveToFinal(outputTemplate)
     discord_web.main(id, "done")
     return

@@ -56,6 +56,14 @@ look_ahead = 48
 # Cookies file location relative to inside the container
 cookies_file = "/app/cookies.txt"
 
+### Torrent options
+torrent = True
+
+torrentOptions = [
+    '-t', 'udp://tracker.holopirates.moe:1337/announce'
+    '-c', 'CanOfSocks'
+]
+
 # Temporary and final directory
 # Don't change for container version
 tempdir = '/app/temp/'
