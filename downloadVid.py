@@ -17,7 +17,9 @@ def createTorrent(output):
     if not getConfig.getTorrent():
         return
     folder = getConfig.getTempOutputPath(output).parent
+    
     torrentRunner = subprocess.run(getConfig.torrentBuilder(output,folder), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        
 def delete_empty_folders(path):
     # Iterate through all files and directories in the specified directory
     for dir_path in path.rglob('*'):
@@ -203,9 +205,16 @@ def downloader(id,outputTemplate):
     discord_notify.join()
     chat_downloader.join()
     info_downloader.join()
-    
+        
+    try:
+        createTorrent(outputTemplate)
+    except subprocess.CalledProcessError as e:
+        print(e.stderr)
+        discord_web.main(id, "error")
+        raise Exception(("Error creating torrent for video: {0}, Code: {1}".format(id, e.returncode)))
+        return
+        
     print("{0} finished successfully".format(id))
-    createTorrent(outputTemplate)
     moveToFinal(outputTemplate)
     discord_web.main(id, "done")
     return
