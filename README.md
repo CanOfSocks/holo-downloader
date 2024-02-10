@@ -89,6 +89,7 @@ While some components have been marked as added, testing of full functionalility
 - [x] Title filtering
 - [x] Description filtering
 - [x] Membership only filtering
+- [x] Automatic torrent creation
 - [ ] Configurable checking frequency
 - [ ] Improve error detection
-- [ ] ytarchive-raw integration (maybe)
+- [ ] ytarchive-raw integration
