@@ -16,7 +16,7 @@ from time import sleep
 def createTorrent(output):
     if not getConfig.getTorrent():
         return
-    folder = getConfig.getTempOutputPath(output).parent
+    folder = Path(output).parent
     
     torrentRunner = subprocess.run(getConfig.torrentBuilder(output,folder), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
         
