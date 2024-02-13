@@ -1,4 +1,4 @@
-def get_upcoming_or_live_videos(channel_id):
+def getUpcomingOrLiveVideos(channel_id):
     import getConfig
     import yt_dlp
     ydl_opts = {
