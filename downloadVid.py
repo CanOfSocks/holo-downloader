@@ -16,9 +16,10 @@ from time import sleep
 def createTorrent(output):
     if not getConfig.getTorrent():
         return
-    folder = getConfig.getTempOutputPath(output).parent
+    fullPath = getConfig.getTempOutputPath(output)
+    folder = Path(fullPath).parent
     
-    torrentRunner = subprocess.run(getConfig.torrentBuilder(output,folder), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    torrentRunner = subprocess.run(getConfig.torrentBuilder(fullPath,folder), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
         
 def delete_empty_folders(path):
     # Iterate through all files and directories in the specified directory
