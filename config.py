@@ -17,7 +17,6 @@ description_filter = {
 
 members_only ={
     "Gawr Gura Ch. hololive-EN": "UCoSrY_IQQVpmIRZ9Xf-y93g",
-    "Mori Calliope Ch. hololive-EN": "UCL_qhgtOy0dy1Agp8vkySQg"
 }
 
 webhook_url = "https://discord.com/api/webhooks/xxxxxxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyy"

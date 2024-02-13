@@ -17,8 +17,8 @@ def send_webhook(url, id="Unknown", status="error"):
     elif(status=="membership-error"):
         title = "Membership error"
         color="ff0000"
-        embed = DiscordEmbed(title, description="Error checking membership streams for [{0}](www.youtube.com/channel/{0}). Check cookies".format(id), color=color)
-        embed.set_author(name=id, url='www.youtube.com/channel/{0}'.format(id))
+        embed = DiscordEmbed(title, description=("Error checking membership streams for [{0}](https://www.youtube.com/channel/{0}). \nCheck cookies!".format(id)), color=color)
+        #embed.set_author(name='{0}'.format(id), url='www.youtube.com/channel/{0}'.format(id))
         #embed.set_thumbnail(url=data.get('thumbnail_url'))
         webhook.add_embed(embed)
         webhook_response = webhook.execute()

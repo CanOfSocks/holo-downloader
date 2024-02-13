@@ -21,11 +21,6 @@ def get_upcoming_or_live_videos(channel_id):
 
         return upcoming_or_live_videos
 
-#channel_id = 'UCoSrY_IQQVpmIRZ9Xf-y93g'
-#channel_id = 'UCgmPnx-EEeOrZSg5Tiw7ZRQ'
-#upcoming_or_live_videos = get_upcoming_or_live_videos(channel_id)
-#print("Upcoming or live video IDs:", upcoming_or_live_videos)
-
 def getVideos(members_only, command=None):
     from subprocess import Popen
     from random import uniform
@@ -43,7 +38,7 @@ def getVideos(members_only, command=None):
             all_lives += lives
         except Exception as e:
             print(("Error fetching membership streams for {0}. Check cookies. \n{1}".format(channel,e)))
-            discord_web.main(channel, "membership-error")
+            discord_web.main(members_only[channel], "membership-error")
     if(command == "spawn"):
         #Assume processes were spawned
         return
