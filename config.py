@@ -16,7 +16,8 @@ description_filter = {
 }
 
 members_only ={
-    "UCoSrY_IQQVpmIRZ9Xf-y93g": True
+    "Gawr Gura Ch. hololive-EN": "UCoSrY_IQQVpmIRZ9Xf-y93g",
+    "Mori Calliope Ch. hololive-EN": "UCL_qhgtOy0dy1Agp8vkySQg"
 }
 
 webhook_url = "https://discord.com/api/webhooks/xxxxxxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyy"
@@ -55,6 +56,8 @@ look_ahead = 48
 
 # Cookies file location relative to inside the container
 cookies_file = "/app/cookies.txt"
+
+
 
 ### Torrent options
 torrent = True

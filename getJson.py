@@ -101,14 +101,15 @@ def getAvailability(live):
                 pass
     return live.availability
 
-def membershipOnlyFilter(live):
-    membersOnly = members_only.get(live.channel_id, None)
-    # If config is set to only get member videos for channel, attempt to get availability. 
-    # Failures to get availability will result in the video not being retrieved
-    if membersOnly:
-        return getAvailability(live).casefold() == "subscriber_only".casefold()
-    else:
-        return True 
+#def membershipOnlyFilter(live):
+#    membersOnly = members_only.get(live.channel_id, None)
+#    # If config is set to only get member videos for channel, attempt to get availability. 
+#    # Failures to get availability will result in the video not being retrieved
+#    if membersOnly:
+#        return getAvailability(live).casefold() == "subscriber_only".casefold()
+#    else:
+#        return True 
+
     
 def filtering(live):
     title = titleFilter(live)
@@ -162,7 +163,7 @@ def getStreams():
                     
                     if(live.platform == "youtube"):
                         #print(time_difference)
-                        if(live.time_until_start() <= look_ahead * 3600 and filtering(live) and membershipOnlyFilter(live)):
+                        if(live.time_until_start() <= look_ahead * 3600 and filtering(live)):
                             matching_streams.append(live.video_id)
 
     # Print the list of matching streams as a JSON representation
