@@ -1,7 +1,9 @@
 #!/usr/local/bin/python
+from sys import argv
+import yt_dlp
 def get_upcoming_or_live_videos(channel_id):
     import getConfig
-    import yt_dlp
+    
     ydl_opts = {
         'quiet': True,
         'extract_flat': True,
@@ -58,4 +60,9 @@ def main(command=None):
     except ImportError:
         pass
 if __name__ == "__main__":
-    main()
+    try:
+        command = argv[1]
+    except IndexError:
+        command = None
+
+    main(command)
