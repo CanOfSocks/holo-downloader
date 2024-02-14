@@ -48,7 +48,7 @@ def getVideos(members_only, command=None):
     for channel in members_only:
         sleep(uniform(5.0, 10.0))
         try:
-            print("Looking for: {0}".format(channel))
+            #print("Looking for: {0}".format(channel))
             lives = get_upcoming_or_live_videos(members_only[channel])
             if(command == "spawn"):
                 for live in lives:
