@@ -22,6 +22,7 @@ members_only ={
 webhook_url = "https://discord.com/api/webhooks/xxxxxxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyy"
 
 ### Download options
+
 # Output folder needs a depth of at least 2 (a slash for directory should be present in this variable)
 # This should be in yt-dlp format (https://github.com/yt-dlp/yt-dlp#output-template)
 # If not detected, the given template will be duplicated e.g. %(fulltitle)s/%(fulltitle)s

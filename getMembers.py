@@ -30,7 +30,6 @@ def get_upcoming_or_live_videos(channel_id):
         info = ydl.extract_info(url, download=False)
         
         upcoming_or_live_videos = []
-        count = 0
         for video in info['entries']:
             #print(video)
             if (video.get('live_status') == 'is_live' or video.get('live_status') == 'is_upcoming' or video.get('live_status') == 'post_live') and withinFuture(video.get('release_timestamp'),getConfig.getLookAhead()):
@@ -38,14 +37,14 @@ def get_upcoming_or_live_videos(channel_id):
                 upcoming_or_live_videos.append(video['id'])
 
 
-        return upcoming_or_live_videos
+        return set(upcoming_or_live_videos)
 
 def getVideos(members_only, command=None):
     from subprocess import Popen
     from random import uniform
     from time import sleep
     import discord_web
-    all_lives = set()
+    all_lives = []
     for channel in members_only:
         sleep(uniform(5.0, 10.0))
         try:
@@ -55,7 +54,7 @@ def getVideos(members_only, command=None):
                 for live in lives:
                     process = ["python", "/app/downloadVid.py", live]
                     Popen(process, start_new_session=True)
-            all_lives.update(lives) 
+            all_lives += list(lives)
         except Exception as e:
             print(("Error fetching membership streams for {0}. Check cookies. \n{1}".format(channel,e)))
             discord_web.main(members_only[channel], "membership-error")
