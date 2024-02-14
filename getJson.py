@@ -175,18 +175,6 @@ def getStreams():
     return matching_streams
 
 
-
-def isIDrunning(command_to_check):
-    for process in psutil.process_iter(['pid', 'cmdline']):
-        try:
-            process_cmdline = process.info['cmdline']
-            # Checks if downloadVid.py is running and if it is running with the same ID
-            if process_cmdline and process_cmdline[1] == command_to_check[1] and process_cmdline[2] == command_to_check[2]:
-                return True
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            pass
-    return False
-
 def main(command=None):
     if(command == "spawn"):
         for live in getStreams():

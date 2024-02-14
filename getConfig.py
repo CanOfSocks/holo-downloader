@@ -205,6 +205,9 @@ def torrentBuilder(output, folder):
     options += ['-o', "{0}.torrent".format(str(output))]
     options += [str(folder)]
     return options
+
+def getLookAhead():
+    return config.look_ahead
         
 
 def main(function):
