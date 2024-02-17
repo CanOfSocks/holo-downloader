@@ -57,6 +57,7 @@ These strings are based off of the Python re library, so use syntax appropriate 
 
 ### Members Only
 Similar to the regular channel dictionary. Any channels in this dictionary have the "Membership" tab scanned when the getMembers script is run (periodically in the docker). Currently this gets all membership videos and does not use title or description filters.
+The membership tab only scans the first 10 videos for possible live videos to reduce direct youtube requests. It is assumed that there will not be that many upcoming/live videos at once in almost all cases.
 ```
 members_only ={
     "Gawr Gura Ch. hololive-EN": "UCoSrY_IQQVpmIRZ9Xf-y93g",
