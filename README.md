@@ -82,7 +82,7 @@ output_folder = "%(channel)s/[%(upload_date)s] %(fulltitle)s - %(channel)s (%(id
 * ```video_quality``` - Sets video quality
 * ```video_only``` - When set to true, only the video is downloaded. Any other items (chat, thumbnail etc.) will not be downloaded
 * ```download_chat``` - Downloads chat if True
-* ```thumbnail``` - Downloads thumbnail to file as PNG
+* ```thumbnail``` - Downloads thumbnail to file if True
 * ```info_json``` - Saves the info_json as a file if True
 * ```description``` - Writes description file if True
 * ```cookies_file``` - Absolute path for cookies file. This is required for membership and age-restricted streams. If you are using Docker, you should leave this as the default ```"/app/cookies.txt"``` and create a mapping for the container instead.
