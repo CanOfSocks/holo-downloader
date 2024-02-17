@@ -85,7 +85,7 @@ output_folder = "%(channel)s/[%(upload_date)s] %(fulltitle)s - %(channel)s (%(id
 * ```thumbnail``` - Downloads thumbnail to file if True
 * ```info_json``` - Saves the info_json as a file if True
 * ```description``` - Writes description file if True
-* ```cookies_file``` - Absolute path for cookies file. This is required for membership and age-restricted streams. If you are using Docker, you should leave this as the default ```"/app/cookies.txt"``` and create a mapping for the container instead.
+* ```cookies_file``` - Absolute path for cookies file. This is required for membership and age-restricted streams. If you are using Docker, you should leave this as the default ```"/app/cookies.txt"``` and create a mount/mapping for the container instead.
 * ```torrent``` - Enables creation of torrent file after download completes
 * ```torrentOptions``` - Array of options for torrent creator. Must include flags, as some options can appear more than once. Refer to the [py3createtorrent documentation](https://py3createtorrent.readthedocs.io/en/latest/user.html#full-usage-guide) 
 
