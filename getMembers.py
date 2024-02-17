@@ -23,6 +23,7 @@ def get_upcoming_or_live_videos(channel_id):
         'cookiefile': getConfig.getCookiesFile(),
         'sleep_interval_requests': 1,
         'no_warnings': True,
+        'playlist_items': '1:10',
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
