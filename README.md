@@ -32,7 +32,15 @@ It is best practice to include a value for each of the variables in the config f
 
 ### Adding channels
 To add channels, add to the channel_ids_to_match dictionary with a name and the channel ID of the video. The channel ID can be found at the share channel button on the about page for a channel.
-
+```
+channel_ids_to_match = {
+    "Gawr Gura Ch. hololive-EN": "UCoSrY_IQQVpmIRZ9Xf-y93g",
+    "Watson Amelia Ch. hololive-EN": "UCyl1z3jo3XHR1riLFKG5UAg",
+    "Mori Calliope Ch. hololive-EN": "UCL_qhgtOy0dy1Agp8vkySQg"
+    
+    # Add more channels as needed
+}
+```
 ### Filtering
 For all of the filters, __if a filter is present then it will not be filtered__. For example, if no description filter is available, then no description filtering will be executed and filtering will rely on any remaining filters.
 
@@ -47,10 +55,11 @@ description_filter = {
 ```
 These strings are based off of the Python re library, so use syntax appropriate for that library.
 
-Use the "members_only" filter for grabbing only membership videos. Set True to only get membership videos, or False for all videos:
+### Members Only
+Similar to the regular channel dictionary. Any channels in this dictionary have the "Membership" tab scanned when the getMembers script is run (periodically in the docker). Currently this gets all membership videos and does not use title or description filters.
 ```
 members_only ={
-    "UCoSrY_IQQVpmIRZ9Xf-y93g": True
+    "Gawr Gura Ch. hololive-EN": "UCoSrY_IQQVpmIRZ9Xf-y93g",
 }
 ```
 
