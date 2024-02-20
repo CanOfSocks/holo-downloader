@@ -7,7 +7,7 @@ import getConfig
 from pathlib import Path
 import subprocess
 import discord_web
-from time import sleep
+from time import sleep, asctime
 
 #id = sys.argv[1]
 #id = "kJGsWORSg-4"
@@ -200,7 +200,7 @@ def downloader(id,outputTemplate):
     except subprocess.CalledProcessError as e:
         print(e.stderr)
         discord_web.main(id, "error")
-        raise Exception(("Error downloading video: {0}, Code: {1}".format(id, e.returncode)))
+        raise Exception(("{2} - Error downloading video: {0}, Code: {1}".format(id, e.returncode, asctime())))
         return
     # Wait for remaining processes
     discord_notify.join()
