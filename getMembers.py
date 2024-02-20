@@ -6,9 +6,9 @@ def withinFuture(releaseTime,lookahead):
     #Assume true if value missing
     if(not releaseTime or not lookahead):
         return True
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
     release = datetime.fromtimestamp(releaseTime, datetime.UTC)    
-    limit = datetime.now(datetime.UTC) + timedelta(hours=lookahead)
+    limit = datetime.now(timezone.UTC) + timedelta(hours=lookahead)
     if(release <= limit):
         return True
     else:
