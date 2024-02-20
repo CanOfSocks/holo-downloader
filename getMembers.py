@@ -33,7 +33,7 @@ def get_upcoming_or_live_videos(channel_id):
         upcoming_or_live_videos = []
         for video in info['entries']:
             #print(video)
-            if (video.get('live_status') == 'is_live' or video.get('live_status') == 'is_upcoming' or video.get('live_status') == 'post_live') and withinFuture(video.get('release_timestamp'),getConfig.getLookAhead()):
+            if video.get('live_status') == 'is_live' or video.get('live_status') == 'post_live' or (video.get('live_status') == 'is_upcoming' and withinFuture(video.get('release_timestamp'),getConfig.getLookAhead())):
                 #print("live_status = {0}".format(video.get('live_status')))
                 upcoming_or_live_videos.append(video['id'])
 
