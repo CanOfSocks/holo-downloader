@@ -208,7 +208,17 @@ def torrentBuilder(output, folder):
 
 def getLookAhead():
     return config.look_ahead
-        
+
+def membership_directory():
+    output = None
+    try:
+        output = config.membersdir
+    except AttributeError:
+        pass
+    return output   
+
+def getMembershipOutputPath(output):
+    return Path(membership_directory()) / Path(output)
 
 def main(function):
     match function:

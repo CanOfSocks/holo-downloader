@@ -30,10 +30,13 @@ def delete_empty_folders(path):
             print("Removing path: {0}".format(dir_path))
             dir_path.rmdir()
 
-def moveToFinal(output):
+def moveToFinal(output, members):
     from shutil import move
     source = getConfig.getTempOutputPath(output)
-    dest = getConfig.getDoneOutputPath(output)
+    if(members == True):
+        dest = getConfig.getMembershipOutputPath(output)
+    else:
+        dest = getConfig.getDoneOutputPath(output)
     # Ensure the destination folder exists
     dest_path = dest.parent
     dest_path.mkdir(parents=True, exist_ok=True)
@@ -177,7 +180,7 @@ def download_info(id,outputFile):
             return 1
     return 0
 
-def downloader(id,outputTemplate):
+def downloader(id,outputTemplate, members):
     if id is None or outputTemplate is None:
         raise Exception(("Unable to retrieve information about video {0}".format(id)))
     #outputFile = "{0}{1}".format(getConfig.getTempFolder(),output)
@@ -207,20 +210,20 @@ def downloader(id,outputTemplate):
     chat_downloader.join()
     info_downloader.join()
         
-    try:
-        createTorrent(outputTemplate)
-    except subprocess.CalledProcessError as e:
-        print(e.stderr)
-        discord_web.main(id, "error")
-        raise Exception(("Error creating torrent for video: {0}, Code: {1}".format(id, e.returncode)))
-        return
+    if(getConfig.getTorrent()):
+        try:
+            createTorrent(outputTemplate)
+        except subprocess.CalledProcessError as e:
+            print(e.stderr)
+            discord_web.main(id, "error")
+            raise Exception(("Error creating torrent for video: {0}, Code: {1}".format(id, e.returncode)))
         
     print("{0} finished successfully".format(id))
-    moveToFinal(outputTemplate)
+    moveToFinal(outputTemplate, members)
     discord_web.main(id, "done")
     return
 
-def download_video_info(video_url):    
+def download_video_info(video_url):
     options = {
         'wait_for_video': (1,300),
         'retries': 25,
@@ -234,8 +237,12 @@ def download_video_info(video_url):
     with yt_dlp.YoutubeDL(options) as ydl:
         info_dict = ydl.extract_info(video_url, download=False)
         outputFile = str(ydl.prepare_filename(info_dict))
+        if(info_dict.get('availability', None) == 'subscriber_only' and getConfig.membership_directory() is not None):
+            members = True
+        else:
+            members = False
     print("Output file: {0}".format(outputFile))
-    return outputFile
+    return outputFile, members
 
 def is_script_running(script_name, id):
     current = psutil.Process()
@@ -271,13 +278,13 @@ def main(id=None):
         return 0
     
     discord_web.main(id, "waiting")
-    outputFile = download_video_info(id)
+    outputFile, members = download_video_info(id)
     #print("Output file: {0}".format(outputFile))
     if outputFile is None:
         discord_web.main(id, "error")
         raise Exception(("Unable to retrieve information about video {0}".format(id)))
     
-    downloader(id,outputFile)
+    downloader(id,outputFile, members)
 
 if __name__ == "__main__":
     main()
