@@ -6,6 +6,8 @@ RUN mkdir -p /app/temp
 
 RUN mkdir -p /app/Done
 
+RUN mkdir -p /app/Members
+
 RUN apt-get update && apt-get install --no-install-recommends wget unzip xz-utils procps cron -y -qq && apt clean -y
 
 RUN wget -q https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz && \
