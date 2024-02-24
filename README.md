@@ -87,7 +87,10 @@ output_folder = "%(channel)s/[%(upload_date)s] %(fulltitle)s - %(channel)s (%(id
 * ```description``` - Writes description file if True
 * ```cookies_file``` - Absolute path for cookies file. This is required for membership and age-restricted streams. If you are using Docker, you should leave this as the default ```"/app/cookies.txt"``` and create a mount/mapping for the container instead.
 * ```torrent``` - Enables creation of torrent file after download completes
-* ```torrentOptions``` - Array of options for torrent creator. Must include flags, as some options can appear more than once. Refer to the [py3createtorrent documentation](https://py3createtorrent.readthedocs.io/en/latest/user.html#full-usage-guide) 
+* ```torrentOptions``` - Array of options for torrent creator. Must include flags, as some options can appear more than once. Refer to the [py3createtorrent documentation](https://py3createtorrent.readthedocs.io/en/latest/user.html#full-usage-guide)
+* ```tempdir``` - Directory for temporary files
+* ```donedir``` - Directory of finished downloads. Files are moved here from temporary folder when successful
+* ```membersdir``` - Moves membership streams (subscriber_only availability) videos to here rather than ```donedir```. Only moves if folder is set, otherwise donedir is used
 
 ### To-Do
 While some components have been marked as added, testing of full functionalility may be required
