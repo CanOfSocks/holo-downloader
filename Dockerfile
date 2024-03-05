@@ -33,6 +33,8 @@ RUN sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" /usr/l
 
 RUN apt-get purge -y wget unzip xz-utils && apt-get autopurge -y && apt clean -y
 
+ENV VIDEOSCHEDULE='*/2 * * * *'
+ENV MEMBERSCHEDULE='*/5 * * * *'
 #Setup Crontab
 #RUN chown -R root /app/crontab && chmod -R 0644 /app/crontab
 #RUN crontab /app/crontab
