@@ -78,6 +78,7 @@ For container usage, you can change the frequency of how often videos and member
 
 For example:
 ```-e VIDEOSCHEDULE='*/2 * * * *' -e MEMBERSCHEDULE='*/5 * * * *'```
+
 By default, videos are checked every 2 minutes and membership videos every 5 minutes.
 
 ### Other
