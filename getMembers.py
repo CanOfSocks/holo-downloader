@@ -70,10 +70,10 @@ def getVideos(members_only, command=None):
         print(all_lives)
         return all_lives
 
-def main(command=None):
+def main(command=None, frequency=None):
     try:
         from config import members_only
-        getVideos(members_only, command)
+        getVideos(members_only, command, frequency)
     except ImportError:
         pass
 if __name__ == "__main__":
@@ -81,5 +81,9 @@ if __name__ == "__main__":
         command = argv[1]
     except IndexError:
         command = None
+    try:
+        frequency = argv[2]
+    except IndexError:
+        frequency = None
 
-    main(command)
+    main(command, frequency)
