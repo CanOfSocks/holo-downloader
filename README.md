@@ -23,7 +23,7 @@ If using a container, you will need to create a copy of the config.py file for a
 Example with Docker hub:
 ```
 docker pull 'canofsocks/holo-downloader:latest'
-docker run -d --name='holo-downloader' --cpus=".75" -e TZ="Europe/London" -e HOST_CONTAINERNAME="holo-downloader" -v '/mnt/holo-downloader/config/config.py':'/app/config.py':'rw' -v '/mnt/holo-downloader/temp/':'/app/temp':'rw' -v '/mnt/holo-downloader/Done/':'/app/Done':'rw' -v '/mnt/holo-downloader/config/cookies.txt':'/app/cookies.txt':'rw' --restart always 'canofsocks/holo-downloader:latest'
+docker run -d --name='holo-downloader' --cpus=".75" -e TZ="Europe/London" -e HOST_CONTAINERNAME="holo-downloader" -e VIDEOSCHEDULE='*/2 * * * *' -e MEMBERSCHEDULE='*/5 * * * *' -v '/mnt/holo-downloader/config/config.py':'/app/config.py':'rw' -v '/mnt/holo-downloader/temp/':'/app/temp':'rw' -v '/mnt/holo-downloader/Done/':'/app/Done':'rw' -v '/mnt/holo-downloader/config/cookies.txt':'/app/cookies.txt':'rw' --restart always 'canofsocks/holo-downloader:latest'
 ```
 ## Configuration
 For the most up to date configuration options, please check the config.py included in the repo
@@ -73,6 +73,11 @@ A **good and recommended** example for this program is:
 ```
 output_folder = "%(channel)s/[%(upload_date)s] %(fulltitle)s - %(channel)s (%(id)s)/[%(upload_date)s] %(fulltitle)s - %(channel)s (%(id)s)"
 ```
+### Scheduling
+For container usage, you can change the frequency of how often videos and membership streams are checked for by adding docker environment variables ```VIDEOSCHEDULE``` and ```MEMBERSCHEDULE```. This must be in the cron format. For help: [crontab.guru](https://crontab.guru)
+For example:
+```-e VIDEOSCHEDULE='*/2 * * * *' -e MEMBERSCHEDULE='*/5 * * * *'```
+By default, videos are checked every 2 minutes and membership videos every 5 minutes.
 
 ### Other
 * ```webhook_url``` - Discord webhook url for Discord integration, disables if None
@@ -103,6 +108,6 @@ While some components have been marked as added, testing of full functionalility
 - [x] Description filtering
 - [x] Membership only filtering
 - [x] Automatic torrent creation
-- [ ] Configurable checking frequency
+- [x] Configurable checking frequency
 - [ ] Improve error detection
 - [ ] ytarchive-raw integration
