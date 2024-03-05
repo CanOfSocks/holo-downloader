@@ -25,6 +25,7 @@ WORKDIR /app
 COPY . .
 
 RUN chmod +x *.py
+RUN chmod +x /app/startCron.sh
 
 RUN pip install -q --no-cache-dir -r requirements.txt
 
