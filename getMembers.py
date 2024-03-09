@@ -40,7 +40,7 @@ def get_upcoming_or_live_videos(channel_id):
 
         return set(upcoming_or_live_videos)
 
-def getVideos(members_only, command=None):
+def getVideos(members_only, command=None, frequency=None):
     from subprocess import Popen
     from random import uniform
     from time import sleep
