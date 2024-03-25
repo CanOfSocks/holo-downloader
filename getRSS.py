@@ -83,6 +83,7 @@ def filtering(live):
     else:
         return False
 
+
 def getStreams():
     matching_streams = []  
     
@@ -94,10 +95,27 @@ def getStreams():
             videos.append(rss_object(vid))
     #print(videos)
     for live in videos:
+        from time import sleep
         #print("Time since update: {0} vs {1}".format(live.time_since_update(),  look_ahead * 3600))
         if(live.time_since_update() <= look_ahead * 3600.0 and filtering(live)):
         #if(live.time_since_update() <= look_ahead * 3600.0):
-            matching_streams.append(live.id)
+            import yt_dlp
+            from getConfig import getCookiesFile,getLookAhead
+            from getMembers import withinFuture
+            options = {
+                'retries': 25,
+                'skip_download': True,
+                'cookiefile': getCookiesFile(),        
+                'quiet': True,
+                'sleep_interval_requests': 1,
+                'no_warnings': True       
+            }
+
+            with yt_dlp.YoutubeDL(options) as ydl:
+                video = ydl.extract_info(live.id, download=False)
+                if video.get('live_status') == 'is_live' or video.get('live_status') == 'post_live' or (video.get('live_status') == 'is_upcoming' and withinFuture(video.get('release_timestamp'),getLookAhead())):         
+                    matching_streams.append(live.id)
+        sleep(1.0)
     return matching_streams
 
 
