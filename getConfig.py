@@ -238,7 +238,14 @@ def main(function):
         case "quality":
             print(getQuality())
         
-
+def getFetchMethod():
+    #output = "rss"
+    #try:
+        output = config.fetch_method
+        return output
+    #except AttributeError:
+    #    pass
+    #return output  
 
 if __name__ == "__main__":
     main(argv[1])

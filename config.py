@@ -21,6 +21,11 @@ members_only ={
 
 webhook_url = "https://discord.com/api/webhooks/xxxxxxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyy"
 
+
+### Video fetch method
+
+fetch_method = "rss"
+
 ### Download options
 
 # Output folder needs a depth of at least 2 (a slash for directory should be present in this variable)

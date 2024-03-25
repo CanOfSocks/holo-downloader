@@ -168,7 +168,7 @@ def getStreams():
 
     # Print the list of matching streams as a JSON representation
     #matching_streams_json = json.dumps(matching_streams)
-    bash_array = ' '.join(matching_streams)
+    #bash_array = ' '.join(matching_streams)
     #print(matching_streams_json)
     #print(bash_array)
 
