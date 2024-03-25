@@ -1,6 +1,7 @@
+#!/usr/local/bin/python
 from getConfig import getFetchMethod
 from sys import argv
-
+command = None
 try:
     command = argv[1]
 except IndexError:
