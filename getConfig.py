@@ -239,13 +239,13 @@ def main(function):
             print(getQuality())
         
 def getFetchMethod():
-    #output = "rss"
-    #try:
+    output = "rss"
+    try:
         output = config.fetch_method
         return output
-    #except AttributeError:
-    #    pass
-    #return output  
+    except AttributeError:
+        pass
+    return output  
 
 if __name__ == "__main__":
     main(argv[1])
