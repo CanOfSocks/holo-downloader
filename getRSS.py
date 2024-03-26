@@ -91,6 +91,7 @@ def getStreams():
     for channel in channel_ids_to_match:
         #print(channel)
         RSSFeed = feedparser.parse("https://www.youtube.com/feeds/videos.xml?channel_id={0}".format(channel_ids_to_match.get(channel)))
+        print(RSSFeed)
         for vid in RSSFeed.entries:
             videos.append(rss_object(vid))
     #print(videos)
