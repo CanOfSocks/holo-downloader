@@ -2,7 +2,8 @@
 channel_ids_to_match = {
     "Gawr Gura Ch. hololive-EN": "UCoSrY_IQQVpmIRZ9Xf-y93g",
     "Watson Amelia Ch. hololive-EN": "UCyl1z3jo3XHR1riLFKG5UAg",
-    "Mori Calliope Ch. hololive-EN": "UCL_qhgtOy0dy1Agp8vkySQg"
+    "Mori Calliope Ch. hololive-EN": "UCL_qhgtOy0dy1Agp8vkySQg",
+    "Ninomae Ina'nis Ch. hololive-EN": "UCMwGHR0BTZuLsmjY_NT5Pwg"
     
     # Add more channels as needed
 }
@@ -59,7 +60,7 @@ description = True
 look_ahead = 48
 
 # Cookies file location relative to inside the container
-#cookies_file = "/app/cookies.txt"
+cookies_file = "/app/cookies.txt"
 
 ### Torrent options
 torrent = True

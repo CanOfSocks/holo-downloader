@@ -7,9 +7,9 @@ try:
 except IndexError:
     command = None
 method = getFetchMethod()
-if(method == "rss"):
-    import getRSS
-    getRSS.main(command)
+if(method == "ytdlp"):
+    import getYTDLP
+    getYTDLP.main(command)
 elif(method == "json"):
     import getJson
     getJson.main(command)
