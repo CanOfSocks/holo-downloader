@@ -243,8 +243,7 @@ def download_video_info(video_url):
         else:
             members = False
             
-        if info_dict.get('live_status') == 'is_live' or info_dict.get('live_status') == 'post_live' or (info_dict.get('live_status') == 'is_upcoming'):
-            raise Exception(("Video is already processed, not continuing: {0}".format(id)))
+        
     print("Output file: {0}".format(outputFile))
     return outputFile, members
 
