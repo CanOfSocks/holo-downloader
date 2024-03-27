@@ -83,6 +83,7 @@ By default, videos are checked every 2 minutes and membership videos every 5 min
 
 ### Other
 * ```webhook_url``` - Discord webhook url for Discord integration, disables if None
+* ```fetch_method``` - Method for obtaining streams. ```ytdlp``` uses yt-dlp on the "streams" of a channel and checks the *first 10* videos if they are upcoming or live, which works for any youtube channel. ```json``` uses the [holo.dev api](https://holo.dev/api/v1/lives/open) to check for live and upcoming *Hololive* streams. If you're only scanning for Hololive content, it is highly recommended to use the ```json``` option.
 * ```mux_file``` - Tells ytarchive whether to combine the videos with ffmpeg after downloading, or leave the ts files with the mux command saved in a txt file
 * ```download_threads``` - Sets the number of threads ytarchive will use to download videos. Default 4
 * ```ytarchive_options``` - Any commands added to this string will be parsed to ytarchive at runtime
