@@ -25,7 +25,7 @@ webhook_url = "https://discord.com/api/webhooks/xxxxxxxxxxxxxxxx/yyyyyyyyyyyyyyy
 
 ### Video fetch method
 
-fetch_method = "rss"
+fetch_method = "ytdlp"
 
 ### Download options
 
