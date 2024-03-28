@@ -2,16 +2,16 @@
 import requests
 
 from sys import argv
-from subprocess import Popen
+import common
 #import json
-from datetime import datetime,timezone
-from config import channel_ids_to_match,look_ahead,title_filter,description_filter,members_only
+from datetime import datetime
+from config import channel_ids_to_match
 
 url = "https://holo.dev/api/v1/lives/open"
 
 class json_object:
     def __init__(self,live):
-        self.id=live.get('id')
+        self.holodev_id=live.get('id')
         self.title=live.get('title')
         date_format = "%Y-%m-%dT%H:%M:%S.%fZ"
         self.start_at = datetime.strptime(live.get('start_at'), date_format)
@@ -19,7 +19,7 @@ class json_object:
         self.json_channel_id = live.get('channel_id')
         self.thumbnail_url = live.get('cover')
         
-        self.video_id = live.get('room')
+        self.id = live.get('room')
         self.platform = live.get('platform')
         self.channel_id = live.get('channel')
         
@@ -28,79 +28,11 @@ class json_object:
         
         #For members only
         self.availability = None
-    def time_until_start(self):
-        current_datetime = datetime.now(timezone.utc)
-        time_difference = self.start_at - current_datetime.replace(tzinfo=None)
-        return time_difference.total_seconds()
     
-def titleFilter(live):
-    titFilter = title_filter.get(live.channel_id)
-    if titFilter is None:
-        return None
-    import re
-    #Return the result of the regex, if the search fails (such as a syntax error), disregard filter
-    try:
-        search = re.search(titFilter,live.title)
-        if(search):
-            return True
-        else:
-            return False
-    except:
-        print("Filter failed")
-        return None
+    def get(self, property, default=None):
+        return getattr(self, property, default)
     
-    
-    
-def descriptionFilter(live):
-    descFilter = description_filter.get(live.channel_id)    
-    #If filter not present, return None
-    if descFilter is None:
-        return None
-    #Otherwise get description
-    if live.description is None:
-        from yt_dlp import YoutubeDL
-        from config import cookies_file
-        options = {
-            "cookiefile": cookies_file,
-            "quiet": True
-        }
-        with YoutubeDL(options) as ydl: 
-            info_dict = ydl.extract_info("https://youtu.be/{0}".format(live.id), download=False)
-            ##Could be expanded based on demand
-            #video_id = info_dict.get("id", None)
-            #video_title = info_dict.get('title', None)
-            live.description = info_dict.get('description', None)
-            live.availability = info_dict.get('availability', None)
-    
-    #if still one after retrieval, disregard description filter
-    if live.description is None:
-        return None
-
-    import re
-    #Return the result of the regex, if the search fails (such as a syntax error), disregard filter
-    try:
-        return re.search(descFilter,live.description)
-    except:
-        return None
-    
-def getAvailability(live):
-    if live.availability is None:        
-        from yt_dlp import YoutubeDL
-        from config import cookies_file
-        options = {
-            "cookiefile": cookies_file,
-            "quiet": True
-        }
-        with YoutubeDL(options) as ydl: 
-            #If unable to get availability (such as broken cookies or not a member), then keep as none
-            try:
-                info_dict = ydl.extract_info("https://youtu.be/{0}".format(live.id), download=False)
-                live.description = info_dict.get('description', None)
-                live.availability = info_dict.get('availability', None)
-            except:
-                pass
-    return live.availability
-
+   
 #def membershipOnlyFilter(live):
 #    membersOnly = members_only.get(live.channel_id, None)
 #    # If config is set to only get member videos for channel, attempt to get availability. 
@@ -111,29 +43,6 @@ def getAvailability(live):
 #        return True 
 
     
-def filtering(live):
-    title = titleFilter(live)
-    description = descriptionFilter(live)
-    
-    #If filter exists for both title and description, try to find match for either
-    if title is not None and description is not None:
-        if(title or description):
-            return True
-        else:
-            return False        
-    #If only title filter exists, use that
-    elif(title and description is None): #The "and" may not be necessary
-        return True
-    #Otherwise use description
-    elif(description and title is None):
-        return True
-    #If neither exist, assume true as there is no filter
-    elif(title is None and description is None):
-        return True
-    #Otherwise none of the filters passed
-    else:
-        return False
-
 def getStreams():
     # List to store the matching live streams
     matching_streams = []
@@ -163,32 +72,18 @@ def getStreams():
                     
                     if(live.platform == "youtube"):
                         #print(time_difference)
-                        if(live.time_until_start() <= look_ahead * 3600 and filtering(live)):
-                            matching_streams.append(live.video_id)
+                        if(common.withinFuture and common.filtering(live, live.get('channel_id'))):
+                            matching_streams.append(live.get('id'))
 
     # Print the list of matching streams as a JSON representation
     #matching_streams_json = json.dumps(matching_streams)
-    #bash_array = ' '.join(matching_streams)
-    #print(matching_streams_json)
-    #print(bash_array)
-
     return matching_streams
 
 
 def main(command=None):
-    if(command == "spawn"):
-        for live in getStreams():
-            command = ["python", "/app/downloadVid.py", live]
-            #Popen(command)
-            Popen(command, start_new_session=True)
-    elif(command == "bash"):
-        bash_array = ' '.join(getStreams())
-        print(bash_array)
-        return bash_array            
-    else:
-        streams = getStreams()
-        print(streams)
-        return streams
+    streams = getStreams()
+    common.vid_executor(streams, command)
+    
 
 
 if __name__ == "__main__":
