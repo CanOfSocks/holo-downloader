@@ -6,7 +6,7 @@ A downloader for getting all streams for given hololive channels. This repo is d
 Feature requests are welcomed
 
 ## Features
-This program get the video, thumbnail, description, live chat and info.json file for all streams of given channels. It uses a temporary directory before moving all the files to a final folder after processing.
+This program get the video, thumbnail, description, live chat and yt-dlp info.json file for all streams of given channels. It uses a temporary directory before moving all the files to a final folder after processing.
 
 It also incorperates Discord Webhooks for status monitoring.
 
