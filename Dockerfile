@@ -31,7 +31,7 @@ RUN pip install -q --no-cache-dir -r requirements.txt
 
 # Install youtube-community-tab
 RUN pip install -q --no-cache-dir -e "git+https://github.com/HoloArchivists/youtube-community-tab.git#egg=youtube-community-tab&subdirectory=youtube-community-tab"
-RUN wget -q -o "/app/ytct.py" https://raw.githubusercontent.com/HoloArchivists/youtube-community-tab/master/ytct.py
+RUN wget -q -O "/app/ytct.py" https://raw.githubusercontent.com/HoloArchivists/youtube-community-tab/master/ytct.py
 RUN apt-get purge git -y && apt-get autopurge -y
 
 #Apply chat_downloader patch

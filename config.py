@@ -85,4 +85,4 @@ comm_tab_archive = '/app/com-tab-archive.txt'
 tempdir = '/app/temp/'
 donedir = '/app/Done/'
 membersdir = "/app/Members"
-communitydir = "/app/CommunityPosts.txt"
+communitydir = "/app/CommunityPosts"
