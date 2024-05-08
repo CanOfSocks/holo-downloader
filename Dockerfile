@@ -8,7 +8,7 @@ RUN mkdir -p /app/Done
 
 RUN mkdir -p /app/Members
 
-RUN apt-get update && apt-get install --no-install-recommends wget unzip xz-utils procps cron -y -qq && apt clean -y
+RUN apt-get update && apt-get install --no-install-recommends wget unzip xz-utils procps cron git -y -qq && apt clean -y
 
 RUN wget -q https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz && \
          tar -C /usr/bin -xvf ffmpeg-master-latest-linux64-gpl.tar.xz --wildcards ffmpeg-master-latest-linux64-gpl/bin/ff* --strip-components 2 && \
@@ -32,6 +32,7 @@ RUN pip install -q --no-cache-dir -r requirements.txt
 # Install youtube-community-tab
 RUN pip install -q --no-cache-dir -e "git+https://github.com/HoloArchivists/youtube-community-tab.git#egg=youtube-community-tab&subdirectory=youtube-community-tab"
 RUN curl -o "/app/ytct.py" https://raw.githubusercontent.com/HoloArchivists/youtube-community-tab/master/ytct.py
+RUN apt-get purge git -y && apt-get autopurge -y
 
 #Apply chat_downloader patch
 RUN sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" /usr/local/lib/python*/site-packages/chat_downloader/sites/youtube.py
