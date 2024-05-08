@@ -220,6 +220,22 @@ def membership_directory():
 def getMembershipOutputPath(output):
     return Path(membership_directory()) / Path(output)
 
+def getCommunityTabArchive():
+    output = None
+    try:
+        output = config.comm_tab_archive
+    except AttributeError:
+        pass
+    return output 
+
+def getCommunityTabDirectory():
+    output = None
+    try:
+        output = config.communitydir
+    except AttributeError:
+        pass
+    return output 
+
 def main(function):
     match function:
         case "cookies":

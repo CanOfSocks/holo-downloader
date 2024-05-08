@@ -21,6 +21,10 @@ members_only ={
     "Gawr Gura Ch. hololive-EN": "UCoSrY_IQQVpmIRZ9Xf-y93g",
 }
 
+community_tab ={
+    "Gawr Gura Ch. hololive-EN": "UCoSrY_IQQVpmIRZ9Xf-y93g",
+}
+
 webhook_url = "https://discord.com/api/webhooks/xxxxxxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyy"
 
 
@@ -71,8 +75,14 @@ torrentOptions = [
     '-c', 'CanOfSocks'
 ]
 
+### Community Tab options
+
+# Archive file to only retrieve new files
+comm_tab_archive = '/app/com-tab-archive.txt'
+
 # Temporary and final directory
 # Don't change for container version
 tempdir = '/app/temp/'
 donedir = '/app/Done/'
 membersdir = "/app/Members"
+communitydir = "/app/CommunityPosts"
