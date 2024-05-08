@@ -7,9 +7,9 @@ recreate_cron_file() {
 PATH=/app:/usr/local/bin:/usr/bin
 SHELL=/bin/bash
 #BASH_ENV=/root/project_env.sh
-${VIDEOSCHEDULE:='*/2 * * * *'} /app/getVids.py "spawn" > /proc/1/fd/1 2>/proc/1/fd/2
-${MEMBERSCHEDULE:='*/5 * * * *'} /app/getMembers.py "spawn" > /proc/1/fd/1 2>/proc/1/fd/2
-${COMMUNITYSCHEDULE:='0 */3 * * *'} /app/communityPosts.py > /proc/1/fd/1 2>/proc/1/fd/2
+${VIDEOSCHEDULE:-'*/2 * * * *'} /app/getVids.py "spawn" > /proc/1/fd/1 2>/proc/1/fd/2
+${MEMBERSCHEDULE:-'*/5 * * * *'} /app/getMembers.py "spawn" > /proc/1/fd/1 2>/proc/1/fd/2
+${COMMUNITYSCHEDULE:-'0 */3 * * *'} /app/communityPosts.py > /proc/1/fd/1 2>/proc/1/fd/2
 @reboot python /app/discord_web.py "0" "starting"
 END
 )
