@@ -23,7 +23,7 @@ If using a container, you will need to create a copy of the config.py file for a
 Example with Docker hub:
 ```
 docker pull 'canofsocks/holo-downloader:latest'
-docker run -d --name='holo-downloader' --cpus=".75" -e TZ="Europe/London" -e HOST_CONTAINERNAME="holo-downloader" -e VIDEOSCHEDULE='*/2 * * * *' -e MEMBERSCHEDULE='*/5 * * * *' -v '/mnt/holo-downloader/config/config.py':'/app/config.py':'rw' -v '/mnt/holo-downloader/temp/':'/app/temp':'rw' -v '/mnt/holo-downloader/Done/':'/app/Done':'rw' -v '/mnt/holo-downloader/config/cookies.txt':'/app/cookies.txt':'rw' --restart always 'canofsocks/holo-downloader:latest'
+docker run -d --name='holo-downloader' --cpus=".75" -e TZ="Europe/London" -e HOST_CONTAINERNAME="holo-downloader" -e VIDEOSCHEDULE='*/2 * * * *' -e MEMBERSCHEDULE='*/5 * * * *' -e COMMUNITYSCHEDULE='0 */3 * * *' -v '/mnt/holo-downloader/config/config.py':'/app/config.py':'rw' -v '/mnt/holo-downloader/temp/':'/app/temp':'rw' -v '/mnt/holo-downloader/Done/':'/app/Done':'rw' -v '/mnt/holo-downloader/config/cookies.txt':'/app/cookies.txt':'rw' --restart always 'canofsocks/holo-downloader:latest'
 ```
 ## Configuration
 For the most up to date configuration options, please check the config.py included in the repo
