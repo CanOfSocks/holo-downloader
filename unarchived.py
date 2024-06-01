@@ -40,7 +40,7 @@ def is_video_private(id):
                 os.makedirs(os.path.dirname(json_out_path), exist_ok=True)
                 with open(json_out_path, 'w', encoding='utf-8') as json_file:
                     json.dump(info_dict, json_file, ensure_ascii=False, indent=4)
-                create_yta_json(id)
+                #create_yta_json(id)
                 return
 
         except yt_dlp.utils.DownloadError as e:
