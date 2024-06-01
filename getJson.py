@@ -99,6 +99,9 @@ def main(command=None, unarchived=False):
         import unarchived
         import threading
         import time
+        streams = common.combine_unarchived(streams)
+        
+        # Threading may be unnecessary
         threads = []
         for stream in streams:
             t = threading.Thread(target=unarchived.main, args=(stream,), daemon=True)

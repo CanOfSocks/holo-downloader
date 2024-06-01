@@ -18,6 +18,9 @@ def getVideos(channel_ids_to_match, command=None, unarchived = False):
         import threading
         import time
         threads = []
+        streams = common.combine_unarchived(streams)
+        
+        # Threading may be unnecessary
         for stream in all_lives:
             t = threading.Thread(target=unarchived.main, args=(stream,), daemon=True)
             threads.append(t)

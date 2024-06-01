@@ -182,10 +182,4 @@ def combine_unarchived(ids):
         id = file.replace('.info.json', '')
         id_set.add(id)
     
-    
-
-    unarchived_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'unarchived.py')
-    for live in id_set:
-        command = ["python", unarchived_script, live]
-        #Popen(command)
-        Popen(command, start_new_session=True)
+    return list(id_set)
