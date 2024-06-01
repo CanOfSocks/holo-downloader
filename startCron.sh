@@ -7,6 +7,7 @@ recreate_cron_file() {
 PATH=/app:/usr/local/bin:/usr/bin
 SHELL=/bin/bash
 #BASH_ENV=/root/project_env.sh
+
 END
 )
 
