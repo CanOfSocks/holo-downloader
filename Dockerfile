@@ -20,6 +20,8 @@ RUN wget -q "https://github.com/Kethsar/ytarchive/releases/download/${YTA_VERSIO
          unzip ytarchive_linux_amd64.zip -d /usr/bin && chmod +x /usr/bin/ytarchive && \
          rm ytarchive_linux_amd64.zip
 
+RUN wget -q "https://github.com/HoloArchivists/ytarchive-raw-go/releases/latest/download/ytarchive-raw-go-linux-amd64" -O /usr/bin/ytarchive-raw-go && chmod +x /usr/bin/ytarchive-raw-go
+
 WORKDIR /app
 
 COPY . .
@@ -36,6 +38,8 @@ RUN apt-get purge git -y && apt-get autopurge -y
 
 #Apply chat_downloader patch
 RUN sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" /usr/local/lib/python*/site-packages/chat_downloader/sites/youtube.py
+#Apply patch to yt-dlp youtube extractor to make it work with yta-raw
+RUN sed -i '/if fmt.get('\'targetDurationSec\''):$/,/    continue$/s/^/#/' "$(pip show yt-dlp | grep Location | awk '{print $2}')/yt_dlp/extractor/youtube.py"
 
 RUN apt-get purge -y wget unzip xz-utils && apt-get autopurge -y && apt clean -y
 

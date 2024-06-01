@@ -5,6 +5,7 @@ import json
 import getConfig
 import requests
 import base64
+from subprocess import Popen, run
 
 def is_video_private(id):
     url = "https://www.youtube.com/watch?v={0}".format(id)
@@ -36,6 +37,7 @@ def is_video_private(id):
                 
                 
                 json_out_path = os.path.join(getConfig.getUnarchivedTempFolder(),"{0}.info.json".format(id))
+                os.makedirs(os.path.dirname(json_out_path), exist_ok=True)
                 with open(json_out_path, 'w', encoding='utf-8') as json_file:
                     json.dump(info_dict, json_file, ensure_ascii=False, indent=4)
                 create_yta_json(id)
@@ -147,6 +149,15 @@ def create_yta_json(id):
     yta_json = os.path.join(getConfig.getUnarchivedTempFolder(),"{0}-yta.info.json".format(id))
     with open(yta_json, 'w', encoding='utf-8') as json_file:
         json.dump(best, json_file, ensure_ascii=False, indent=4)
+        
+    output_path = yt_dlp.YoutubeDL({}).prepare_filename(info_dict=data, outtmpl=os.path.join(getConfig.getUnarchivedFolder(),getConfig.get_ytdlp()))
+    
+        
+    download_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'runYTAraw.py')
+    command = ["python", download_script, yta_json, output_path, ytdlp_json]
+    #print(command)
+    Popen(command, start_new_session=True)
+    #run(command)
     
 def main(id=None):
     # If system args were also none, raise exception
@@ -155,4 +166,4 @@ def main(id=None):
     
     is_video_private(id)
 
-main("pdRrz4zZeMI")
+main("j6l4JDvIIeo")

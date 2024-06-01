@@ -38,7 +38,7 @@ def get_ytdlp():
         output_folder = str(PurePath(output_folder,output_folder))
     
     #out += " -o {0}".format(output_folder)
-    str(Path(config.cookies_file))
+    #str(Path(config.cookies_file))
     out += str(Path(output_folder))
     return out
 
@@ -244,6 +244,24 @@ def getUnarchivedTempFolder():
             return getTempFolder()
     except AttributeError:
         return getTempFolder()
+    return output
+
+def getUnarchivedFolder():
+    output = None
+    try:
+        output = config.unarchiveddir
+        if output is None:
+            return getDoneFolder()
+    except AttributeError:
+        return getDoneFolder()
+    return output
+
+def getOutputTemplateYTAraw():
+    output = None
+    try:
+        output = config.output_folder.replace('%(fulltitle)s', '%(title)s')
+    except AttributeError:
+        pass
     return output
 
 def main(function):

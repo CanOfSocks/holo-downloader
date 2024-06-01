@@ -87,5 +87,5 @@ donedir = '/app/Done/'
 membersdir = "/app/Members"
 communitydir = "/app/CommunityPosts"
 
-unarchiveddir = "/app/unarchived"
-unarchivedtempdir = "/app/temp/unarchived"
+unarchiveddir = "A:\\Users\\uncle\\Documents\\Scripts"
+unarchivedtempdir = "A:\\Users\\uncle\\Documents\\Scripts\\temp"
