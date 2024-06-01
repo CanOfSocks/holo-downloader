@@ -101,7 +101,7 @@ def main(command=None, unarchived=False):
         import time
         threads = []
         for stream in streams:
-            t = threading.Thread(target=unarchived.main, args=(stream), daemon=True)
+            t = threading.Thread(target=unarchived.main, args=(stream,), daemon=True)
             threads.append(t)
             t.start()
             time.sleep(3.0)
