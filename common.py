@@ -3,13 +3,14 @@ from config import title_filter,description_filter
 from yt_dlp import YoutubeDL
 import getConfig
 from datetime import datetime, timedelta, timezone    
-
+import os
 
 
 def vid_executor(streams, command):    
     if(command == "spawn"):
+        download_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'unarchived.py')
         for live in streams:
-            command = ["python", "/app/downloadVid.py", live]
+            command = ["python", download_script, live]
             #Popen(command)
             Popen(command, start_new_session=True)
     elif(command == "bash"):
@@ -107,7 +108,7 @@ def filtering(live,channel_id):
 #    else:
 #        return False
        
-def withinFuture(releaseTime):
+def withinFuture(releaseTime=None):
     #Assume true if value missing
     lookahead = getConfig.getLookAhead()
     if(not releaseTime or not lookahead):
@@ -168,3 +169,23 @@ def get_upcoming_or_live_videos(channel_id, tab):
 
 
         return list(set(upcoming_or_live_videos))
+    
+def combine_unarchived(ids):
+    import os
+    directory = getConfig.getUnarchivedTempFolder()
+    files = [f for f in os.listdir(directory) if (os.path.isfile(os.path.join(directory, f)) and os.path.join(directory, f).endswith('.info.json'))]
+    id_set = set()
+    
+    for id in ids:
+        id_set.add(id)
+    for file in files:
+        id = file.replace('.info.json', '')
+        id_set.add(id)
+    
+    
+
+    unarchived_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'unarchived.py')
+    for live in id_set:
+        command = ["python", unarchived_script, live]
+        #Popen(command)
+        Popen(command, start_new_session=True)

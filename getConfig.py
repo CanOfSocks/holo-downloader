@@ -236,6 +236,16 @@ def getCommunityTabDirectory():
         pass
     return output 
 
+def getUnarchivedTempFolder():
+    output = None
+    try:
+        output = config.unarchivedtempdir
+        if output is None:
+            return getTempFolder()
+    except AttributeError:
+        return getTempFolder()
+    return output
+
 def main(function):
     match function:
         case "cookies":

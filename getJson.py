@@ -5,7 +5,7 @@ from sys import argv
 import common
 #import json
 from datetime import datetime
-from config import channel_ids_to_match
+
 
 url = "https://holo.dev/api/v1/lives/open"
 
@@ -43,7 +43,7 @@ class json_object:
 #        return True 
 
     
-def getStreams():
+def getStreams(unarchived=False):
     # List to store the matching live streams
     matching_streams = []
 
@@ -62,6 +62,12 @@ def getStreams():
             for live in data['lives']:
                 videos.append(json_object(live))
                 
+            # Get dictionary depending on which search (unarchived/normal)    
+            if unarchived:
+                from config import unarchived_channel_ids_to_match as channel_ids_to_match
+            else:
+                from config import channel_ids_to_match
+                
             #Run for each class object made
             for live in videos:            
                 # Check if the "channel_id" is in the dictionary
@@ -72,17 +78,34 @@ def getStreams():
                     
                     if(live.platform == "youtube"):
                         #print(time_difference)
-                        if(common.withinFuture and common.filtering(live, live.get('channel_id'))):
-                            matching_streams.append(live.get('id'))
+                        if unarchived:
+                            if common.withinFuture(live.start_at.timestamp()):
+                                matching_streams.append(live.get('id'))
+                        else:
+                            if(common.withinFuture(live.start_at.timestamp()) and common.filtering(live, live.get('channel_id'))):
+                                matching_streams.append(live.get('id'))
 
     # Print the list of matching streams as a JSON representation
     #matching_streams_json = json.dumps(matching_streams)
     return matching_streams
 
 
-def main(command=None):
-    streams = getStreams()
-    common.vid_executor(streams, command)
+def main(command=None, unarchive=False):
+    streams = getStreams(unarchive)
+    if unarchive:
+        import unarchived
+        import threading
+        import time
+        threads = []
+        for stream in streams:
+            t = threading.Thread(target=unarchived.main, args=(stream), daemon=True)
+            threads.append(t)
+            t.start()
+            time.sleep(3.0)
+        for t in threads:
+            t.join()
+    else:
+        common.vid_executor(streams, command)
     
 
 

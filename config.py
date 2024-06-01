@@ -86,3 +86,6 @@ tempdir = '/app/temp/'
 donedir = '/app/Done/'
 membersdir = "/app/Members"
 communitydir = "/app/CommunityPosts"
+
+unarchiveddir = "/app/unarchived"
+unarchivedtempdir = "/app/temp/unarchived"
