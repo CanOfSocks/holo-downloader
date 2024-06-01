@@ -94,7 +94,7 @@ def getStreams(unarchived=False):
 
 def main(command=None, unarchived=False):
     streams = getStreams(unarchived)
-    if unarchive:
+    if unarchived:
         import unarchived
         import threading
         import time
