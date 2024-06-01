@@ -92,8 +92,8 @@ def getStreams(unarchived=False):
     return matching_streams
 
 
-def main(command=None, unarchive=False):
-    streams = getStreams(unarchive)
+def main(command=None, unarchived=False):
+    streams = getStreams(unarchived)
     if unarchive:
         import unarchived
         import threading
