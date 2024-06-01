@@ -8,7 +8,7 @@ import os
 
 def vid_executor(streams, command):    
     if(command == "spawn"):
-        download_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'unarchived.py')
+        download_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloadVid.py')
         for live in streams:
             command = ["python", download_script, live]
             #Popen(command)
