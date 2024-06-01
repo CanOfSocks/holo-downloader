@@ -32,7 +32,7 @@ END
     if [ -n "${UNARCHIVEDSCHEDULE}" ]; then
         CRON_CONTENT+="${UNARCHIVEDSCHEDULE} /app/getVids.py 'unarchived' > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     else
-        CRON_CONTENT+="*/30 * * * * /app/getVids.py 'unarchived' > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
+        CRON_CONTENT+="*/30 * * * * /app/getVids.py 'spawn' 'unarchived' > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     fi
 
     CRON_CONTENT+="@reboot python /app/discord_web.py '0' 'starting'"
