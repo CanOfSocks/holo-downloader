@@ -67,7 +67,9 @@ def getStreams(unarchived=False):
                 from config import unarchived_channel_ids_to_match as channel_ids_to_match
             else:
                 from config import channel_ids_to_match
-                
+            
+            if channel_ids_to_match is None:
+                return
             #Run for each class object made
             for live in videos:            
                 # Check if the "channel_id" is in the dictionary
@@ -114,5 +116,9 @@ if __name__ == "__main__":
         command = argv[1]
     except IndexError:
         command = None
+    try:
+        unarchive = argv[2]
+    except IndexError:
+        pass
 
     main(command)

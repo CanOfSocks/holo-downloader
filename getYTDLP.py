@@ -3,7 +3,7 @@ from sys import argv
 import common
 
 
-def getVideos(channel_ids_to_match, command=None, frequency=None):
+def getVideos(channel_ids_to_match, command=None):
     from random import uniform
     all_lives = []
     for channel in channel_ids_to_match:
@@ -15,10 +15,14 @@ def getVideos(channel_ids_to_match, command=None, frequency=None):
             print(("Error fetching streams for {0}. Check cookies. \n{1}".format(channel,e)))
     common.vid_executor(all_lives, command)
        
-def main(command=None, frequency=None):
+def main(command=None, unarchived = False):
     try:
-        from config import channel_ids_to_match
-        getVideos(channel_ids_to_match, command, frequency)
+        if unarchived:
+            from config import unarchived_channel_ids_to_match as channel_ids_to_match
+        else:
+            from config import channel_ids_to_match
+        if channel_ids_to_match:
+            getVideos(channel_ids_to_match, command)
     except ImportError:
         pass
 if __name__ == "__main__":
@@ -27,8 +31,8 @@ if __name__ == "__main__":
     except IndexError:
         command = None
     try:
-        frequency = argv[2]
+        unarchived = argv[2]
     except IndexError:
-        frequency = None
+        pass
 
-    main(command, frequency)
+    main(command, unarchived=unarchived)

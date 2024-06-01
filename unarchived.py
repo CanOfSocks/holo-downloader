@@ -155,7 +155,7 @@ def create_yta_json(id):
         
     download_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'runYTAraw.py')
     command = ["python", download_script, yta_json, output_path, ytdlp_json]
-    #print(command)
+    #print(' '.join(command))
     Popen(command, start_new_session=True)
     #run(command)
     
@@ -165,5 +165,3 @@ def main(id=None):
         raise Exception("No video ID provided, unable to continue")
     
     is_video_private(id)
-
-main("j6l4JDvIIeo")

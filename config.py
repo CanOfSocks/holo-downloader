@@ -3,7 +3,7 @@ channel_ids_to_match = {
     "Gawr Gura Ch. hololive-EN": "UCoSrY_IQQVpmIRZ9Xf-y93g",
     "Watson Amelia Ch. hololive-EN": "UCyl1z3jo3XHR1riLFKG5UAg",
     "Mori Calliope Ch. hololive-EN": "UCL_qhgtOy0dy1Agp8vkySQg",
-    "Ninomae Ina'nis Ch. hololive-EN": "UCMwGHR0BTZuLsmjY_NT5Pwg",
+    
     "Fauna": "UCO_aKKYxn4tvrqPjcTzZ6EQ"
     
     # Add more channels as needed
@@ -27,6 +27,9 @@ community_tab ={
 
 webhook_url = "https://discord.com/api/webhooks/xxxxxxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyy"
 
+unarchived_channel_ids_to_match = {
+    "Ninomae Ina'nis Ch. hololive-EN": "UCMwGHR0BTZuLsmjY_NT5Pwg",
+}
 
 ### Video fetch method
 
@@ -87,5 +90,5 @@ donedir = '/app/Done/'
 membersdir = "/app/Members"
 communitydir = "/app/CommunityPosts"
 
-unarchiveddir = "A:\\Users\\uncle\\Documents\\Scripts"
-unarchivedtempdir = "A:\\Users\\uncle\\Documents\\Scripts\\temp"
+unarchiveddir = "/app/unarchived"
+unarchivedtempdir = "/app/temp/unarchived"
