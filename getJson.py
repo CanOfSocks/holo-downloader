@@ -68,8 +68,8 @@ def getStreams(unarchived=False):
             else:
                 from config import channel_ids_to_match
             
-            if channel_ids_to_match is None:
-                return
+            #if not channel_ids_to_match:
+            #    return
             #Run for each class object made
             for live in videos:            
                 # Check if the "channel_id" is in the dictionary
