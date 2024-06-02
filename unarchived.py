@@ -53,6 +53,8 @@ def is_video_private(id):
                 except e:
                     print("Error processing {0} - {1}".format(id,e))
                 return
+            elif 'This live event will begin in' in str(e):
+                return
             else:
                 raise e
     existing_file = os.path.join(getConfig.getUnarchivedTempFolder(),"{0}.info.json".format(id))
@@ -64,7 +66,7 @@ def is_video_private(id):
             # Load the JSON data from the file
             data = json.load(file)
         if data and 'epoch' in data:
-            current_time = time
+            current_time = time()
             if ((current_time - data['epoch']) / 3600) > 6:
                 print("JSON for {0} is older than 6 hours, removing...".format(id))
                 os.remove(existing_file)
