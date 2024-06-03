@@ -25,7 +25,10 @@ def getVideos(channel_ids_to_match, command=None, unarchived = False):
             #t = threading.Thread(target=unarchived.main, args=(stream,), daemon=True)
             #threads.append(t)
             #t.start()
-            unarchived.main(stream)
+            try:
+                unarchived.main(stream)
+            except Exception as e:
+                print(e)
             time.sleep(1.0)
         #for t in threads:
             #t.join()
