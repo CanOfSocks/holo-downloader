@@ -86,7 +86,7 @@ def get_image(url):
 
 # FROM https://github.com/Spicadox/auto-ytarchive-raw/blob/master/getjson.py
 def create_yta_json(id):
-    from datetime import datetime, timezone
+    from datetime import datetime
     ytdlp_json = os.path.join(getConfig.getUnarchivedTempFolder(),"{0}.info.json".format(id))
     data = None
     if os.path.exists(ytdlp_json):
@@ -125,14 +125,14 @@ def create_yta_json(id):
                 "description": data.get('description'),
                 "id": data.get('id'),
                 # Fallback to release_timestamp to timestamp to epoch and make it zero (1/1/1970) if neither
-                "startTimestamp": datetime.fromtimestamp(data.get('release_timestamp', data.get('timestamp', data.get('epoch',0))), tz=timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                "startTimestamp": datetime.fromtimestamp(data.get('release_timestamp', data.get('timestamp', data.get('epoch',0))), tz=datetime.now().tzinfo).strftime('%Y-%m-%dT%H:%M:%SZ'),
                 "thumbnail": data.get('b64_img'),
                 "thumbnailUrl": data.get('best_thumb'),
                 "title": data.get('fulltitle')
             },
         "other": {},
         "version": VERSION,
-        "createTime": datetime.fromtimestamp(data.get('epoch', datetime.now().timestamp()), tz=timezone.utc).isoformat()
+        "createTime": datetime.fromtimestamp(data.get('epoch', datetime.now().timestamp()), tz=datetime.now().tzinfo).isoformat()
     }    
     #Get best available format for video and audio
     for video_format in PRIORITY['VIDEO']:
