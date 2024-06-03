@@ -43,6 +43,8 @@ def run_yta_raw(json_file, output_path = None, ytdlp_json = None):
         os.remove(json_file)
         if ytdlp_json and output_path:
             move(ytdlp_json, '{0}.info.json'.format(output))
+            from downloadVid import replace_ip_in_json
+            replace_ip_in_json('{0}.info.json'.format(output))
         if data:
             discord_web.main(data['metadata']['id'], "done")
         
