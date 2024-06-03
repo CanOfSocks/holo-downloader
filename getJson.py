@@ -97,19 +97,20 @@ def main(command=None, unarchived=False):
     streams = getStreams(unarchived)
     if unarchived:
         import unarchived
-        import threading
+        #import threading
         import time
         streams = common.combine_unarchived(streams)
         
         # Threading may be unnecessary
-        threads = []
+        #threads = []
         for stream in streams:
-            t = threading.Thread(target=unarchived.main, args=(stream,), daemon=True)
-            threads.append(t)
-            t.start()
-            time.sleep(3.0)
-        for t in threads:
-            t.join()
+            #t = threading.Thread(target=unarchived.main, args=(stream,), daemon=True)
+            #threads.append(t)
+            #t.start()
+            unarchived.main(stream)
+            time.sleep(1.0)
+        #for t in threads:
+            #t.join()
     else:
         common.vid_executor(streams, command)
     
