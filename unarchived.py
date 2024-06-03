@@ -45,7 +45,7 @@ def is_video_private(id):
 
         except yt_dlp.utils.DownloadError as e:
             # If an error occurs, we can assume the video is private or unavailable
-            if 'Private video' in str(e):
+            if 'video is private' in str(e):
                 print("Video {0} is private".format(id))
                 #if os.
                 try:
