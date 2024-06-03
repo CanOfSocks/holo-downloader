@@ -124,7 +124,8 @@ def create_yta_json(id):
                 "channelURL": data.get('channel_url'),
                 "description": data.get('description'),
                 "id": data.get('id'),
-                "startTimestamp": datetime.fromtimestamp(data.get('release_timestamp'), tz=timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                # Fallback to release_timestamp to timestamp to epoch and make it zero (1/1/1970) if neither
+                "startTimestamp": datetime.fromtimestamp(data.get('release_timestamp', data.get('timestamp', data.get('epoch',0))), tz=timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
                 "thumbnail": data.get('b64_img'),
                 "thumbnailUrl": data.get('best_thumb'),
                 "title": data.get('fulltitle')
