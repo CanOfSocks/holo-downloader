@@ -18,7 +18,7 @@ def run_yta_raw(json_file, output_path = None, ytdlp_json = None):
         command = ['ytarchive-raw-go-windows-amd64']
     else:
         command = ['ytarchive-raw-go']
-    command += [ '--threads', '20', '--overwrite-temp', '-i', json_file, '-v']
+    command += [ '--threads', '20', '--overwrite-temp', '-i', json_file, '--log-level', 'error']
     if getConfig.getUnarchivedTempFolder():
         command += ['--temp-dir', str(getConfig.getUnarchivedTempFolder())]
     #if not getConfig.getMux():
