@@ -53,7 +53,7 @@ def is_video_private(id):
                 except e:
                     print("Error processing {0} - {1}".format(id,e))
                 return
-            elif 'This live event will begin in' in str(e):
+            elif 'This live event will begin in' in str(e) or 'Premieres in' in str(e):
                 return
             else:
                 raise e
