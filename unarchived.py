@@ -74,6 +74,18 @@ def is_video_private(id):
             if ((current_time - data['epoch']) / 3600) > 6 or (os.path.getmtime(existing_file) / 3600) > 6:
                 print("JSON for {0} is older than 6 hours, removing...".format(id))
                 os.remove(existing_file)
+    elif os.path.exists(os.path.join(getConfig.getUnarchivedTempFolder(),"{0}-yta.info.json".format(id))):
+        existing_file = os.path.join(getConfig.getUnarchivedTempFolder(),"{0}-yta.info.json".format(id))
+        with open(existing_file, 'r') as file:
+            # Load the JSON data from the file
+            data = json.load(file)
+        if data and 'createTime' in data:
+            current_time = time()
+            from datetime import datetime
+            if ((current_time - datetime.fromisoformat(data['createTime']).timestamp()) / 3600) > 6 or (os.path.getmtime(existing_file) / 3600) > 6:
+                print("YTA-raw JSON for {0} is older than 6 hours, removing...".format(id))
+                os.remove(existing_file)
+            
 
 def get_image(url):
     response = requests.get(url)
