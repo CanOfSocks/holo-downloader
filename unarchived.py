@@ -67,7 +67,7 @@ def is_video_private(id):
             data = json.load(file)
         if data and 'epoch' in data:
             current_time = time()
-            if ((current_time - data['epoch']) / 3600) > 6:
+            if ((current_time - data['epoch']) / 3600) > 6 or (os.path.getmtime(existing_file) / 3600) > 6:
                 print("JSON for {0} is older than 6 hours, removing...".format(id))
                 os.remove(existing_file)
 
