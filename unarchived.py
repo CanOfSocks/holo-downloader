@@ -126,7 +126,7 @@ def create_yta_json(id):
                 "description": data.get('description'),
                 "id": data.get('id'),
                 # Fallback to release_timestamp to timestamp to epoch and make it zero (1/1/1970) if neither
-                "startTimestamp": datetime.fromtimestamp(data.get('release_timestamp', data.get('timestamp', data.get('epoch',0))), tz=timezone.utc).isoformat(),
+                "startTimestamp": datetime.fromtimestamp(data.get('release_timestamp', data.get('timestamp', data.get('epoch',datetime.now().timestamp()))), tz=timezone.utc).isoformat(),
                 "thumbnail": data.get('b64_img'),
                 "thumbnailUrl": data.get('best_thumb'),
                 "title": data.get('fulltitle')
