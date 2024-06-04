@@ -52,9 +52,10 @@ def is_video_private(id):
                     create_yta_json(id)
                 except e:
                     print("Error processing {0} - {1}".format(id,e))
-                return
             elif 'This live event will begin in' in str(e) or 'Premieres in' in str(e):
-                return
+                pass
+            elif "This video is available to this channel's members on level" in str(e):
+                pass
             else:
                 raise e
     existing_file = os.path.join(getConfig.getUnarchivedTempFolder(),"{0}.info.json".format(id))
