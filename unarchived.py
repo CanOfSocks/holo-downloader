@@ -50,6 +50,9 @@ def is_video_private(id):
                 #if os.
                 try:
                     create_yta_json(id)
+                    # Add delay before age check
+                    from time import sleep
+                    sleep(5.0)
                 except e:
                     print("Error processing {0} - {1}".format(id,e))
             elif 'This live event will begin in' in str(e) or 'Premieres in' in str(e):
