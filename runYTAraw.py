@@ -39,12 +39,12 @@ def run_yta_raw(json_file, output_path = None, ytdlp_json = None):
         #print(e.stderr.decode())
         discord_web.main(data['metadata']['id'], "error")
         raise Exception(("Error downloading unarchived video, Code: {0}".format(e.returncode)))
-    if result.returncode == 0:
-        os.remove(json_file)
+    if result.returncode == 0:        
         if ytdlp_json and output_path:
             move(ytdlp_json, '{0}.info.json'.format(output))
             from downloadVid import replace_ip_in_json
             replace_ip_in_json('{0}.info.json'.format(output))
+        os.remove(json_file)
         if data:
             discord_web.main(data['metadata']['id'], "done")
         
