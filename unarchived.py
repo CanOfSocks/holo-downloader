@@ -7,6 +7,44 @@ import requests
 import base64
 from subprocess import Popen, run
 
+def check_ytdlp_age(existing_file):    
+    from time import time
+    # Open the file
+    data = None
+    with open(existing_file, 'r') as file:
+        # Load the JSON data from the file
+        data = json.load(file)
+    if data and 'epoch' in data:
+        current_time = time()
+        if ((current_time - data['epoch']) / 3600) > 6 or (os.path.getmtime(existing_file) / 3600) > 6:
+            print("JSON for {0} is older than 6 hours, removing...".format(id))
+            os.remove(existing_file)
+    # Return False if removed, otherwise True
+            return False
+    elif (os.path.getmtime(existing_file) / 3600) > 6:
+        os.remove(existing_file)
+        return False
+    return True
+
+def check_yta_raw_age(existing_file):   
+    from time import time 
+    existing_file = os.path.join(getConfig.getUnarchivedTempFolder(),"{0}-yta.info.json".format(id))
+    with open(existing_file, 'r') as file:
+        # Load the JSON data from the file
+        data = json.load(file)
+    if data and 'createTime' in data:
+        current_time = time()
+        from datetime import datetime
+        if ((current_time - datetime.fromisoformat(data['createTime']).timestamp()) / 3600) > 6 or (os.path.getmtime(existing_file) / 3600) > 6:
+            print("YTA-raw JSON for {0} is older than 6 hours, removing...".format(id))
+            os.remove(existing_file)
+    # Return False if removed, otherwise True
+            return False
+    elif (os.path.getmtime(existing_file) / 3600) > 6:
+        os.remove(existing_file)
+        return False
+    return True            
+
 def is_video_private(id):
     url = "https://www.youtube.com/watch?v={0}".format(id)
     ydl_opts = {
@@ -51,8 +89,7 @@ def is_video_private(id):
                 try:
                     create_yta_json(id)
                     # Add delay before age check
-                    from time import sleep
-                    sleep(5.0)
+                    return
                 except e:
                     print("Error processing {0} - {1}".format(id,e))
             elif 'This live event will begin in' in str(e) or 'Premieres in' in str(e):
@@ -63,28 +100,10 @@ def is_video_private(id):
                 raise e
     existing_file = os.path.join(getConfig.getUnarchivedTempFolder(),"{0}.info.json".format(id))
     if os.path.exists(existing_file):
-        from time import time
-        # Open the file
-        data = None
-        with open(existing_file, 'r') as file:
-            # Load the JSON data from the file
-            data = json.load(file)
-        if data and 'epoch' in data:
-            current_time = time()
-            if ((current_time - data['epoch']) / 3600) > 6 or (os.path.getmtime(existing_file) / 3600) > 6:
-                print("JSON for {0} is older than 6 hours, removing...".format(id))
-                os.remove(existing_file)
+        check_ytdlp_age(existing_file)
     elif os.path.exists(os.path.join(getConfig.getUnarchivedTempFolder(),"{0}-yta.info.json".format(id))):
         existing_file = os.path.join(getConfig.getUnarchivedTempFolder(),"{0}-yta.info.json".format(id))
-        with open(existing_file, 'r') as file:
-            # Load the JSON data from the file
-            data = json.load(file)
-        if data and 'createTime' in data:
-            current_time = time()
-            from datetime import datetime
-            if ((current_time - datetime.fromisoformat(data['createTime']).timestamp()) / 3600) > 6 or (os.path.getmtime(existing_file) / 3600) > 6:
-                print("YTA-raw JSON for {0} is older than 6 hours, removing...".format(id))
-                os.remove(existing_file)
+        check_yta_raw_age(existing_file)
             
 
 def get_image(url):
@@ -105,7 +124,7 @@ def create_yta_json(id):
     from datetime import datetime, timezone
     ytdlp_json = os.path.join(getConfig.getUnarchivedTempFolder(),"{0}.info.json".format(id))
     data = None
-    if os.path.exists(ytdlp_json):
+    if os.path.exists(ytdlp_json) and check_ytdlp_age(ytdlp_json):        
         with open(ytdlp_json, 'r', encoding='utf-8') as file:
             # Load the JSON data from the file
             data = json.load(file)
