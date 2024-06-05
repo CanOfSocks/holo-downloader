@@ -9,6 +9,11 @@ from subprocess import Popen, run
 
 def check_ytdlp_age(existing_file):    
     from time import time
+    if (os.path.getmtime(existing_file) / 3600) > 6:
+        os.remove(existing_file)
+        return False
+    return True
+"""
     # Open the file
     data = None
     with open(existing_file, 'r') as file:
@@ -25,10 +30,14 @@ def check_ytdlp_age(existing_file):
         os.remove(existing_file)
         return False
     return True
-
+"""
 def check_yta_raw_age(existing_file):   
-    from time import time 
-    existing_file = os.path.join(getConfig.getUnarchivedTempFolder(),"{0}-yta.info.json".format(id))
+    from time import time
+    if (os.path.getmtime(existing_file) / 3600) > 6:
+        os.remove(existing_file)
+        return False
+    return True
+"""
     with open(existing_file, 'r') as file:
         # Load the JSON data from the file
         data = json.load(file)
@@ -44,7 +53,7 @@ def check_yta_raw_age(existing_file):
         os.remove(existing_file)
         return False
     return True            
-
+"""
 def is_video_private(id):
     url = "https://www.youtube.com/watch?v={0}".format(id)
     ydl_opts = {
