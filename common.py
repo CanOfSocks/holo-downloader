@@ -172,6 +172,8 @@ def get_upcoming_or_live_videos(channel_id, tab):
     
 def combine_unarchived(ids):
     import os
+    import re
+    yta_pattern = "^.{11}-yta\.info\.json$"
     directory = getConfig.getUnarchivedTempFolder()
     files = [f for f in os.listdir(directory) if (os.path.isfile(os.path.join(directory, f)) and os.path.join(directory, f).endswith('.info.json'))]
     id_set = set()
@@ -179,6 +181,8 @@ def combine_unarchived(ids):
     for id in ids:
         id_set.add(id)
     for file in files:
+        if re.match(yta_pattern, file):
+            continue
         id = file.replace('.info.json', '')
         id_set.add(id)
     
