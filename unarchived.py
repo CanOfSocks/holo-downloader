@@ -9,7 +9,9 @@ from subprocess import Popen, run
 
 def check_ytdlp_age(existing_file):    
     from time import time
-    if (os.path.getmtime(existing_file) / 3600) > 6:
+    current_time = time()
+    if (current_time - os.path.getmtime(existing_file) / 3600) > 6:
+        print("JSON for {0} is older than 6 hours, removing...".format(id))
         os.remove(existing_file)
         return False
     return True
@@ -33,7 +35,9 @@ def check_ytdlp_age(existing_file):
 """
 def check_yta_raw_age(existing_file):   
     from time import time
-    if (os.path.getmtime(existing_file) / 3600) > 6:
+    current_time = time()
+    if (current_time - os.path.getmtime(existing_file) / 3600) > 6:
+        print("YTA-raw JSON for {0} is older than 6 hours, removing...".format(id))
         os.remove(existing_file)
         return False
     return True
