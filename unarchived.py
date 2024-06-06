@@ -91,9 +91,9 @@ def is_video_private(id):
     
     ydl_opts = {
         'retries': 25,
-        'wait_for_video': (5, 300),
+        'wait_for_video': (5, 900),
         'skip_download': True,
-        #'cookiefile': getConfig.getCookiesFile(),        
+        'cookiefile': getConfig.getCookiesFile(),        
         'quiet': True,
         'no_warnings': True,
         'extractor_args': 'youtube:player_client=web;skip=dash;formats=incomplete,duplicate',
