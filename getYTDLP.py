@@ -14,26 +14,9 @@ def getVideos(channel_ids_to_match, command=None, unarchived = False):
         except Exception as e:
             print(("Error fetching streams for {0}. Check cookies. \n{1}".format(channel,e)))
     if unarchived:
-        import unarchived
-        #import threading
-        import time
-        streams = common.combine_unarchived(streams)
-        
-        # Threading may be unnecessary
-        #threads = []
-        for stream in streams:
-            #t = threading.Thread(target=unarchived.main, args=(stream,), daemon=True)
-            #threads.append(t)
-            #t.start()
-            try:
-                unarchived.main(stream)
-            except Exception as e:
-                print(e)
-            time.sleep(1.0)
-        #for t in threads:
-            #t.join()
-    else:
-        common.vid_executor(all_lives, command)
+        all_lives = common.combine_unarchived(all_lives)
+
+    common.vid_executor(all_lives, command)
        
 def main(command=None, unarchived = False):
     try:

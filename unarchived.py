@@ -5,7 +5,14 @@ import json
 import getConfig
 import requests
 import base64
-from subprocess import Popen, run
+import subprocess
+#from yt_dlp.utils import DownloadError
+
+import psutil
+import sys
+from shutil import move
+import discord_web
+from json import load
 
 def check_ytdlp_age(existing_file):    
     from time import time
@@ -58,15 +65,39 @@ def check_yta_raw_age(existing_file):
         return False
     return True            
 """
+
+class MyLogger:
+    def __init__(self):
+        self.private_video_detected = False
+
+    def debug(self, msg):
+        #print(msg)
+        pass
+
+    def warning(self, msg):
+        #print(msg)
+        if "[youtube] Private video. Sign in if you've been granted access to this video" in msg:
+            raise yt_dlp.utils.DownloadError("Private video. Sign in if you've been granted access to this video")
+        
+
+    def error(self, msg):
+        print(msg)
+        pass
+            
 def is_video_private(id):
     url = "https://www.youtube.com/watch?v={0}".format(id)
+    
+    logger = MyLogger()
+    
     ydl_opts = {
         'retries': 25,
+        'wait_for_video': (5, 300),
         'skip_download': True,
-        'cookiefile': getConfig.getCookiesFile(),        
+        #'cookiefile': getConfig.getCookiesFile(),        
         'quiet': True,
         'no_warnings': True,
-        'extractor_args': 'youtube:player_client=web;skip=dash;formats=incomplete,duplicate'
+        'extractor_args': 'youtube:player_client=web;skip=dash;formats=incomplete,duplicate',
+        'logger': logger
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -96,7 +127,7 @@ def is_video_private(id):
 
         except yt_dlp.utils.DownloadError as e:
             # If an error occurs, we can assume the video is private or unavailable
-            if 'video is private' in str(e):
+            if 'video is private' in str(e) or "Private video. Sign in if you've been granted access to this video" in str(e):
                 print("Video {0} is private".format(id))
                 #if os.
                 try:
@@ -204,15 +235,88 @@ def create_yta_json(id):
     output_path = yt_dlp.YoutubeDL({}).prepare_filename(info_dict=data, outtmpl=os.path.join(getConfig.getUnarchivedFolder(),getConfig.get_ytdlp()))
     
         
-    download_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'runYTAraw.py')
-    command = ["python", download_script, yta_json, output_path, ytdlp_json]
+    #download_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'runYTAraw.py')
+    #command = ["python", download_script, yta_json, output_path, ytdlp_json]
+    run_yta_raw(yta_json, output_path, ytdlp_json)
+    
+def run_yta_raw(json_file, output_path = None, ytdlp_json = None):
+    data = None
+    with open(json_file, 'r', encoding='utf-8') as file:
+            # Load the JSON data from the file
+            data = load(file)
+    if data:
+        discord_web.main(data['metadata']['id'], "recording")
+    if os.name == 'nt':
+        command = ['ytarchive-raw-go-windows-amd64']
+    else:
+        command = ['ytarchive-raw-go']
+    command += [ '--threads', '20', '--overwrite-temp', '-i', json_file, '--log-level', 'error']
+    if getConfig.getUnarchivedTempFolder():
+        command += ['--temp-dir', str(getConfig.getUnarchivedTempFolder())]
+    #if not getConfig.getMux():
+    #    command += ["--merger", "download-only"]
+    if output_path:
+        output = output_path
+    elif getConfig.getOutputTemplateYTAraw():
+        output = ['--output', os.path.join(getConfig.getUnarchivedFolder(), getConfig.get_ytdlp)]
+    else:
+        output = ['--output', os.path.join(getConfig.getUnarchivedFolder(), '[%(upload_date)s] %(title)s [%(channel)s] (%(id)s)')]
+    command += ['--output', output]
     #print(' '.join(command))
-    Popen(command, start_new_session=True)
-    #run(command)
+    try:
+        
+        result = subprocess.run(command, check=True, text=True)
+    except subprocess.CalledProcessError as e:
+        #print(e.stdout.decode())
+        #print(e.stderr.decode())
+        discord_web.main(data['metadata']['id'], "error")
+        raise Exception(("Error downloading unarchived video, Code: {0}".format(e.returncode)))
+    if result.returncode == 0:        
+        if ytdlp_json and output_path:
+            move(ytdlp_json, '{0}.info.json'.format(output))
+            from downloadVid import replace_ip_in_json
+            replace_ip_in_json('{0}.info.json'.format(output))
+        os.remove(json_file)
+        if data:
+            discord_web.main(data['metadata']['id'], "done")
+        
+        
+        
+def is_script_running(script_name, id):
+    #current = psutil.Process()
+    #print("PID: {0}, command line: {1}, argument: {2}".format(current.pid, current.cmdline(), current.cmdline()[2:]))
+    current_pid = psutil.Process().pid
+    
+    for process in psutil.process_iter():
+        try:
+            process_cmdline = process.cmdline()
+            if (
+                process.pid != current_pid and
+                script_name in process_cmdline and
+                id in process_cmdline[2:]   # Needs testing between Windows and Postix to ensure compatibility
+            ):
+                return True
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            pass
+    return False
     
 def main(id=None):
     # If system args were also none, raise exception
+    script_name = sys.argv[0]
+    if id is None:
+        try:
+            id = sys.argv[1]
+        except:
+            raise Exception("No video ID provided, unable to continue")
     if id is None:
         raise Exception("No video ID provided, unable to continue")
     
+    if is_script_running(script_name, id):
+        #print("{0} already running, exiting...".format(id))
+        return 0
+    
     is_video_private(id)
+
+
+if __name__ == "__main__":
+    main()

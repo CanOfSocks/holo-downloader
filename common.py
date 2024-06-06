@@ -4,15 +4,21 @@ from yt_dlp import YoutubeDL
 import getConfig
 from datetime import datetime, timedelta, timezone    
 import os
+from time import sleep
 
 
-def vid_executor(streams, command):    
+def vid_executor(streams, command, unarchived = False):    
     if(command == "spawn"):
-        download_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloadVid.py')
+        if unarchived == True:
+            download_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'unarchived.py')
+        else:
+            download_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloadVid.py')
         for live in streams:
             command = ["python", download_script, live]
             #Popen(command)
             Popen(command, start_new_session=True)
+            from time import sleep
+            sleep(1.0)
     elif(command == "bash"):
         bash_array = ' '.join(streams)
         print(bash_array)
