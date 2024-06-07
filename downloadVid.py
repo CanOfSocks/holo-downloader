@@ -12,6 +12,7 @@ from time import sleep, asctime
 #id = sys.argv[1]
 #id = "kJGsWORSg-4"
 #outputFile = None
+kill_all = False
 
 def createTorrent(output):
     if not getConfig.getTorrent():
@@ -107,14 +108,25 @@ def download_chat_ytdlp(video_url,outputFile):
 def download_chat(id,outputFile):
     if getConfig.getChat() and not getConfig.vid_Only():        
         try:
-            chatRunner = subprocess.run(chatBuilder(id, outputFile), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+            chatRunner = subprocess.Popen(chatBuilder(id, outputFile), stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
             
+            while chatRunner.poll() is None:
+                if kill_all:
+                    chatRunner.terminate()
+                    break
+                sleep(0.5)
         except subprocess.CalledProcessError as e:
             print(e.stderr)
             #If fail, try use without cookies
             print("Failed to run chatdownloader for {0} with cookies, trying without...".format(id))
             try:
-                chatRunner = subprocess.run(chatBuilder(id, outputFile, False), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)   
+                chatRunner = subprocess.Popen(chatBuilder(id, outputFile, False), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)   
+                
+                while chatRunner.poll() is None:
+                    if kill_all:
+                        chatRunner.terminate()
+                        break
+                    sleep(0.5)
             except:
                 print("Downloading chat for {0} failed, trying once more with yt-dlp".format(id))
                 try:
@@ -203,6 +215,8 @@ def downloader(id,outputTemplate, members):
     except subprocess.CalledProcessError as e:
         print(e.stderr)
         discord_web.main(id, "error")
+        kill_all = True
+        sleep(1.0)
         raise Exception(("{2} - Error downloading video: {0}, Code: {1}".format(id, e.returncode, asctime())))
         return
     # Wait for remaining processes
