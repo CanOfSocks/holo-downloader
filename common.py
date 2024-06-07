@@ -13,12 +13,13 @@ def vid_executor(streams, command, unarchived = False):
             download_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'unarchived.py')
         else:
             download_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloadVid.py')
+        from time import sleep
+        from random import uniform
         for live in streams:
             command = ["python", download_script, live]
             #Popen(command)
             Popen(command, start_new_session=True)
-            from time import sleep
-            from random import uniform
+
             sleep(uniform(min(len(streams),30),min(2*len(streams),90)))
     elif(command == "bash"):
         bash_array = ' '.join(streams)
