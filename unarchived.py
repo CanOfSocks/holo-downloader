@@ -91,7 +91,7 @@ def is_video_private(id):
     
     ydl_opts = {
         'retries': 25,
-        'wait_for_video': (5, 900),
+        'wait_for_video': (5, 1800),
         'skip_download': True,
         'cookiefile': getConfig.getCookiesFile(),        
         'quiet': True,
