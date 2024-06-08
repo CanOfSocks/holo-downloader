@@ -215,6 +215,7 @@ def downloader(id,outputTemplate, members):
     except subprocess.CalledProcessError as e:
         print(e.stderr)
         discord_web.main(id, "error")
+        global kill_all
         kill_all = True
         sleep(1.0)
         raise Exception(("{2} - Error downloading video: {0}, Code: {1}".format(id, e.returncode, asctime())))
