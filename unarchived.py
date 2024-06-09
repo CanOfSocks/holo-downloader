@@ -76,7 +76,7 @@ class MyLogger:
 
     def warning(self, msg):
         #print(msg)
-        if "[youtube] Private video. Sign in if you've been granted access to this video" in msg:
+        if "[youtube] Private video. Sign in if you've been granted access to this video" in msg or "This video is private" in msg:
             raise yt_dlp.utils.DownloadError("Private video. Sign in if you've been granted access to this video")
         
 
