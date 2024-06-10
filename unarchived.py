@@ -17,12 +17,6 @@ from json import load
 def check_ytdlp_age(existing_file):    
     from time import time
     current_time = time()
-    if (current_time - os.path.getmtime(existing_file) / 3600) > 6:
-        print("JSON for {0} is older than 6 hours, removing...".format(os.path.basename(existing_file)))
-        os.remove(existing_file)
-        return False
-    return True
-"""
     # Open the file
     data = None
     with open(existing_file, 'r') as file:
@@ -30,41 +24,35 @@ def check_ytdlp_age(existing_file):
         data = json.load(file)
     if data and 'epoch' in data:
         current_time = time()
-        if ((current_time - data['epoch']) / 3600) > 6 or (os.path.getmtime(existing_file) / 3600) > 6:
-            print("JSON for {0} is older than 6 hours, removing...".format(id))
+        if ((current_time - data['epoch']) / 3600) > 6 or (current_time - os.path.getmtime(existing_file) / 3600) > 6:
+            print("JSON for {0} is older than 6 hours, removing...".format(os.path.basename(existing_file)))
             os.remove(existing_file)
     # Return False if removed, otherwise True
             return False
-    elif (os.path.getmtime(existing_file) / 3600) > 6:
+    elif (current_time - os.path.getmtime(existing_file) / 3600) > 6:
         os.remove(existing_file)
         return False
     return True
-"""
+
 def check_yta_raw_age(existing_file):   
     from time import time
     current_time = time()
-    if (current_time - os.path.getmtime(existing_file) / 3600) > 6:
-        print("YTA-raw JSON for {0} is older than 6 hours, removing...".format(os.path.basename(existing_file)))
-        os.remove(existing_file)
-        return False
-    return True
-"""
+    
     with open(existing_file, 'r') as file:
         # Load the JSON data from the file
         data = json.load(file)
     if data and 'createTime' in data:
         current_time = time()
         from datetime import datetime
-        if ((current_time - datetime.fromisoformat(data['createTime']).timestamp()) / 3600) > 6 or (os.path.getmtime(existing_file) / 3600) > 6:
-            print("YTA-raw JSON for {0} is older than 6 hours, removing...".format(id))
+        if ((current_time - datetime.fromisoformat(data['createTime']).timestamp()) / 3600) > 6 or (current_time - os.path.getmtime(existing_file) / 3600) > 6:
+            print("{1}: YTA-raw JSON for {0} is older than 6 hours, removing...".format(os.path.basename(existing_file)))
             os.remove(existing_file)
     # Return False if removed, otherwise True
             return False
-    elif (os.path.getmtime(existing_file) / 3600) > 6:
+    elif (current_time - os.path.getmtime(existing_file) / 3600) > 6:
         os.remove(existing_file)
         return False
     return True            
-"""
 
 class MyLogger:
     def __init__(self):
