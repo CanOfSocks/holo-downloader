@@ -230,7 +230,7 @@ def downloader(id,outputTemplate, members):
             createTorrent(outputTemplate)
         except subprocess.CalledProcessError as e:
             print(e.stderr)
-            discord_web.main(id, "error")
+            discord_web.main(id, "error", message=e.stderr)
             raise Exception(("Error creating torrent for video: {0}, Code: {1}".format(id, e.returncode)))
         
     print("{0} finished successfully".format(id))

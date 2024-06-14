@@ -5,7 +5,7 @@ import sys
 from discord_webhook import DiscordWebhook, DiscordEmbed
 from config import webhook_url 
 
-def send_webhook(url, id="Unknown", status="error"):
+def send_webhook(url, id="Unknown", status="error", message=None):
     webhook = DiscordWebhook(url, rate_limit_retry=True)
     if(status == "starting"):
         title="Starting"
@@ -60,6 +60,9 @@ def send_webhook(url, id="Unknown", status="error"):
 
     # add embed object to webhook
     webhook.add_embed(embed)
+    
+    if status == "error" and message:
+        embed.add_embed_field(name="Error Message {0}".format(id), value=message)
 
     webhook_response = webhook.execute()
 
