@@ -259,7 +259,7 @@ def run_yta_raw(json_file, output_path = None, ytdlp_json = None):
     except subprocess.CalledProcessError as e:
         #print(e.stdout.decode())
         #print(e.stderr.decode())
-        discord_web.main(data['metadata']['id'], "error", message=e.stderr)
+        discord_web.main(data['metadata']['id'], "error", message=str(e.stderr)[-1500:])
         raise Exception(("Error downloading unarchived video, Code: {0}".format(e.returncode)))
     if result.returncode == 0:        
         if ytdlp_json and output_path:
