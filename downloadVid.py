@@ -214,7 +214,7 @@ def downloader(id,outputTemplate, members):
         result = subprocess.run(ytarchiveCMD, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
     except subprocess.CalledProcessError as e:
         print(e.stderr)
-        discord_web.main(id, "error")
+        discord_web.main(id, "error", message=str(e.stderr)[-1500:])
         global kill_all
         kill_all = True
         sleep(1.0)
