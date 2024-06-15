@@ -269,6 +269,7 @@ def run_yta_raw(json_file, output_path = None, ytdlp_json = None):
         os.remove(json_file)
         if data:
             discord_web.main(data['metadata']['id'], "done")
+        print("Finished downloading yta video: {0}".format(json_file))
         
         
         
