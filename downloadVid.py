@@ -104,7 +104,7 @@ def download_chat_ytdlp(video_url,outputFile):
     with yt_dlp.YoutubeDL(options) as ydl:
         ydl.download(video_url)
     return 0
-
+"""
 def download_chat(id,outputFile):
     if getConfig.getChat() and not getConfig.vid_Only():        
         try:
@@ -147,7 +147,7 @@ def download_chat(id,outputFile):
             print("Compressing chat for {0} failed".format(id))
             return 2 
     return 0
-
+"""
 def replace_ip_in_json(file_name):
     import re
     pattern = re.compile(r'((?:[0-9]{1,3}\.){3}[0-9]{1,3})|((?:[a-f0-9]{1,4}:){7}[a-f0-9]{1,4})')
@@ -165,7 +165,8 @@ def download_info(id,outputFile):
     if (getConfig.vid_Only() or not
             (getConfig.getThumbnail() or 
              getConfig.getDescription() or 
-             getConfig.getInfoJson())        
+             getConfig.getInfoJson() or
+             getConfig.getChat())        
     ):
         return 0
     options = {
@@ -181,13 +182,29 @@ def download_info(id,outputFile):
         'no_warnings': True,
         'live_from_start': True,
     }
+    
+    if getConfig.getChat():
+        options.update({
+            'writesubtitles': True,
+            'subtitleslangs': ['live_chat'],
+            'subtitlesformat': 'json',
+        })
+    
     url = 'https://www.youtube.com/watch?v={0}'.format(id)
     with yt_dlp.YoutubeDL(options) as ydl:
         ydl.download(url)
         try:
             replace_ip_in_json(("{0}.info.json".format(outputFile)))
+            
         except Exception as e:
             print("Unable to remove IP from info.json file for {0}".format(id))
+            print(e)
+            return 1
+        try:
+            compressChat(("{0}.live_chat.json".format(outputFile)))
+            
+        except Exception as e:
+            print("Unable to compress live_chat file for {0}".format(id))
             print(e)
             return 1
     return 0
@@ -200,10 +217,10 @@ def downloader(id,outputTemplate, members):
     
     # Start additional information downloaders
     discord_notify = threading.Thread(target=discord_web.main, args=(id, "recording"), daemon=True)
-    chat_downloader = threading.Thread(target=download_chat, args=(id,output), daemon=True)
+    #chat_downloader = threading.Thread(target=download_chat, args=(id,output), daemon=True)
     info_downloader = threading.Thread(target=download_info, args=(id,output), daemon=True)
     discord_notify.start()
-    chat_downloader.start()
+    #chat_downloader.start()
     info_downloader.start()
     
     
@@ -222,7 +239,7 @@ def downloader(id,outputTemplate, members):
         return
     # Wait for remaining processes
     discord_notify.join()
-    chat_downloader.join()
+    #chat_downloader.join()
     info_downloader.join()
         
     if(getConfig.getTorrent()):
