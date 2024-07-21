@@ -66,9 +66,9 @@ def send_webhook(url, id="Unknown", status="error", message=None):
 
     webhook_response = webhook.execute()
 
-def main(id, status):
+def main(id, status, message = None):
     if webhook_url is not None:
-        send_webhook(webhook_url, id, status)
+        send_webhook(webhook_url, id, status, message)
 
 
 if __name__ == "__main__":

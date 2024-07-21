@@ -98,7 +98,7 @@ By default, videos are checked every 2 minutes and membership videos every 5 min
 * ```torrentOptions``` - Array of options for torrent creator. Must include flags, as some options can appear more than once. Refer to the [py3createtorrent documentation](https://py3createtorrent.readthedocs.io/en/latest/user.html#full-usage-guide)
 * ```tempdir``` - Directory for temporary files
 * ```donedir``` - Directory of finished downloads. Files are moved here from temporary folder when successful
-* ```membersdir``` - Moves membership streams (subscriber_only availability) videos to here rather than ```donedir```. Only moves if folder is set, otherwise donedir is used
+* ```membersdir``` - Moves membership streams (subscriber_only availability) videos to here rather than ```donedir```. Only moves if folder is set, otherwise donedir is used.
 
 ### To-Do
 While some components have been marked as added, testing of full functionalility may be required
