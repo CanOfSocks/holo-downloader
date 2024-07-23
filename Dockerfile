@@ -37,7 +37,7 @@ RUN wget -q -O "/app/ytct.py" https://raw.githubusercontent.com/HoloArchivists/y
 RUN apt-get purge git -y && apt-get autopurge -y
 
 #Apply chat_downloader patch
-#RUN sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" /usr/local/lib/python*/site-packages/chat_downloader/sites/youtube.py
+RUN sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" /usr/local/lib/python*/site-packages/chat_downloader/sites/youtube.py
 #Apply patch to yt-dlp youtube extractor to make it work with yta-raw
 RUN sed -i '/if fmt.get('\'targetDurationSec\''):$/,/    continue$/s/^/#/' "$(pip show yt-dlp | grep Location | awk '{print $2}')/yt_dlp/extractor/youtube.py"
 
