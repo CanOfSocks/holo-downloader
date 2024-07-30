@@ -74,7 +74,6 @@ cookies_file = "/app/cookies.txt"
 torrent = True
 
 torrentOptions = [
-    '-t', 'udp://tracker.holopirates.moe:1337/announce'
     '-c', 'CanOfSocks'
 ]
 
