@@ -5,12 +5,18 @@ import sys
 from discord_webhook import DiscordWebhook, DiscordEmbed
 from config import webhook_url 
 
+
 def send_webhook(url, id="Unknown", status="error", message=None):
+    if message is not None:
+        message = remove_ansi_escape_sequences(message)
+        
+        
     webhook = DiscordWebhook(url, rate_limit_retry=True)
     if(status == "starting"):
         title="Starting"
         color="fc8803"
         embed = DiscordEmbed(title, description="Starting holo-downloader", color=color)
+        embed.set_timestamp()
         webhook.add_embed(embed)
         webhook_response = webhook.execute()
         return
@@ -18,6 +24,10 @@ def send_webhook(url, id="Unknown", status="error", message=None):
         title = "Membership error"
         color="ff0000"
         embed = DiscordEmbed(title, description=("Error checking membership streams for [{0}](https://www.youtube.com/channel/{0}). \nCheck cookies!".format(id)), color=color)
+        if message:
+            embed.add_embed_field(name="Error Message: {0}".format(id), value=message)
+            embed.set_footer(text='Error Logger')
+        embed.set_timestamp()
         #embed.set_author(name='{0}'.format(id), url='www.youtube.com/channel/{0}'.format(id))
         #embed.set_thumbnail(url=data.get('thumbnail_url'))
         webhook.add_embed(embed)
@@ -58,13 +68,22 @@ def send_webhook(url, id="Unknown", status="error", message=None):
     else:                
         embed = DiscordEmbed(title, description="Video https://youtu.be/{0} is not accessible, perhaps it has been privated".format(id), color=color)
 
+    if message:
+        embed.add_embed_field(name="Message: {0}".format(id), value=message)
+    embed.set_timestamp()
+
     # add embed object to webhook
     webhook.add_embed(embed)
     
-    if status == "error" and message:
-        embed.add_embed_field(name="Error Message {0}".format(id), value=message)
+
 
     webhook_response = webhook.execute()
+    
+def remove_ansi_escape_sequences(text):
+    import re
+    # This regular expression matches ANSI escape sequences
+    ansi_escape = re.compile(r'\x1B[@-_][0-?]*[ -/]*[@-~]')
+    return ansi_escape.sub('', text)
 
 def main(id, status, message = None):
     if webhook_url is not None:

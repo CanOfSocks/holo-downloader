@@ -68,8 +68,7 @@ description = True
 look_ahead = 48
 
 # Cookies file location relative to inside the container
-#cookies_file = "/app/cookies.txt"
-cookies_file = "A:\\Users\\uncle\\Documents\\Scripts\\cookies.txt"
+cookies_file = "/app/cookies.txt"
 
 ### Torrent options
 torrent = True

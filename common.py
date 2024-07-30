@@ -151,11 +151,11 @@ def get_upcoming_or_live_videos(channel_id, tab):
     ydl_opts = {
         'quiet': True,
         'extract_flat': True,
-        'force_generic_extractor': True,
+        #'force_generic_extractor': True,
         'sleep_interval': 1,
         'sleep_interval_requests': 1,
         'no_warnings': True,
-        'playlist_items': '1:10',
+        #'playlist_items': '1:10',
         #'verbose': True
         #'match_filter': filters
     }
@@ -164,7 +164,25 @@ def get_upcoming_or_live_videos(channel_id, tab):
         ydl_opts.update({'cookiefile': getConfig.getCookiesFile()})
     
     with YoutubeDL(ydl_opts) as ydl:
-        url = "https://www.youtube.com/channel/{0}/{1}".format(channel_id, tab)
+        if tab == "membership":
+            if channel_id.startswith("UUMO"):
+                url = "https://www.youtube.com/playlist?list={0}".format(channel_id)
+            elif channel_id.startswith("UC") or channel_id.startswith("UU"):
+                url = "https://www.youtube.com/playlist?list={0}".format("UUMO" + channel_id[2:])
+            else:
+                url = "https://www.youtube.com/channel/{0}/{1}".format(channel_id, tab)
+        elif tab == "streams":
+            if channel_id.startswith("UU"):
+                url = "https://www.youtube.com/playlist?list={0}".format(channel_id)
+            elif channel_id.startswith("UC"):
+                url = "https://www.youtube.com/playlist?list={0}".format("UU" + channel_id[2:])
+            elif channel_id.startswith("UUMO"):
+                url = "https://www.youtube.com/playlist?list={0}".format("UU" + channel_id[4:])
+            else:
+                url = "https://www.youtube.com/channel/{0}/{1}".format(channel_id, tab)
+        else:
+            url = "https://www.youtube.com/channel/{0}/{1}".format(channel_id, tab)
+            ydl_opts.update({'playlist_items': '1:10'})
         info = ydl.extract_info(url, download=False)
         #print(info)
         upcoming_or_live_videos = []
