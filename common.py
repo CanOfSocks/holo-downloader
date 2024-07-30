@@ -171,6 +171,7 @@ def get_upcoming_or_live_videos(channel_id, tab):
                 url = "https://www.youtube.com/playlist?list={0}".format("UUMO" + channel_id[2:])
             else:
                 url = "https://www.youtube.com/channel/{0}/{1}".format(channel_id, tab)
+                ydl_opts.update({'playlist_items': '1:10'})
         elif tab == "streams":
             if channel_id.startswith("UU"):
                 url = "https://www.youtube.com/playlist?list={0}".format(channel_id)
@@ -180,6 +181,7 @@ def get_upcoming_or_live_videos(channel_id, tab):
                 url = "https://www.youtube.com/playlist?list={0}".format("UU" + channel_id[4:])
             else:
                 url = "https://www.youtube.com/channel/{0}/{1}".format(channel_id, tab)
+                ydl_opts.update({'playlist_items': '1:10'})
         else:
             url = "https://www.youtube.com/channel/{0}/{1}".format(channel_id, tab)
             ydl_opts.update({'playlist_items': '1:10'})
