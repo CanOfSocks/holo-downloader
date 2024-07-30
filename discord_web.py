@@ -7,6 +7,9 @@ from config import webhook_url
 
 
 def send_webhook(url, id="Unknown", status="error", message=None):
+    if url is None:
+        return
+    
     if message is not None:
         message = remove_ansi_escape_sequences(message)
         
