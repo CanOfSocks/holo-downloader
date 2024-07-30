@@ -15,7 +15,7 @@ def getVideos(members_only, command=None, frequency=None):
             all_lives += lives
         except Exception as e:
             print(("Error fetching membership streams for {0}. Check cookies. \n{1}".format(channel,e)))
-            discord_web.main(members_only[channel], "membership-error")
+            discord_web.main(members_only[channel], "membership-error", message=str(e))
     common.vid_executor(all_lives, command)
 
 def main(command=None, frequency=None):
