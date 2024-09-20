@@ -12,15 +12,15 @@ END
     CRON_CONTENT+=$'\n'
     # Append each schedule line to CRON_CONTENT if the corresponding environment variable is set
     if [ -n "${VIDEOSCHEDULE}" ]; then
-        CRON_CONTENT+="${VIDEOSCHEDULE} /app/getVids.py 'spawn' --frequency '${VIDEOSCHEDULE}'> /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
+        CRON_CONTENT+="${VIDEOSCHEDULE} /app/getVids.py --command 'spawn' --frequency '${VIDEOSCHEDULE}'> /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     else
-        CRON_CONTENT+="*/2 * * * * /app/getVids.py 'spawn' > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
+        CRON_CONTENT+="*/2 * * * * /app/getVids.py --command 'spawn' > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     fi
 
     if [ -n "${MEMBERSCHEDULE}" ]; then
-        CRON_CONTENT+="${MEMBERSCHEDULE} /app/getMembers.py 'spawn' --frequency '${MEMBERSCHEDULE}'> /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
+        CRON_CONTENT+="${MEMBERSCHEDULE} /app/getMembers.py --command 'spawn' --frequency '${MEMBERSCHEDULE}'> /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     else
-        CRON_CONTENT+="*/5 * * * * /app/getMembers.py 'spawn' > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
+        CRON_CONTENT+="*/5 * * * * /app/getMembers.py --command 'spawn' > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     fi
 
     if [ -n "${COMMUNITYSCHEDULE}" ]; then
@@ -30,9 +30,9 @@ END
     fi
 
     if [ -n "${UNARCHIVEDSCHEDULE}" ]; then
-        CRON_CONTENT+="${UNARCHIVEDSCHEDULE} /app/getVids.py 'spawn' --unarchived --frequency '${UNARCHIVEDSCHEDULE}' > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
+        CRON_CONTENT+="${UNARCHIVEDSCHEDULE} /app/getVids.py --command 'spawn' --unarchived --frequency '${UNARCHIVEDSCHEDULE}' > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     else
-        CRON_CONTENT+="*/30 * * * * /app/getVids.py 'spawn' '--unarchived' > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
+        CRON_CONTENT+="*/30 * * * * /app/getVids.py --command 'spawn' '--unarchived' > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     fi
 
     CRON_CONTENT+="@reboot python /app/discord_web.py '0' 'starting'"
