@@ -1,7 +1,7 @@
 #!/usr/local/bin/python
 import requests
 
-from sys import argv
+import argparse
 import common
 #import json
 from datetime import datetime
@@ -93,21 +93,27 @@ def getStreams(unarchived=False):
     return matching_streams
 
 
-def main(command=None, unarchived=False):
+def main(command=None, unarchived=False, frequency=None):
     streams = getStreams(unarchived)
     if unarchived:
         streams = common.combine_unarchived(streams)
-    common.vid_executor(streams, command, unarchived)  
+    common.vid_executor(streams, command, unarchived, frequency=frequency)  
 
 
 if __name__ == "__main__":
-    try:
-        command = argv[1]
-    except IndexError:
-        command = None
-    try:
-        unarchive = argv[2]
-    except IndexError:
-        pass
+    parser = argparse.ArgumentParser(description="Process a command and optionally an unarchive value.")
 
-    main(command)
+    # Add the required positional argument 'command'
+    parser.add_argument('command', type=str, help='The command value')
+
+    # Add an optional named argument '--unarchive' with default as None
+    parser.add_argument('--unarchived', action='store_true', help='Flag to indicate unarchived (default: False)')
+
+    # Parse the arguments
+    args = parser.parse_args()
+
+    # Access the arguments
+    command = args.command
+    unarchived = args.unarchive  # Will be None if not provided
+
+    main(command=command, unarchived=unarchived)

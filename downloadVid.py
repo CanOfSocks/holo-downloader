@@ -9,6 +9,8 @@ import subprocess
 import discord_web
 from time import sleep, asctime
 
+import argparse
+
 #id = sys.argv[1]
 #id = "kJGsWORSg-4"
 #outputFile = None
@@ -299,11 +301,7 @@ def is_script_running(script_name, id):
 def main(id=None):
     script_name = sys.argv[0]
     # If id was no included as a variable, try and retrieve from sys args
-    if id is None:
-        try:
-            id = sys.argv[1]
-        except:
-            raise Exception("No video ID provided, unable to continue")
+
     # If system args were also none, raise exception
     if id is None:
         raise Exception("No video ID provided, unable to continue")
@@ -321,4 +319,15 @@ def main(id=None):
     downloader(id,outputFile, members)
 
 if __name__ == "__main__":
-    main()
+    # Create the parser
+    parser = argparse.ArgumentParser(description="Process an video by ID")
+
+    # Add a required positional argument 'ID'
+    parser.add_argument('ID', type=str, help='The video ID (required)')
+
+    # Parse the arguments
+    args = parser.parse_args()
+
+    # Access the 'ID' value
+    id = args.ID
+    main(id=id)

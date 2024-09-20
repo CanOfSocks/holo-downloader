@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-from sys import argv
+import argparse
 import common
 
 
@@ -18,24 +18,31 @@ def getVideos(channel_ids_to_match, command=None, unarchived = False):
 
     common.vid_executor(all_lives, command)
        
-def main(command=None, unarchived = False):
+def main(command=None, unarchived = False, frequency=None):
     try:
         if unarchived:
             from config import unarchived_channel_ids_to_match as channel_ids_to_match
         else:
             from config import channel_ids_to_match
         if channel_ids_to_match:
-            getVideos(channel_ids_to_match, command, unarchived)
+            getVideos(channel_ids_to_match, command, unarchived, frequency=frequency)
     except ImportError:
         pass
+    
 if __name__ == "__main__":
-    try:
-        command = argv[1]
-    except IndexError:
-        command = None
-    try:
-        unarchived = argv[2]
-    except IndexError:
-        pass
+    # Create the parser
+    parser = argparse.ArgumentParser(description="Process command and an optional unarchived flag.")
 
-    main(command, unarchived=unarchived)
+    # Add an optional named argument '--command' (default to None if not provided)
+    parser.add_argument('--command', type=str, default=None, help='The command (optional, default: None)')
+
+    # Add an optional flag '--unarchived' (set to True if provided, otherwise False)
+    parser.add_argument('--unarchived', action='store_true', help='Flag to indicate unarchived (default: False)')
+
+    # Parse the arguments
+    args = parser.parse_args()
+    # Access the arguments
+    command = args.command
+    unarchived = args.unarchived
+    
+    main(command=command, unarchived=unarchived)

@@ -7,7 +7,7 @@ import os
 from time import sleep
 
 
-def vid_executor(streams, command, unarchived = False):    
+def vid_executor(streams, command, unarchived = False, frequency = None):    
     if(command == "spawn"):
         if unarchived == True:
             download_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'unarchived.py')
@@ -15,12 +15,19 @@ def vid_executor(streams, command, unarchived = False):
             download_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloadVid.py')
         from time import sleep
         from random import uniform
+        
+        if frequency:
+            frequency_sec = cron_frequency(frequency)
+            sleep_time = frequency_sec/(max(len(streams) - 1),1)
+        else:
+            sleep_time = 60
+        
         for live in streams:
             command = ["python", download_script, live]
             #Popen(command)
             Popen(command, start_new_session=True)
 
-            sleep(uniform(min(len(streams),30),min(2*len(streams),90)))
+            sleep(uniform(max(sleep_time - (sleep_time/2), 1.0),max(sleep_time + (sleep_time/2), 1.0)))
     elif(command == "bash"):
         bash_array = ' '.join(streams)
         print(bash_array)
@@ -215,3 +222,17 @@ def combine_unarchived(ids):
         id_set.add(id)
     
     return list(id_set)
+
+def cron_frequency(cron_expr):
+    from croniter import croniter
+    now = datetime.now()
+    cron = croniter(cron_expr, now)
+    
+    # Get the next two execution times
+    next_time = cron.get_next(datetime)
+    next_time_after = cron.get_next(datetime)
+    
+    # Calculate the interval in seconds
+    interval_seconds = (next_time_after - next_time).total_seconds()
+    
+    return interval_seconds
