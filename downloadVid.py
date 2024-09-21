@@ -62,6 +62,7 @@ def moveToFinal(output, members):
 
 def compressChat(output):
     import zipfile
+    print("Compressing live_chat from {0}".format(output))
     partPath = Path("{0}.live_chat.json.part".format(getConfig.getTempOutputPath(output)))
     input_path = Path("{0}.live_chat.json".format(getConfig.getTempOutputPath(output)))
     output_path = Path("{0}.live_chat.zip".format(getConfig.getTempOutputPath(output)))
