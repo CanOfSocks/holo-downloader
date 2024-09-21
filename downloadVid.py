@@ -137,7 +137,7 @@ def download_chat(id,outputFile):
                         compressChat(outputFile)
                         return 0
                     except:
-                        print("Compressing chat for {0} failed".format(id))
+                        print("Compressing chat for {0} failed (yt-dlp)".format(id))
                         return 2 
                 except:
                     print("Downloading chat for {0} failed".format(id))
@@ -146,7 +146,7 @@ def download_chat(id,outputFile):
             compressChat(outputFile)
             return 0
         except:
-            print("Compressing chat for {0} failed".format(id))
+            print("Compressing chat for {0} failed (chat-downloader)".format(id))
             return 2 
     return 0
 
@@ -202,13 +202,14 @@ def download_info(id,outputFile):
             print("Unable to remove IP from info.json file for {0}".format(id))
             print(e)
             return 1
-        try:
-            compressChat(("{0}.live_chat.json".format(outputFile)))
-            
-        except Exception as e:
-            print("Unable to compress live_chat file for {0}".format(id))
-            print(e)
-            return 1
+        if getConfig.getChat():
+            try:
+                compressChat(("{0}.live_chat.json".format(outputFile)))
+                
+            except Exception as e:
+                print("Unable to compress live_chat file for {0}".format(id))
+                print(e)
+                return 1
     return 0
 
 def downloader(id,outputTemplate, members):
