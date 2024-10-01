@@ -23,7 +23,7 @@ def vid_executor(streams, command, unarchived = False, frequency = None):
             sleep_time = 60
         
         for live in streams:
-            command = ["python", download_script, live]
+            command = ["python", download_script, '--', live]
             #Popen(command)
             Popen(command, start_new_session=True)
 
