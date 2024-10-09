@@ -6,6 +6,7 @@ import getConfig
 import requests
 import base64
 import subprocess
+import argparse
 #from yt_dlp.utils import DownloadError
 
 import psutil
@@ -295,11 +296,6 @@ def main(id=None):
     # If system args were also none, raise exception
     script_name = sys.argv[0]
     if id is None:
-        try:
-            id = sys.argv[1]
-        except:
-            raise Exception("No video ID provided, unable to continue")
-    if id is None:
         raise Exception("No video ID provided, unable to continue")
     
     if is_script_running(script_name, id):
@@ -310,4 +306,15 @@ def main(id=None):
 
 
 if __name__ == "__main__":
-    main()
+    # Create the parser
+    parser = argparse.ArgumentParser(description="Process an video by ID")
+
+    # Add a required positional argument 'ID'
+    parser.add_argument('ID', type=str, help='The video ID (required)')
+
+    # Parse the arguments
+    args = parser.parse_args()
+
+    # Access the 'ID' value
+    id = args.ID
+    main(id=id)
