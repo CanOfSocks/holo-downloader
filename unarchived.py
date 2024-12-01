@@ -67,7 +67,7 @@ class MyLogger:
 
     def warning(self, msg):
         #print(msg)
-        if "Private" in msg or "private" in msg or "UNAVAILABLE" in msg.upper() or "should already be available" in msg.upper():
+        if "Private" in msg or "private" in msg or "UNAVAILABLE" in msg.upper() or "should already be available" in msg.lower():
             raise yt_dlp.utils.DownloadError("Private video. Sign in if you've been granted access to this video")
         
 
@@ -86,17 +86,19 @@ def is_video_private(id):
         'skip_download': True,
         'cookiefile': getConfig.getCookiesFile(),        
         'quiet': True,
-        'no_warnings': True,
+        #'no_warnings': True,
         #'extractor_args': 'youtube:player_client=web;skip=dash;formats=incomplete,duplicate',
         'logger': logger
     }
 
+    json_out_path = os.path.join(getConfig.getUnarchivedTempFolder(),"{0}.info.json".format(id))
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
             info_dict = ydl.extract_info(url, download=False)
+            info_dict = ydl.sanitize_info(info_dict)
             # Check if the video is private
-            if info_dict.get('live_status') == 'is_live':
+            if info_dict.get('live_status') == 'is_live' or info_dict.get('live_status') == 'post_live':
                 # Save best thumbnail as base64 for yta-raw
                 best_thumb = None
                 best_preference = None
@@ -109,8 +111,6 @@ def is_video_private(id):
                     info_dict['b64_img'] = get_image(best_thumb)
                     info_dict['best_thumb'] = best_thumb
                 
-                
-                json_out_path = os.path.join(getConfig.getUnarchivedTempFolder(),"{0}.info.json".format(id))
                 os.makedirs(os.path.dirname(json_out_path), exist_ok=True)
                 with open(json_out_path, 'w', encoding='utf-8') as json_file:
                     json.dump(info_dict, json_file, ensure_ascii=False, indent=4)
@@ -123,7 +123,7 @@ def is_video_private(id):
                 print("Video {0} is private".format(id))
                 #if os.
                 try:
-                    create_yta_json(id)
+                    create_yta_json(id, json_out_path)
                     # Add delay before age check
                     return
                 except e:
@@ -156,9 +156,10 @@ def get_image(url):
         return f"data:image/jpeg;base64,{base64_image}"
 
 # FROM https://github.com/Spicadox/auto-ytarchive-raw/blob/master/getjson.py
-def create_yta_json(id):
+def create_yta_json(id, ytdlp_json = None):
     from datetime import datetime, timezone
-    ytdlp_json = os.path.join(getConfig.getUnarchivedTempFolder(),"{0}.info.json".format(id))
+    if ytdlp_json is None:
+        ytdlp_json = os.path.join(getConfig.getUnarchivedTempFolder(),"{0}.info.json".format(id))
     data = None
     if os.path.exists(ytdlp_json) and check_ytdlp_age(ytdlp_json):        
         with open(ytdlp_json, 'r', encoding='utf-8') as file:
@@ -177,9 +178,9 @@ def create_yta_json(id):
             248, 169, 137, # 1080p
             334, 302, 298, # 720p60
             247, 136, # 720p
-            231, 135, # 480p
-            230, 134, # 360p
-            229, 133, # 240p
+            244, 135, # 480p
+            243, 134, # 360p
+            242, 133, # 240p
             269, 160  # 144p 
         ],
         "AUDIO": [
@@ -212,14 +213,14 @@ def create_yta_json(id):
         for ytdlp_format in data['formats']:
             if video_format == ytdlp_format['format_id'] and ytdlp_format['protocol'] == 'https':
                 best['video'][video_format] = ytdlp_format['url']
-                break
+                #break
     for audio_format in PRIORITY['AUDIO']:
         audio_format = str(audio_format)
         #if best['audio'] is None:
         for ytdlp_format in data['formats']:
             if audio_format == ytdlp_format['format_id'] and ytdlp_format['protocol'] == 'https':
                 best['audio'][audio_format] = ytdlp_format['url']
-                break   
+                #break   
     yta_json = os.path.join(getConfig.getUnarchivedTempFolder(),"{0}-yta.info.json".format(id))
     with open(yta_json, 'w', encoding='utf-8') as json_file:
         json.dump(best, json_file, ensure_ascii=False, indent=4)
@@ -261,7 +262,7 @@ def run_yta_raw(json_file, output_path = None, ytdlp_json = None):
     except subprocess.CalledProcessError as e:
         #print(e.stdout.decode())
         #print(e.stderr.decode())
-        discord_web.main(data['metadata']['id'], "error", message=str(e.stderr)[-1500:])
+        discord_web.main(data['metadata']['id'], "error", message=str(e.stderr)[-1000:])
         raise Exception(("Error downloading unarchived video, Code: {0}".format(e.returncode)))
     if result.returncode == 0:        
         if ytdlp_json and output_path:
