@@ -87,9 +87,10 @@ def is_video_private(id):
         'cookiefile': getConfig.getCookiesFile(),        
         'quiet': True,
         'no_warnings': True,
-        'extractor_args': 'youtube:player_client=web;skip=dash;formats=incomplete,duplicate',
+        #'extractor_args': 'youtube:player_client=web;skip=dash;formats=incomplete,duplicate',
         'logger': logger
     }
+
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
