@@ -36,7 +36,7 @@ END
     fi
 
     if [ -n "${UPDATEYTDLP}" ]; then
-        CRON_CONTENT+="0 0 * * * /usr/local/bin/pip install -U yt-dlp"$'\n'
+        CRON_CONTENT+="0 0 * * * /usr/local/bin/pip install -U yt-dlp && sed -i '/if fmt.get(\\'targetDurationSec\\'):$/,/    continue$/s/^/#/' \"\$(pip show yt-dlp | grep Location | awk '{print \$2}')/yt_dlp/extractor/youtube.py\""$'\n'
     fi
     
     CRON_CONTENT+="@reboot python /app/discord_web.py '0' 'starting'"
