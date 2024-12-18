@@ -35,6 +35,9 @@ END
         CRON_CONTENT+="*/30 * * * * /app/getVids.py --command 'spawn' '--unarchived' > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     fi
 
+    if [ -n "${UPDATEYTDLP}" ]; then
+        CRON_CONTENT+="0 0 * * * /usr/local/bin/pip install -U yt-dlp"$'\n'
+
     CRON_CONTENT+="@reboot python /app/discord_web.py '0' 'starting'"
 
     # Recreate the cron file with the specified content
