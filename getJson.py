@@ -5,7 +5,9 @@ import argparse
 import common
 #import json
 from datetime import datetime
+from getConfig import ConfigHandler
 
+getConfig = ConfigHandler()
 
 url = "https://holo.dev/api/v1/lives/open"
 
@@ -64,9 +66,9 @@ def getStreams(unarchived=False):
                 
             # Get dictionary depending on which search (unarchived/normal)    
             if unarchived:
-                from config import unarchived_channel_ids_to_match as channel_ids_to_match
+                channel_ids_to_match = getConfig.unarchived_channel_ids_to_match        
             else:
-                from config import channel_ids_to_match
+                channel_ids_to_match = getConfig.channel_ids_to_match
             
             if channel_ids_to_match is None:
                 return
