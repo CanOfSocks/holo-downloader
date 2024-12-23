@@ -45,6 +45,7 @@ unarchived_dir = "/app/unarchived"
 unarchived_tempdir = "/app/temp/unarchived"
 look_ahead = 48
 cookies_file = "/app/cookies.txt"
+direct_to_ts = false
 
 [torrent]
 enabled = true

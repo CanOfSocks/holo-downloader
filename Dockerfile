@@ -26,7 +26,7 @@ WORKDIR /app
 
 COPY . .
 
-RUN git pull "https://github.com/CanOfSocks/livestream_dl"
+RUN git clone "https://github.com/CanOfSocks/livestream_dl"
 
 RUN chmod +x *.py
 RUN chmod +x /app/startCron.sh
