@@ -181,6 +181,12 @@ class ConfigHandler:
     def get_discord_webhook(self):
         return self.webhook.get("url", None)
     
+    def get_log_level(self):
+        return str(self.download_options.get('log_level', "INFO")).upper()
+    
+    def get_log_file(self):
+        return self.download_options.get('log_file', None)
+    
     def get_livestream_dl_options(self, info_dict, output_template):
         options = {
             "ID": info_dict.get('id'),
@@ -207,7 +213,9 @@ class ConfigHandler:
             "direct_to_ts": self.get_direct_to_ts(),
             "wait_for_video": None,
             "json_file": None,
-            "remove_ip_from_json": self.get_remove_ip()
+            "remove_ip_from_json": self.get_remove_ip(),
+            "log_level": self.get_log_level(),
+            "log_file": self.get_log_file()
         }
         if info_dict.get('availability', None) == 'subscriber_only':
             options.update({'output': str(self.get_membership_output_path(output_template))})
