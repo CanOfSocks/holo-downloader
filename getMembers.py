@@ -1,6 +1,7 @@
 #!/usr/local/bin/python
 import argparse
 import common
+from getConfig import ConfigHandler
     
 def getVideos(members_only, command=None, frequency=None):
     from random import uniform
@@ -19,11 +20,8 @@ def getVideos(members_only, command=None, frequency=None):
     common.vid_executor(all_lives, command)
 
 def main(command=None, frequency=None):
-    try:
-        from config import members_only
-        getVideos(members_only, command, frequency)
-    except ImportError:
-        pass
+    getConfig = ConfigHandler()
+    getVideos(getConfig.members_only, command, frequency)
 if __name__ == "__main__":
 # Create the parser
     parser = argparse.ArgumentParser(description="Process optional command and frequency values.")

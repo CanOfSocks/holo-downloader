@@ -2,7 +2,7 @@
 import yt_dlp
 import os
 import json
-import getConfig
+from getConfig import ConfigHandler
 import requests
 import base64
 import subprocess
@@ -14,6 +14,8 @@ import sys
 from shutil import move
 import discord_web
 from json import load
+
+getConfig = ConfigHandler()
 
 def check_ytdlp_age(existing_file):    
     from time import time
@@ -84,14 +86,14 @@ def is_video_private(id):
         'retries': 25,
         'wait_for_video': (5, 1800),
         'skip_download': True,
-        'cookiefile': getConfig.getCookiesFile(),        
+        'cookiefile': getConfig.get_cookies_file(),        
         'quiet': True,
         #'no_warnings': True,
         #'extractor_args': 'youtube:player_client=web;skip=dash;formats=incomplete,duplicate',
         'logger': logger
     }
 
-    json_out_path = os.path.join(getConfig.getUnarchivedTempFolder(),"{0}.info.json".format(id))
+    json_out_path = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.info.json".format(id))
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
@@ -134,11 +136,11 @@ def is_video_private(id):
                 pass
             else:
                 raise e
-    existing_file = os.path.join(getConfig.getUnarchivedTempFolder(),"{0}.info.json".format(id))
+    existing_file = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.info.json".format(id))
     if os.path.exists(existing_file):
         check_ytdlp_age(existing_file)
-    elif os.path.exists(os.path.join(getConfig.getUnarchivedTempFolder(),"{0}-yta.info.json".format(id))):
-        existing_file = os.path.join(getConfig.getUnarchivedTempFolder(),"{0}-yta.info.json".format(id))
+    elif os.path.exists(os.path.join(getConfig.get_unarchived_temp_folder(),"{0}-yta.info.json".format(id))):
+        existing_file = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}-yta.info.json".format(id))
         check_yta_raw_age(existing_file)
             
 
@@ -159,7 +161,7 @@ def get_image(url):
 def create_yta_json(id, ytdlp_json = None):
     from datetime import datetime, timezone
     if ytdlp_json is None:
-        ytdlp_json = os.path.join(getConfig.getUnarchivedTempFolder(),"{0}.info.json".format(id))
+        ytdlp_json = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.info.json".format(id))
     data = None
     if os.path.exists(ytdlp_json) and check_ytdlp_age(ytdlp_json):        
         with open(ytdlp_json, 'r', encoding='utf-8') as file:
@@ -221,11 +223,11 @@ def create_yta_json(id, ytdlp_json = None):
             if audio_format == ytdlp_format['format_id'] and ytdlp_format['protocol'] == 'https':
                 best['audio'][audio_format] = ytdlp_format['url']
                 #break   
-    yta_json = os.path.join(getConfig.getUnarchivedTempFolder(),"{0}-yta.info.json".format(id))
+    yta_json = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}-yta.info.json".format(id))
     with open(yta_json, 'w', encoding='utf-8') as json_file:
         json.dump(best, json_file, ensure_ascii=False, indent=4)
         
-    output_path = yt_dlp.YoutubeDL({}).prepare_filename(info_dict=data, outtmpl=os.path.join(getConfig.getUnarchivedFolder(),getConfig.get_ytdlp()))
+    output_path = yt_dlp.YoutubeDL({}).prepare_filename(info_dict=data, outtmpl=os.path.join(getConfig.get_unarchived_temp_folder(),getConfig.get_ytdlp()))
     
         
     #download_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'runYTAraw.py')
@@ -244,16 +246,16 @@ def run_yta_raw(json_file, output_path = None, ytdlp_json = None):
     else:
         command = ['ytarchive-raw-go']
     command += [ '--threads', '20', '--overwrite-temp', '-i', json_file, '--log-level', 'error']
-    if getConfig.getUnarchivedTempFolder():
-        command += ['--temp-dir', str(getConfig.getUnarchivedTempFolder())]
+    if getConfig.get_unarchived_temp_folder():
+        command += ['--temp-dir', str(getConfig.get_unarchived_temp_folder())]
     #if not getConfig.getMux():
     #    command += ["--merger", "download-only"]
     if output_path:
         output = output_path
-    elif getConfig.getOutputTemplateYTAraw():
-        output = ['--output', os.path.join(getConfig.getUnarchivedFolder(), getConfig.get_ytdlp)]
+    elif getConfig.get_output_template_yta_raw():
+        output = ['--output', os.path.join(getConfig.get_unarchived_temp_folder(), getConfig.get_ytdlp())]
     else:
-        output = ['--output', os.path.join(getConfig.getUnarchivedFolder(), '[%(upload_date)s] %(title)s [%(channel)s] (%(id)s)')]
+        output = ['--output', os.path.join(getConfig.get_unarchived_temp_folder(), '[%(upload_date)s] %(title)s [%(channel)s] (%(id)s)')]
     command += ['--output', output]
     #print(' '.join(command))
     try:

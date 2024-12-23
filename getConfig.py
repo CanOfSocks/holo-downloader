@@ -1,300 +1,235 @@
 from sys import argv
-import config
-from pathlib import Path,PurePath
+from pathlib import Path, PurePath
+#import os
+import tomllib as toml
+import json
 
-#For general cookies
-#def getCookiesOptions():
-def getCookiesFile():
-    out = ""
-    try:
-        cookies = config.cookies_file
-    except AttributeError:
-        cookies = None
+class ConfigHandler:
+    def __init__(self, config=None, config_file="config.toml"):
+        if config is None and config_file:
+            with open(config_file, "rb") as toml_file:
+                config = toml.load(toml_file)
+        self.channel_ids_to_match = config.get("channel_ids_to_match", {})
+        self.unarchived_channel_ids_to_match = config.get("unarchived_channel_ids_to_match", {})
+        self.community_tab_channels = config.get("community_tab", {})
         
-    if cookies is not None:
-#        out += " --cookies {0}".format(config.cookies_file)
-
-        # Get Cookies path with conversion for specific OS
-        out += str(Path(config.cookies_file))
-    return out
-
-#For waiter
-def get_ytdlp():
-    out = ""
-    #Cookies
-#    out += getCookiesOptions()
+        self.title_filter = config.get("title_filter", {})   
+        self.description_filter = config.get("description_filter", {})
+        self.members_only = config.get("members_only", {})
+        self.community_tab = config.get("community_tab", {})
+        self.webhook = config.get("webhook", {})
         
-    # Output file(s)
-    try:
-        output_folder = config.output_folder
-    except AttributeError:
-        output_folder = "%(fulltitle)s"
-    # Output folder is empty, add default
-    if not output_folder:
-        output_folder = "%(fulltitle)s"
+        self.download_options = config.get("download_options", {})
         
-    # duplicate path if depth is 1 (or less)
-    if(len(Path(output_folder).parents) <= 1):
-        output_folder = str(PurePath(output_folder,output_folder))
-    
-    #out += " -o {0}".format(output_folder)
-    #str(Path(config.cookies_file))
-    out += str(Path(output_folder))
-    return out
+        #print(self.download_options)
+        
+        self.torrent_options = config.get("torrent_options", {})
+        
+        self.community_tab_options = config.get("community_tab_options", {})
+        
+        
 
-#Check if vidOnly
-def vid_Only():
-    try:
-        video_only = config.video_only
-    except AttributeError:
-        video_only = False
-    return video_only
-    
+    def get_cookies_file(self):
+        if self.download_options.get("cookies_file", None) is not None:
+            return str(Path(self.download_options.get("cookies_file")))
+        else:
+            return None
+        
 
-def getChat():
-    #Default to state of video_only variable in config
-    chat = not vid_Only()
-    if chat:
+    def get_ytdlp(self):
+        output_folder = self.download_options.get('output_path', "")
+        if not output_folder:
+            output_folder = "%(fulltitle)s"
+
+        if len(Path(output_folder).parents) <= 1:
+            output_folder = str(PurePath(output_folder, output_folder))
+
+        return str(Path(output_folder))
+
+    def vid_only(self):
+        return self.download_options.get("video_only", False)
+
+    def get_chat(self):
+        if not self.download_options.get("video_only", False) and self.download_options.get("download_chat", False):
+            return True
+        else:
+            return False
+
+    def get_thumbnail(self):
+        return not self.download_options.get("video_only", False) and self.download_options.get("thumbnail", False)
+
+    def get_description(self):
+        return not self.download_options.get("video_only", False) and self.download_options.get("description", False)
+
+    def get_info_json(self):
+        return not self.download_options.get("video_only", False) and self.download_options.get("info_json", False)
+
+    def get_info(self):
+        out = []
+        if self.vid_only():
+            return out
+
+        if self.get_thumbnail():
+            out += ["--write-thumbnail", "--convert-thumbnails", "png"]
+        if self.get_info_json():
+            out += ["--write-info-json"]
+        if self.get_description():
+            out += ["--write-description"]
+
+        return out
+
+    def get_mux(self):
+        return self.download_options.get("mux_file", True)
+
+    def get_download_threads(self):
+        return self.download_options.get("download_threads", 4)
+
+    def get_ytarchive_options(self):
         try:
-            chat = config.download_chat
+            ytarchive_options = self.config.ytarchive_options
+        except AttributeError:
+            ytarchive_options = ""
+
+        options = ytarchive_options.split(' ')
+        options += ["--threads", str(self.get_download_threads())]
+
+        if self.get_thumbnail():
+            options += ["-t"]
+        if not self.get_mux():
+            options += ["--write-mux-file"]
+
+        return options
+
+    def get_quality(self):
+        return self.download_options.get("video_quality", "best")
+
+    def get_temp_folder(self):
+        return self.download_options.get('temp_dir', "/app/temp/")
+
+    def get_done_folder(self):
+        return self.download_options.get('done_dir', "/app/Done/")
+
+    def get_temp_output_path(self, output):
+        return Path(self.get_temp_folder()) / Path(output)
+
+    def get_done_output_path(self, output):
+        return Path(self.get_done_folder()) / Path(output)
+    
+    def get_direct_to_ts(self):
+        return self.download_options.get("direct_to_ts", False)
+
+    def ytarchive_builder(self, video_id, output):
+        out = ["ytarchive", "--error"]
+        out += self.get_ytarchive_options()
+
+        cookies = self.get_cookies_file()
+        if cookies:
+            out += ["--cookies", cookies]
+
+        output_folder = self.get_temp_output_path(output)
+        out += ["--output", str(output_folder)]
+        out.append(f"https://www.youtube.com/watch?v={video_id}")
+        out.append(self.get_quality())
+        return out
+
+    def get_torrent(self):
+        return self.torrent_options.get('enabled', False)
+
+    def torrent_builder(self, output, folder):
+        options = ['py3createtorrent']
+        try:
+            options += self.config.torrentOptions
         except AttributeError:
             pass
-        
-    return chat
+        options += ['-o', f"{output}.torrent"]
+        options += [str(folder)]
+        return options
+
+    def get_look_ahead(self):
+        return self.download_options.get('look_ahead', 48)
+
+    def get_membership_directory(self):
+        return self.download_options.get('members_dir') or self.get_done_folder()
+
+    def get_membership_output_path(self, output):
+        return Path(self.get_membership_directory()) / Path(output)
+
+    def get_community_tab_archive(self):
+        return self.community_tab_options.get('archive_file', None)
+
+    def get_community_tab_directory(self):
+        return self.community_tab_options.get("community_dir", "")
+
+    def get_unarchived_temp_folder(self):
+        return self.download_options.get("unarchived_tempdir") or self.get_temp_folder()
+
+    def get_remove_ip(self):
+        return self.download_options.get('remove_ip', False)
+
+    def get_unarchived_folder(self):
+        return self.download_options.get("unarchived_dir") or self.get_done_folder()
+
+    def get_output_template_yta_raw(self):
+        if self.download_options.get("output_folder", None):
+            return self.download_options.get("output_folder").replace('%(fulltitle)s', '%(title)s')
+        return None
+
+    def get_fetch_method(self):
+        return self.download_options.get('video_fetch_method', "rss")
     
-
-def getThumbnail():
-    try:
-        thumbnail = config.thumbnail
-    except AttributeError:
-        thumbnail = True
-    return thumbnail
-def getDescription():
-    try:
-        description = config.description
-    except AttributeError:
-        description = True
-    return description
-def getInfoJson():
-    try:
-        info_json = config.info_json
-    except AttributeError:
-        info_json = True
-    return info_json
+    def get_discord_webhook(self):
+        return self.webhook.get("url", None)
     
-#Info to download
-def getInfo():
-    out = []
-    #Check if video only
-    
-    if vid_Only():
-        return out    
-
-    if getThumbnail():
-        out += ["--write-thumbnail", "--convert-thumbnails", "png"]
-        
-    if getInfoJson():
-        out += ["--write-info-json"]
-        
-
-    if getDescription():
-        out += ["--write-description"]
-        
-    #out += getCookiesOptions()
-    
-    return out
-        
-def getMux():
-    mux_file = True
-    try:
-        mux_file = config.mux_file
-    except AttributeError:
-        pass
-    return mux_file
-    
-def getYtarchiveOptions():
-    out = []
-    try:
-        ytarchive_options = config.ytarchive_options
-    except AttributeError:
-        ytarchive_options = None
-        
-    out += ytarchive_options.split(' ')
-    
-    try:
-        download_threads = config.download_threads
-    except AttributeError:
-        download_threads = 4
-        
-    out += ["--threads", str(download_threads)]
-    
-    #Embed thumbnail?
-    try:
-        thumbnail = config.thumbnail
-    except AttributeError:
-        thumbnail = True
-    if thumbnail:
-        out += ["-t"]
-    
-    if not getMux():
-        out += ["--write-mux-file"]
-       
-    #out += getCookiesOptions()
-        
-    return out   
-
-def getQuality():
-    out = "best"  
-    try:
-        out = str(config.video_quality)
-    #Any issue, go to default of best
-    except Exception: 
-        pass
-    return out
-
-def getTempFolder():
-    out = "/app/temp/"  
-    try:
-        out = str(config.tempdir)
-    #Any issue, go to default of best
-    except Exception: 
-        pass
-    return out
-
-def getDoneFolder():
-    out = "/app/Done/"   
-    try:
-        out = str(config.donedir)
-    #Any issue, go to default of best
-    except Exception: 
-        pass
-    return out
-
-def getTempOutputPath(output):
-    return Path(getTempFolder()) / Path(output)
-
-def getDoneOutputPath(output):
-    return Path(getDoneFolder()) / Path(output)
-
-def ytarchiveBuilder(id,output):
-    out = ["ytarchive", "--error"]
-    out += getYtarchiveOptions()
-    cookies = getCookiesFile()
-    if cookies:
-        out += ["--cookies", cookies]
-    outputFolder = getTempOutputPath(output)
-    out += ["--output", str(outputFolder)]
-    out.append("https://www.youtube.com/watch?v={0}".format(id))
-    out.append(getQuality())
-    return out
-
-def getTorrent():
-    getTorrent = True
-    try:
-        getTorrent = config.torrent
-    except AttributeError:
-        pass
-    return getTorrent
-
-def torrentBuilder(output, folder):
-    options = ['py3createtorrent']
-    try:
-        options += config.torrentOptions
-    except AttributeError:
-        pass
-    options += ['-o', "{0}.torrent".format(str(output))]
-    options += [str(folder)]
-    return options
-
-def getLookAhead():
-    return config.look_ahead
-
-def membership_directory():
-    output = None
-    try:
-        output = config.membersdir
-    except AttributeError:
-        pass
-    return output   
-
-def getMembershipOutputPath(output):
-    return Path(membership_directory()) / Path(output)
-
-def getCommunityTabArchive():
-    output = None
-    try:
-        output = config.comm_tab_archive
-    except AttributeError:
-        pass
-    return output 
-
-def getCommunityTabDirectory():
-    output = None
-    try:
-        output = config.communitydir
-    except AttributeError:
-        pass
-    return output 
-
-def getUnarchivedTempFolder():
-    output = None
-    try:
-        output = config.unarchivedtempdir
-        if output is None:
-            return getTempFolder()
-    except AttributeError:
-        return getTempFolder()
-    return output
-
-def getUnarchivedFolder():
-    output = None
-    try:
-        output = config.unarchiveddir
-        if output is None:
-            return getDoneFolder()
-    except AttributeError:
-        return getDoneFolder()
-    return output
-
-def getOutputTemplateYTAraw():
-    output = None
-    try:
-        output = config.output_folder.replace('%(fulltitle)s', '%(title)s')
-    except AttributeError:
-        pass
-    return output
-
-def main(function):
-    match function:
-        case "cookies":
-            #print(getCookiesOptions())
-            print(getCookiesFile())
-        case "yt-dlp_options":
-            print(get_ytdlp())
-        case "info_options":
-            print(getInfo())
-        case "get_chat":
-            print(getChat())
-        case "ytarchive_options":
-            print(getYtarchiveOptions())
-        case "mux_file":
-            print(getMux())
-        case "quality":
-            print(getQuality())
-        
-def getFetchMethod():
-    output = "rss"
-    try:
-        output = config.fetch_method
-        return output
-    except AttributeError:
-        pass
-    return output  
+    def get_livestream_dl_options(self, info_dict, output_template):
+        options = {
+            "ID": info_dict.get('id'),
+            "resolution": self.get_quality(),
+            "video_format": None,
+            "audio_format": None,
+            "threads": self.get_download_threads(),
+            "batch_size": 5,
+            "segment_retries": 10,
+            "merge": self.get_mux(),
+            "cookies": str(self.get_cookies_file()),
+            #"output": self.get_done_output_path(),
+            "temp_folder": str(self.get_temp_folder()),
+            "write_thumbnail": self.get_thumbnail(),
+            "embed_thumbnail": self.get_thumbnail(),
+            "write_info_json": self.get_info_json(),
+            "write_description": self.get_description(),
+            "keep_temp_files": False,
+            "keep_ts_files": False,
+            "live_chat": self.get_chat(),
+            "keep_database_file": False,
+            "recovery": False,
+            "database_in_memory": False,
+            "direct_to_ts": self.get_direct_to_ts(),
+            "wait_for_video": None,
+            "json_file": None,
+            "remove_ip_from_json": self.get_remove_ip()
+        }
+        if info_dict.get('availability', None) == 'subscriber_only':
+            options.update({'output': str(self.get_membership_output_path(output_template))})
+        else:
+            options.update({'output': str(self.get_done_output_path(output_template))})
+            
+        return options
 
 if __name__ == "__main__":
-    main(argv[1])
-
-
-
-    
-    
+    handler = ConfigHandler()
+    function = argv[1]
+    match function:
+        case "cookies":
+            print(handler.get_cookies_file())
+        case "yt-dlp_options":
+            print(handler.get_ytdlp())
+        case "info_options":
+            print(handler.get_info())
+        case "get_chat":
+            print(handler.get_chat())
+        case "ytarchive_options":
+            print(handler.get_ytarchive_options())
+        case "mux_file":
+            print(handler.get_mux())
+        case "quality":
+            print(handler.get_quality())

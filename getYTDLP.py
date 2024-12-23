@@ -1,9 +1,10 @@
 #!/usr/local/bin/python
 import argparse
 import common
+from getConfig import ConfigHandler
 
 
-def getVideos(channel_ids_to_match, command=None, unarchived = False):
+def getVideos(channel_ids_to_match, command=None, unarchived = False, frequency=None):
     from random import uniform
     all_lives = []
     for channel in channel_ids_to_match:
@@ -19,15 +20,14 @@ def getVideos(channel_ids_to_match, command=None, unarchived = False):
     common.vid_executor(all_lives, command)
        
 def main(command=None, unarchived = False, frequency=None):
-    try:
-        if unarchived:
-            from config import unarchived_channel_ids_to_match as channel_ids_to_match
-        else:
-            from config import channel_ids_to_match
-        if channel_ids_to_match:
-            getVideos(channel_ids_to_match, command, unarchived, frequency=frequency)
-    except ImportError:
-        pass
+    getConfig = ConfigHandler()
+    if unarchived:
+        channel_ids_to_match = getConfig.unarchived_channel_ids_to_match
+    else:
+        channel_ids_to_match = getConfig.channel_ids_to_match
+    if channel_ids_to_match:
+        getVideos(channel_ids_to_match, command, unarchived, frequency=frequency)
+
     
 if __name__ == "__main__":
     # Create the parser

@@ -1,0 +1,56 @@
+[channel_ids_to_match]
+"Gawr Gura Ch. hololive-EN" = "UCoSrY_IQQVpmIRZ9Xf-y93g"
+"Watson Amelia Ch. hololive-EN" = "UCyl1z3jo3XHR1riLFKG5UAg"
+"Mori Calliope Ch. hololive-EN" = "UCL_qhgtOy0dy1Agp8vkySQg"
+"Fauna" = "UCO_aKKYxn4tvrqPjcTzZ6EQ"
+
+[title_filter]
+"UCoSrY_IQQVpmIRZ9Xf-y93g" = "(?i).asmr|unarchive|karaoke|unarchived|no archive|WATCH-A-LONG|WATCHALONG|watch-along|birthday|offcollab|off-collab|off collab|SINGING."
+
+[description_filter]
+"UCoSrY_IQQVpmIRZ9Xf-y93g" = ".Calliope."
+
+[members_only]
+"Gawr Gura Ch. hololive-EN" = "UCoSrY_IQQVpmIRZ9Xf-y93g"
+
+[community_tab]
+"Gawr Gura Ch. hololive-EN" = "UCoSrY_IQQVpmIRZ9Xf-y93g"
+
+[webhook]
+url = "https://discord.com/api/webhooks/xxxxxxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyy"
+
+[unarchived_channel_ids_to_match]
+"Ninomae Ina'nis Ch. hololive-EN" = "UCMwGHR0BTZuLsmjY_NT5Pwg"
+
+[video_fetch]
+
+
+[download_options]
+video_fetch_method = "ytdlp"
+output_path = "%(channel)s/[%(upload_date)s] %(fulltitle)s - %(channel)s (%(id)s)/[%(upload_date)s] %(fulltitle)s - %(channel)s (%(id)s)"
+mux_file = true
+download_threads = 4
+ytarchive_options = "--vp9 --add-metadata --no-frag-files"
+video_quality = "best"
+video_only = false
+download_chat = true
+thumbnail = true
+info_json = true
+remove_ip = true
+description = true
+temp_dir = "/app/temp/"
+done_dir = "/app/Done/"
+members_dir = "/app/Members"
+unarchived_dir = "/app/unarchived"
+unarchived_tempdir = "/app/temp/unarchived"
+look_ahead = 48
+cookies_file = "/app/cookies.txt"
+
+[torrent]
+enabled = true
+options = ["-c", "CanOfSocks"]
+
+[community_tab_options]
+archive_file = "/app/com-tab-archive.txt"
+community_dir = "/app/CommunityPosts"
+

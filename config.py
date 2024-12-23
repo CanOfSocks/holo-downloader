@@ -59,8 +59,10 @@ download_chat = True
 thumbnail = True
 
 info_json = True
+remove_ip = True
 
 description = True
+
 
 
 ### Function options

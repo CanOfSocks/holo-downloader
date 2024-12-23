@@ -3,8 +3,9 @@ import requests
 #import json
 import sys
 from discord_webhook import DiscordWebhook, DiscordEmbed
-from config import webhook_url 
+from getConfig import ConfigHandler
 
+getConfig = ConfigHandler()
 
 def send_webhook(url, id="Unknown", status="error", message=None):
     if url is None:
@@ -89,8 +90,8 @@ def remove_ansi_escape_sequences(text):
     return ansi_escape.sub('', text)
 
 def main(id, status, message = None):
-    if webhook_url is not None:
-        send_webhook(webhook_url, id, status, message)
+    if getConfig.get_discord_webhook() is not None:
+        send_webhook(getConfig.get_discord_webhook(), id, status, message)
 
 
 if __name__ == "__main__":

@@ -1,11 +1,13 @@
 from subprocess import Popen 
 from config import title_filter,description_filter
 from yt_dlp import YoutubeDL
-import getConfig
+#import getConfig
+from getConfig import ConfigHandler
 from datetime import datetime, timedelta, timezone    
 import os
 from time import sleep
 
+getConfig = ConfigHandler()
 
 def vid_executor(streams, command, unarchived = False, frequency = None):    
     if(command == "spawn"):
@@ -67,12 +69,10 @@ def descriptionFilter(live,channel_id):
         'sleep_interval_requests': 1,
         'no_warnings': True,
         'playlist_items': '1:10',
+        'cookiefile': getConfig.get_cookies_file(),
         #'verbose': True
         #'match_filter': filters
     }
-
-    if getConfig.getCookiesFile():
-        ydl_opts.update({'cookiefile': getConfig.getCookiesFile()})
     
     with YoutubeDL(ydl_opts) as ydl:
         url = "https://www.youtube.com/watch?v={0}".format(live.get('id'))
@@ -125,7 +125,7 @@ def filtering(live,channel_id):
        
 def withinFuture(releaseTime=None):
     #Assume true if value missing
-    lookahead = getConfig.getLookAhead()
+    lookahead = getConfig.get_look_ahead()
     if(not releaseTime or not lookahead):
         return True
     release = datetime.fromtimestamp(releaseTime, timezone.utc)    
@@ -138,9 +138,8 @@ def withinFuture(releaseTime=None):
 def getAvailability(live):
     if live.availability is None:        
         from yt_dlp import YoutubeDL
-        from config import cookies_file
         options = {
-            "cookiefile": cookies_file,
+            "cookiefile": getConfig.get_cookies_file(),
             "quiet": True
         }
         with YoutubeDL(options) as ydl: 
@@ -162,13 +161,11 @@ def get_upcoming_or_live_videos(channel_id, tab):
         'sleep_interval': 1,
         'sleep_interval_requests': 1,
         'no_warnings': True,
+        'cookiefile': getConfig.get_cookies_file(),
         #'playlist_items': '1:10',
         #'verbose': True
         #'match_filter': filters
     }
-
-    if getConfig.getCookiesFile():
-        ydl_opts.update({'cookiefile': getConfig.getCookiesFile()})
     
     with YoutubeDL(ydl_opts) as ydl:
         if tab == "membership":
@@ -209,7 +206,7 @@ def combine_unarchived(ids):
     import os
     import re
     yta_pattern = r"^.{11}-yta\.info\.json$"
-    directory = getConfig.getUnarchivedTempFolder()
+    directory = getConfig.get_unarchived_temp_folder()
     files = [f for f in os.listdir(directory) if (os.path.isfile(os.path.join(directory, f)) and os.path.join(directory, f).endswith('.info.json'))]
     id_set = set()
     

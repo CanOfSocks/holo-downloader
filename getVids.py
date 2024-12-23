@@ -1,11 +1,11 @@
 #!/usr/local/bin/python
-from getConfig import getFetchMethod
+from getConfig import ConfigHandler
 import argparse
 
-
+getConfig = ConfigHandler()
 
 def main(command=None, unarchived=False, frequency=None):
-    method = getFetchMethod()
+    method = getConfig.get_fetch_method()
     if(method == "ytdlp"):
         import getYTDLP
         getYTDLP.main(command,unarchived=unarchived,frequency=frequency)

@@ -1,11 +1,13 @@
 #!/usr/local/bin/python
 import subprocess
-import getConfig
+from getConfig import ConfigHandler
 from os import path
 
 def main(command=None):
-    from config import community_tab
-    com_tab_folder = getConfig.getCommunityTabDirectory()
+    getConfig = ConfigHandler()
+    com_tab_folder = getConfig.get_community_tab_directory()
+    community_tab = getConfig.community_tab
+    
     if com_tab_folder:
         com_tab_archive = getConfig.getCommunityTabArchive()
         for channel in community_tab:
@@ -18,9 +20,6 @@ def main(command=None):
             command.append('"https://www.youtube.com/channel/{0}/community"'.format(id))
             
             result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    
-    
-
 
 if __name__ == "__main__":
     main()
