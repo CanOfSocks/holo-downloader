@@ -1,12 +1,13 @@
 from sys import argv
 from pathlib import Path, PurePath
-#import os
+import os
 import tomllib as toml
-import json
+#import json
 
 class ConfigHandler:
     def __init__(self, config=None, config_file="config.toml"):
         if config is None and config_file:
+            config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), config_file)
             with open(config_file, "rb") as toml_file:
                 config = toml.load(toml_file)
         self.channel_ids_to_match = config.get("channel_ids_to_match", {})
