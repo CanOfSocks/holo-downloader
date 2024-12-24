@@ -28,6 +28,7 @@ url = "https://discord.com/api/webhooks/xxxxxxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyy"
 [download_options]
 video_fetch_method = "ytdlp"
 output_path = "%(channel)s/[%(upload_date)s] %(fulltitle)s - %(channel)s (%(id)s)/[%(upload_date)s] %(fulltitle)s - %(channel)s (%(id)s)"
+alternative_path = "%(channel)s/[%(upload_date)s] (%(id)s)/[%(upload_date)s] (%(id)s)"
 mux_file = true
 download_threads = 4
 ytarchive_options = "--vp9 --add-metadata --no-frag-files"

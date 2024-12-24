@@ -9,7 +9,7 @@ def main(command=None):
     community_tab = getConfig.community_tab
     
     if com_tab_folder:
-        com_tab_archive = getConfig.getCommunityTabArchive()
+        com_tab_archive = getConfig.get_community_tab_archive()
         for channel in community_tab:
             id = community_tab[channel]
             command = ["python", "/app/ytct.py", "--dates", "-d", "{0}".format(path.join(com_tab_folder, channel))]
