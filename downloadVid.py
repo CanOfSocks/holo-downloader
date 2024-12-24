@@ -42,7 +42,7 @@ def downloader(id,outputTemplate, info_dict):
         download_Live.download_segments(info_dict, getConfig.get_quality(), options)
     except Exception as e:
         print(e)
-        discord_web.main(id, "error", message=str(e)[-1500:])
+        discord_web.main(id, "error", message=str(e)[-500:])
         global kill_all
         kill_all = True
         sleep(1.0)

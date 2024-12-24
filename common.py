@@ -233,3 +233,15 @@ def cron_frequency(cron_expr):
     interval_seconds = (next_time_after - next_time).total_seconds()
     
     return interval_seconds
+
+def replace_ip_in_json(file_name):
+    import re
+    pattern = re.compile(r'((?:[0-9]{1,3}\.){3}[0-9]{1,3})|((?:[a-f0-9]{1,4}:){7}[a-f0-9]{1,4})')
+
+    with open(file_name, 'r', encoding="utf8") as file:
+        content = file.read()
+
+    modified_content = re.sub(pattern, '0.0.0.0', content)
+
+    with open(file_name, 'w', encoding="utf8") as file:
+        file.write(modified_content)

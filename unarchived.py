@@ -269,7 +269,7 @@ def run_yta_raw(json_file, output_path = None, ytdlp_json = None):
     if result.returncode == 0:        
         if ytdlp_json and output_path:
             move(ytdlp_json, '{0}.info.json'.format(output))
-            from downloadVid import replace_ip_in_json
+            from common import replace_ip_in_json
             replace_ip_in_json('{0}.info.json'.format(output))
         os.remove(json_file)
         if data:
