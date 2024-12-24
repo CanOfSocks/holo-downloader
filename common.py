@@ -207,6 +207,8 @@ def combine_unarchived(ids):
     import re
     yta_pattern = r"^.{11}-yta\.info\.json$"
     directory = getConfig.get_unarchived_temp_folder()
+    if not os.path.exists(directory):
+        os.makedirs(directory, exist_ok=True)
     files = [f for f in os.listdir(directory) if (os.path.isfile(os.path.join(directory, f)) and os.path.join(directory, f).endswith('.info.json'))]
     id_set = set()
     
