@@ -14,7 +14,7 @@ def main(command=None):
             id = community_tab[channel]
             command = ["python", "/app/ytct.py", "--dates", "-d", "{0}".format(path.join(com_tab_folder, channel))]
             if getConfig.getCookiesFile():
-                command += ["--cookies", getConfig.getCookiesFile()]
+                command += ["--cookies", getConfig.get_cookies_file()]
             if com_tab_archive:
                 command += ["--post-archive", com_tab_archive]
             command.append('"https://www.youtube.com/channel/{0}/community"'.format(id))
