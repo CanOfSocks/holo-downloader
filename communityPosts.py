@@ -13,7 +13,7 @@ def main(command=None):
         for channel in community_tab:
             id = community_tab[channel]
             command = ["python", "/app/ytct.py", "--dates", "-d", "{0}".format(path.join(com_tab_folder, channel))]
-            if getConfig.getCookiesFile():
+            if getConfig.get_cookies_file():
                 command += ["--cookies", getConfig.get_cookies_file()]
             if com_tab_archive:
                 command += ["--post-archive", com_tab_archive]

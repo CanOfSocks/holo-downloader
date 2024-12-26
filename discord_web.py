@@ -15,7 +15,7 @@ def send_webhook(url, id="Unknown", status="error", message=None):
         message = remove_ansi_escape_sequences(message)
         
         
-    webhook = DiscordWebhook(url, rate_limit_retry=True)
+    webhook = DiscordWebhook(url, rate_limit_retry=True, timeout=30)
     if(status == "starting"):
         title="Starting"
         color="fc8803"
