@@ -35,7 +35,12 @@ class ConfigHandler:
             return str(Path(self.download_options.get("cookies_file")))
         else:
             return None
-        
+       
+    def get_title_filter(self):
+        return self.title_filter
+    
+    def get_desc_filter(self):
+        return self.description_filter
 
     def get_ytdlp(self):
         output_folder = self.download_options.get('output_path', "")

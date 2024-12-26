@@ -1,5 +1,5 @@
 from subprocess import Popen 
-from config import title_filter,description_filter
+#from config import title_filter,description_filter
 from yt_dlp import YoutubeDL
 #import getConfig
 from getConfig import ConfigHandler
@@ -16,7 +16,7 @@ def vid_executor(streams, command, unarchived = False, frequency = None):
             download_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'unarchived.py')
         else:
             download_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloadVid.py')
-        from time import sleep
+
         from random import uniform
         
         if frequency:
@@ -25,12 +25,12 @@ def vid_executor(streams, command, unarchived = False, frequency = None):
         else:
             sleep_time = 60
         
-        for live in streams:
+        for i, live in enumerate(streams):
             command = ["python", download_script, '--', live]
             #Popen(command)
             Popen(command, start_new_session=True)
-
-            sleep(uniform(max(sleep_time - (sleep_time/2), 1.0),max(sleep_time + (sleep_time/2), 1.0)))
+            if i < len(streams) - 1:
+                sleep(uniform(max(sleep_time - (sleep_time/2), 1.0),max(sleep_time + (sleep_time/2), 1.0)))
         return    
         
     elif(command == "bash"):
@@ -42,7 +42,7 @@ def vid_executor(streams, command, unarchived = False, frequency = None):
         return streams
     
 def titleFilter(live,channel_id):
-    titFilter = title_filter.get(channel_id)
+    titFilter = getConfig.get_title_filter().get(channel_id)
     if titFilter is None:
         return None
     
@@ -58,7 +58,7 @@ def titleFilter(live,channel_id):
         return None
     
 def descriptionFilter(live,channel_id):
-    descFilter = description_filter.get(channel_id)    
+    descFilter = getConfig.get_desc_filter().get(channel_id)    
     #If filter not present, return None
     if descFilter is None:
         return None
