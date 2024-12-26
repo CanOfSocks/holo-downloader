@@ -6,6 +6,7 @@ from getConfig import ConfigHandler
 from datetime import datetime, timedelta, timezone    
 import os
 from time import sleep
+import re
 
 getConfig = ConfigHandler()
 
@@ -30,6 +31,8 @@ def vid_executor(streams, command, unarchived = False, frequency = None):
             Popen(command, start_new_session=True)
 
             sleep(uniform(max(sleep_time - (sleep_time/2), 1.0),max(sleep_time + (sleep_time/2), 1.0)))
+        return    
+        
     elif(command == "bash"):
         bash_array = ' '.join(streams)
         print(bash_array)
@@ -42,7 +45,7 @@ def titleFilter(live,channel_id):
     titFilter = title_filter.get(channel_id)
     if titFilter is None:
         return None
-    import re
+    
     #Return the result of the regex, if the search fails (such as a syntax error), disregard filter
     try:
         search = re.search(titFilter,live.get('title'))
@@ -59,31 +62,28 @@ def descriptionFilter(live,channel_id):
     #If filter not present, return None
     if descFilter is None:
         return None
-    
-    desc = None
-    ydl_opts = {
-        'quiet': True,
-        'extract_flat': True,
-        'force_generic_extractor': True,
-        'sleep_interval': 1,
-        'sleep_interval_requests': 1,
-        'no_warnings': True,
-        'playlist_items': '1:10',
-        'cookiefile': getConfig.get_cookies_file(),
-        #'verbose': True
-        #'match_filter': filters
-    }
-    
-    with YoutubeDL(ydl_opts) as ydl:
-        url = "https://www.youtube.com/watch?v={0}".format(live.get('id'))
-        info = ydl.extract_info(url, download=False)
-        #print(info)
-        desc = info.get('description')
+    desc = live.get('description', None)
+    if desc is None:
+        ydl_opts = {
+            'quiet': True,
+            'force_generic_extractor': True,
+            'sleep_interval': 1,
+            'sleep_interval_requests': 1,
+            'no_warnings': True,
+            'cookiefile': getConfig.get_cookies_file(),
+            #'verbose': True
+            #'match_filter': filters
+        }
+        
+        with YoutubeDL(ydl_opts) as ydl:
+            url = "https://www.youtube.com/watch?v={0}".format(live.get('id'))
+            info = ydl.extract_info(url, download=False)
+            #print(info)
+            desc = info.get('description')
     
     #if not desc:
     #    return None
 
-    import re
     #Return the result of the regex, if the search fails (such as a syntax error), disregard filter
     try:
         if re.search(descFilter,desc):
@@ -104,24 +104,6 @@ def filtering(live,channel_id):
         return True
     else:
         return False
-    #If filter exists for both title and description, try to find match for either
-#    if title is not None and description is not None:
-#        if(title or description):
-#            return True
-#        else:
-#           return False        
-    #If only title filter exists, use that
-#    elif(title and description is None): #The "and" may not be necessary
-#        return True
-    #Otherwise use description
-#    elif(description and title is None):
-#        return True
-    #If neither exist, assume true as there is no filter
-#    elif(title is None and description is None):
-#        return True
-    #Otherwise none of the filters passed
-#    else:
-#        return False
        
 def withinFuture(releaseTime=None):
     #Assume true if value missing
@@ -152,7 +134,7 @@ def getAvailability(live):
                 pass
     return live.availability
 
-def get_upcoming_or_live_videos(channel_id, tab):
+def get_upcoming_or_live_videos(channel_id, tab=None):
     #channel_id = str(channel_id)
     ydl_opts = {
         'quiet': True,
@@ -194,7 +176,7 @@ def get_upcoming_or_live_videos(channel_id, tab):
         upcoming_or_live_videos = []
         for video in info['entries']:
             
-            if (video.get('live_status') == 'is_live' or video.get('live_status') == 'post_live' or (video.get('live_status') == 'is_upcoming' and withinFuture(video.get('release_timestamp')))) and filtering(video,channel_id):
+            if (video.get('live_status') == 'is_live' or video.get('live_status') == 'post_live' or (video.get('live_status') == 'is_upcoming' and withinFuture(video.get('release_timestamp')))) and filtering(video,video.get('channel_id')):
                 #print("live_status = {0}".format(video.get('live_status')))
                 #print(video)
                 upcoming_or_live_videos.append(video.get('id'))
@@ -203,9 +185,7 @@ def get_upcoming_or_live_videos(channel_id, tab):
         return list(set(upcoming_or_live_videos))
     
 def combine_unarchived(ids):
-    import os
-    import re
-    yta_pattern = r"^.{11}-yta\.info\.json$"
+    yta_pattern = r"^.([0-9A-Za-z_-]{10}[048AEIMQUYcgkosw])-yta\.info\.json$"
     directory = getConfig.get_unarchived_temp_folder()
     if not os.path.exists(directory):
         os.makedirs(directory, exist_ok=True)
@@ -237,7 +217,6 @@ def cron_frequency(cron_expr):
     return interval_seconds
 
 def replace_ip_in_json(file_name):
-    import re
     pattern = re.compile(r'((?:[0-9]{1,3}\.){3}[0-9]{1,3})|((?:[a-f0-9]{1,4}:){7}[a-f0-9]{1,4})')
 
     with open(file_name, 'r', encoding="utf8") as file:

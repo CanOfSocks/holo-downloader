@@ -1,11 +1,12 @@
 #!/usr/local/bin/python
 import argparse
 import common
+import time
 from getConfig import ConfigHandler
 
 
 def getVideos(channel_ids_to_match, command=None, unarchived = False, frequency=None):
-    from random import uniform
+    
     all_lives = []
     for channel in channel_ids_to_match:
         try:
@@ -14,6 +15,7 @@ def getVideos(channel_ids_to_match, command=None, unarchived = False, frequency=
             all_lives += lives
         except Exception as e:
             print(("Error fetching streams for {0}. Check cookies. \n{1}".format(channel,e)))
+        time.sleep(1)
     if unarchived:
         all_lives = common.combine_unarchived(all_lives)
 
