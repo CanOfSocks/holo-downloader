@@ -1,4 +1,5 @@
 # holo-downloader
+## Currently going over major refactoring. Will update readme when completed
 A downloader for getting all streams for given hololive channels. This repo is designed primarily to be used in a Docker container, but the program should work on both Windows and Linux as is (with your choice of scheduler)
 
 [Build on Docker Hub](https://hub.docker.com/r/canofsocks/holo-downloader)
