@@ -183,6 +183,9 @@ class ConfigHandler:
     def get_fetch_method(self):
         return self.download_options.get('video_fetch_method', "rss")
     
+    def get_ffmpeg_command(self):
+        return self.download_options.get('write_ffmpeg_command', False)
+    
     def get_discord_webhook(self):
         return self.webhook.get("url", None)
     
@@ -220,7 +223,8 @@ class ConfigHandler:
             "json_file": None,
             "remove_ip_from_json": self.get_remove_ip(),
             "log_level": self.get_log_level(),
-            "log_file": self.get_log_file()
+            "log_file": self.get_log_file(),
+            'write_ffmpeg_command': self.get_ffmpeg_command(),
         }
         if info_dict.get('availability', None) == 'subscriber_only':
             options.update({'output': str(self.get_membership_output_path(output_template))})
