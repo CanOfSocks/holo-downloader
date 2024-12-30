@@ -186,6 +186,9 @@ class ConfigHandler:
     def get_ffmpeg_command(self):
         return self.download_options.get('write_ffmpeg_command', False)
     
+    def get_keep_ts_files(self):
+        return self.download_options.get('keep_ts_files', False)
+    
     def get_discord_webhook(self):
         return self.webhook.get("url", None)
     
@@ -213,7 +216,7 @@ class ConfigHandler:
             "write_info_json": self.get_info_json(),
             "write_description": self.get_description(),
             "keep_temp_files": False,
-            "keep_ts_files": False,
+            "keep_ts_files": self.get_keep_ts_files(),
             "live_chat": self.get_chat(),
             "keep_database_file": False,
             "recovery": False,
