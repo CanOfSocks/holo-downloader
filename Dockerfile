@@ -20,20 +20,12 @@ RUN wget -q "https://github.com/Kethsar/ytarchive/releases/download/${YTA_VERSIO
 RUN wget -q "https://github.com/HoloArchivists/ytarchive-raw-go/releases/latest/download/ytarchive-raw-go-linux-amd64" -O /usr/bin/ytarchive-raw-go && \
     chmod +x /usr/bin/ytarchive-raw-go
 
-# Install python dependencies
-COPY requirements.txt .
-
-
 # Clone the repository
 RUN git clone "https://github.com/CanOfSocks/livestream_dl" /app/livestream_dl
 
-# Install youtube-community-tab
-
-
 # Apply patches
 RUN wget -q -O "/app/ytct.py" https://raw.githubusercontent.com/HoloArchivists/youtube-community-tab/master/ytct.py
-RUN sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" /usr/local/lib/python*/site-packages/chat_downloader/sites/youtube.py
-RUN sed -i '/if fmt.get('\'targetDurationSec\''):$/,/    continue$/s/^/#/' "$(pip show yt-dlp | grep Location | awk '{print $2}')/yt_dlp/extractor/youtube.py
+
 
 # Final minimal image setup
 FROM python:3.12-slim
@@ -58,8 +50,11 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 RUN chmod +x *.py /app/startCron.sh
 
 # Install remaining dependencies
-RUN pip install --no-cache-dir -e "git+https://github.com/HoloArchivists/youtube-community-tab.git#egg=youtube-community-tab&subdirectory=youtube-community-tab"
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -e "git+https://github.com/HoloArchivists/youtube-community-tab.git#egg=youtube-community-tab&subdirectory=youtube-community-tab"
+
+# Modify yt-dlp
+RUN (sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" /usr/local/lib/python*/site-packages/chat_downloader/sites/youtube.py) ; (sed -i '/if fmt.get('\'targetDurationSec\''):$/,/    continue$/s/^/#/' "$(pip show yt-dlp | grep Location | awk '{print $2}')/yt_dlp/extractor/youtube.py)
 
 # Set environment variables and cron schedule
 ENV VIDEOSCHEDULE='*/2 * * * *'
