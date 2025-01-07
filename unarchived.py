@@ -23,7 +23,7 @@ def check_ytdlp_age(existing_file):
     # Open the file
     data = None
     if os.path.exists(existing_file):
-        with open(existing_file, 'r') as file:
+        with open(existing_file, 'r', encoding='utf-8') as file:
             # Load the JSON data from the file
             data = json.load(file)
     if data and 'epoch' in data:
@@ -43,7 +43,7 @@ def check_yta_raw_age(existing_file):
     current_time = time()
     data = None
     if os.path.exists(existing_file):
-        with open(existing_file, 'r') as file:
+        with open(existing_file, 'r', encoding='utf-8') as file:
             # Load the JSON data from the file
             data = json.load(file)
     if data and 'createTime' in data:
