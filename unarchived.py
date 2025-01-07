@@ -15,6 +15,9 @@ from shutil import move
 import discord_web
 from json import load
 
+from livestream_dl import getUrls
+from livestream_dl import download_Live
+
 getConfig = ConfigHandler()
 
 def check_ytdlp_age(existing_file):    
@@ -23,7 +26,7 @@ def check_ytdlp_age(existing_file):
     # Open the file
     data = None
     if os.path.exists(existing_file):
-        with open(existing_file, 'r') as file:
+        with open(existing_file, 'r', encoding='utf-8') as file:
             # Load the JSON data from the file
             data = json.load(file)
     if data and 'epoch' in data:
@@ -43,7 +46,7 @@ def check_yta_raw_age(existing_file):
     current_time = time()
     data = None
     if os.path.exists(existing_file):
-        with open(existing_file, 'r') as file:
+        with open(existing_file, 'r', encoding='utf-8') as file:
             # Load the JSON data from the file
             data = json.load(file)
     if data and 'createTime' in data:
@@ -58,43 +61,38 @@ def check_yta_raw_age(existing_file):
         os.remove(existing_file)
         return False
     return True            
-
-class MyLogger:
-    def __init__(self):
-        self.private_video_detected = False
-
-    def debug(self, msg):
-        #print(msg)
-        pass
-
-    def warning(self, msg):
-        #print(msg)
-        if "Private" in msg or "private" in msg or "UNAVAILABLE" in msg.upper() or "should already be available" in msg.lower():
-            raise yt_dlp.utils.DownloadError("Private video. Sign in if you've been granted access to this video")
-        
-
-    def error(self, msg):
-        print(msg)
-        pass
             
 def is_video_private(id):
-    url = "https://www.youtube.com/watch?v={0}".format(id)
-    
-    logger = MyLogger()
-    
-    ydl_opts = {
-        'retries': 25,
-        'wait_for_video': (5, 1800),
-        'skip_download': True,
-        'cookiefile': getConfig.get_cookies_file(),        
-        'quiet': True,
-        #'no_warnings': True,
-        #'extractor_args': 'youtube:player_client=web;skip=dash;formats=incomplete,duplicate',
-        'logger': logger
-    }
-
     json_out_path = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.info.json".format(id))
+    jpg_out_path = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.jpg".format(id))
+    
+    try:
+        info_dict, live_status = getUrls.get_Video_Info(id=id,  wait=(5, 1800))
+        if info_dict.get('live_status') == 'is_live' or info_dict.get('live_status') == 'post_live':
+            os.makedirs(os.path.dirname(json_out_path), exist_ok=True)
+            with open(json_out_path, 'w', encoding='utf-8') as json_file:
+                json.dump(info_dict, json_file, ensure_ascii=False, indent=4)    
+            print("Downloading thumbnail")
+            file, file_type = download_Live.download_auxiliary_files(info_dict=info_dict, options={'write_thumbnail': True})
+            print(file)
+            if file.get("thumbnail",None) is not None and not str(file.get("thumbnail").suffix).endswith("jpg"):
+                subprocess.run([
+                    "ffmpeg",
+                    "-i", file.get("thumbnail").absolute(),  # Input file
+                    "-q:v", "2",
+                    jpg_out_path        # Output file
+                ], check=True)
+                file.get("thumbnail").unlink()
+            return
+    except PermissionError as e:
+        print(e)
+        pass
+    except ValueError as e:
+        print(e)
+    except Exception as e:
+        print(e)
 
+    """
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
             info_dict = ydl.extract_info(url, download=False)
@@ -136,6 +134,7 @@ def is_video_private(id):
                 pass
             else:
                 raise e
+    """
     existing_file = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.info.json".format(id))
     if os.path.exists(existing_file):
         check_ytdlp_age(existing_file)
