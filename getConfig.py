@@ -169,7 +169,7 @@ class ConfigHandler:
     def get_unarchived_temp_folder(self):
         return self.download_options.get("unarchived_tempdir", None) or self.get_temp_folder()
     
-    def get_unarchived_output(self, output):
+    def get_unarchived_output_path(self, output):
         return Path(self.get_unarchived_folder()) / Path(output)
 
     def get_remove_ip(self):

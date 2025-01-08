@@ -293,7 +293,7 @@ def download_private(info_dict_file, thumbnail=None):
         "batch_size": 5,
         "segment_retries": 10,
         "merge": getConfig.get_mux(),
-        "output": str(getConfig.get_unarchived_output(getConfig.get_ytdlp())),
+        "output": str(getConfig.get_unarchived_output_path(getConfig.get_ytdlp())),
         "temp_folder": getConfig.get_unarchived_temp_folder(),
         "write_thumbnail": getConfig.get_thumbnail(),
         "embed_thumbnail": getConfig.get_thumbnail(),
@@ -311,6 +311,7 @@ def download_private(info_dict_file, thumbnail=None):
         "log_file": getConfig.get_log_file(),
         'write_ffmpeg_command': getConfig.get_ffmpeg_command(),
     }
+    print("Output path: {0}".format(options.get('output')))
     if thumbnail:
         download_Live.file_names['thumbnail'] = download_Live.FileInfo(thumbnail, file_type='thumbnail')
     try:
