@@ -293,7 +293,7 @@ def download_private(info_dict_file, thumbnail=None):
         "batch_size": 5,
         "segment_retries": 10,
         "merge": getConfig.get_mux(),
-        "output": getConfig.get_unarchived_output(),
+        "output": str(getConfig.get_unarchived_output(getConfig.get_ytdlp())),
         "temp_folder": getConfig.get_unarchived_temp_folder(),
         "write_thumbnail": getConfig.get_thumbnail(),
         "embed_thumbnail": getConfig.get_thumbnail(),

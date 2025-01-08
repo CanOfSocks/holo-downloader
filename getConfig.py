@@ -169,8 +169,8 @@ class ConfigHandler:
     def get_unarchived_temp_folder(self):
         return self.download_options.get("unarchived_tempdir", None) or self.get_temp_folder()
     
-    def get_unarchived_output(self):
-        return os.path.join(self.get_unarchived_folder(), '[%(upload_date)s] %(title)s [%(channel)s] (%(id)s)')
+    def get_unarchived_output(self, output):
+        return Path(self.get_unarchived_folder()) / Path(output)
 
     def get_remove_ip(self):
         return self.download_options.get('remove_ip', False)
