@@ -317,7 +317,14 @@ def download_private(info_dict_file, thumbnail=None):
         download_Live.download_segments(info_dict=info_dict, resolution='best', options=options)   
     except Exception as e:
         discord_web.main(info_dict.get('id'), "error", message=str(e.stderr)[-500:])
+        return
     discord_web.main(info_dict.get('id'), "done")
+    
+    if os.path.exists(info_dict_file):
+        os.remove(info_dict_file)
+        
+    if os.path.exists(thumbnail):
+        os.remove(thumbnail)
         
 def is_script_running(script_name, id):
     #current = psutil.Process()
