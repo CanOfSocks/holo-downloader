@@ -16,7 +16,7 @@ import discord_web
 from json import load
 
 from livestream_dl import getUrls
-from livestream_dl import download_Live
+
 
 getConfig = ConfigHandler()
 
@@ -65,28 +65,31 @@ def check_yta_raw_age(existing_file):
 def is_video_private(id):
     json_out_path = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.info.json".format(id))
     jpg_out_path = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.jpg".format(id))
-    
+    #jpg_out_path= "{0}.jpg".format(id)
+
     try:
         info_dict, live_status = getUrls.get_Video_Info(id=id,  wait=(5, 1800))
         if info_dict.get('live_status') == 'is_live' or info_dict.get('live_status') == 'post_live':
             os.makedirs(os.path.dirname(json_out_path), exist_ok=True)
             with open(json_out_path, 'w', encoding='utf-8') as json_file:
-                json.dump(info_dict, json_file, ensure_ascii=False, indent=4)    
-            print("Downloading thumbnail")
-            file, file_type = download_Live.download_auxiliary_files(info_dict=info_dict, options={'write_thumbnail': True})
-            print(file)
-            if file.get("thumbnail",None) is not None and not str(file.get("thumbnail").suffix).endswith("jpg"):
+                json.dump(info_dict, json_file, ensure_ascii=False, indent=4)   
+                print(os.path.abspath(json_out_path)) 
+            from livestream_dl.download_Live import download_auxiliary_files
+            file = download_auxiliary_files(info_dict=info_dict, options={'write_thumbnail': True})[0].get('thumbnail',None)
+            if file is not None and not str(file.suffix).endswith("jpg"):
                 subprocess.run([
-                    "ffmpeg",
-                    "-i", file.get("thumbnail").absolute(),  # Input file
+                    "ffmpeg", "-y",
+                    '-hide_banner', '-nostdin', '-loglevel', 'error',
+                    "-i", file.absolute(),  # Input file
                     "-q:v", "2",
                     jpg_out_path        # Output file
                 ], check=True)
-                file.get("thumbnail").unlink()
+                print(file.absolute())
+                file.unlink()
             return
     except PermissionError as e:
-        print(e)
-        pass
+        if os.path.exists(json_out_path):
+            download_private(info_dict_file=json_out_path, thumbnail=jpg_out_path)   
     except ValueError as e:
         print(e)
     except Exception as e:
@@ -275,7 +278,46 @@ def run_yta_raw(json_file, output_path = None, ytdlp_json = None):
             discord_web.main(data['metadata']['id'], "done")
         print("Finished downloading yta video: {0}".format(json_file))
         
-        
+def download_private(info_dict_file, thumbnail=None):
+    with open(info_dict_file, 'r', encoding='utf-8') as file:
+        # Load the JSON data from the file
+        info_dict = json.load(file)
+    discord_web.main(info_dict.get('id'), "recording")
+    from livestream_dl import download_Live
+    options = {
+        "ID": info_dict.get('id'),
+        "resolution": 'best',
+        "video_format": None,
+        "audio_format": None,
+        "threads": 20,
+        "batch_size": 5,
+        "segment_retries": 10,
+        "merge": getConfig.get_mux(),
+        "output": getConfig.get_unarchived_output(),
+        "temp_folder": getConfig.get_unarchived_temp_folder(),
+        "write_thumbnail": getConfig.get_thumbnail(),
+        "embed_thumbnail": getConfig.get_thumbnail(),
+        "write_info_json": getConfig.get_info_json(),
+        "write_description": getConfig.get_description(),
+        "keep_database_file": False,
+        "recovery": True,
+        "database_in_memory": False,
+        "direct_to_ts": False,
+        "wait_for_video": None,
+        "json_file": None,
+        "remove_ip_from_json": getConfig.get_remove_ip(),
+        "log_level": getConfig.get_log_level(),
+        #"log_level": "DEBUG",
+        "log_file": getConfig.get_log_file(),
+        'write_ffmpeg_command': getConfig.get_ffmpeg_command(),
+    }
+    if thumbnail:
+        download_Live.file_names['thumbnail'] = download_Live.FileInfo(thumbnail, file_type='thumbnail')
+    try:
+        download_Live.download_segments(info_dict=info_dict, resolution='best', options=options)   
+    except Exception as e:
+        discord_web.main(info_dict.get('id'), "error", message=str(e.stderr)[-500:])
+    discord_web.main(info_dict.get('id'), "done")
         
 def is_script_running(script_name, id):
     #current = psutil.Process()

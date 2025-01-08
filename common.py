@@ -21,7 +21,7 @@ def vid_executor(streams, command, unarchived = False, frequency = None):
         
         if frequency:
             frequency_sec = cron_frequency(frequency)
-            sleep_time = frequency_sec/(max(len(streams) - 1),1)
+            sleep_time = frequency_sec/(max(len(streams) + 1),2)
         else:
             sleep_time = 60
         
@@ -30,7 +30,7 @@ def vid_executor(streams, command, unarchived = False, frequency = None):
             #Popen(command)
             Popen(command, start_new_session=True)
             if i < len(streams) - 1:
-                sleep(uniform(max(sleep_time - (sleep_time/2), 1.0),max(sleep_time + (sleep_time/2), 1.0)))
+                sleep(uniform(max(sleep_time/2, 1.0),max(sleep_time * 1.25, 1.0)))
         return    
         
     elif(command == "bash"):
