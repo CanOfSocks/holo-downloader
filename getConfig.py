@@ -155,7 +155,7 @@ class ConfigHandler:
         return self.download_options.get('look_ahead', 48)
 
     def get_membership_directory(self):
-        return self.download_options.get('members_dir') or self.get_done_folder()
+        return self.download_options.get('members_dir', None) or self.get_done_folder()
 
     def get_membership_output_path(self, output):
         return Path(self.get_membership_directory()) / Path(output)
@@ -167,7 +167,7 @@ class ConfigHandler:
         return self.community_tab_options.get("community_dir", "")
 
     def get_unarchived_temp_folder(self):
-        return self.download_options.get("unarchived_tempdir") or self.get_temp_folder()
+        return self.download_options.get("unarchived_tempdir", None) or self.get_temp_folder()
     
     def get_unarchived_output(self):
         return os.path.join(self.get_unarchived_folder(), '[%(upload_date)s] %(title)s [%(channel)s] (%(id)s)')
@@ -176,7 +176,7 @@ class ConfigHandler:
         return self.download_options.get('remove_ip', False)
 
     def get_unarchived_folder(self):
-        return self.download_options.get("unarchived_dir") or self.get_done_folder()
+        return self.download_options.get("unarchived_dir", None) or self.get_done_folder()
 
     def get_output_template_yta_raw(self):
         if self.download_options.get("output_folder", None):
