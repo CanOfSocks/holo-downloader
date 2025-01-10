@@ -9,7 +9,7 @@ SHELL=/bin/bash
 #BASH_ENV=/root/project_env.sh
 END
 )
-    CRON_CONTENT+=$'\n'
+    CRON_CONTENT+=$'0 */3 * * * /usr/sbin/update-ca-certificates\n'
     # Append each schedule line to CRON_CONTENT if the corresponding environment variable is set
     if [ -n "${VIDEOSCHEDULE}" ]; then
         CRON_CONTENT+="${VIDEOSCHEDULE} /app/getVids.py --command 'spawn' --frequency '${VIDEOSCHEDULE}'> /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
