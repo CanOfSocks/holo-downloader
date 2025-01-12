@@ -138,12 +138,9 @@ def is_video_private(id):
             else:
                 raise e
     """
-    existing_file = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.info.json".format(id))
-    if os.path.exists(existing_file):
-        check_ytdlp_age(existing_file)
-    elif os.path.exists(os.path.join(getConfig.get_unarchived_temp_folder(),"{0}-yta.info.json".format(id))):
-        existing_file = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}-yta.info.json".format(id))
-        check_yta_raw_age(existing_file)
+    #existing_file = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.info.json".format(id))
+    if os.path.exists(json_out_path):
+        check_ytdlp_age(json_out_path)
             
 
 def get_image(url):
