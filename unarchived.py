@@ -140,7 +140,9 @@ def is_video_private(id):
     """
     #existing_file = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.info.json".format(id))
     if os.path.exists(json_out_path):
-        check_ytdlp_age(json_out_path)
+        # If removed (returns false), the also remove thumbnail if it exists
+        if not check_ytdlp_age(json_out_path) and os.path.exists(jpg_out_path):
+            os.remove(jpg_out_path)
             
 
 def get_image(url):
