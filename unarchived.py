@@ -316,7 +316,8 @@ def download_private(info_dict_file, thumbnail=None):
     try:
         download_Live.download_segments(info_dict=info_dict, resolution='best', options=options)   
     except Exception as e:
-        discord_web.main(info_dict.get('id'), "error", message=str(e.stderr)[-500:])
+        import traceback
+        discord_web.main(info_dict.get('id'), "error", message=str("{0}\n{1}".format(e, traceback.format_exc))[-1000:])
         return
     discord_web.main(info_dict.get('id'), "done")
     
