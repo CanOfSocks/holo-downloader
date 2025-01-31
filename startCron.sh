@@ -39,7 +39,7 @@ END
         CRON_CONTENT+="0 0 * * * /usr/local/bin/pip install -U yt-dlp && sed -i '/if fmt.get(\\'targetDurationSec\\'):$/,/    continue$/s/^/#/' \"\$(pip show yt-dlp | grep Location | awk '{print \$2}')/yt_dlp/extractor/youtube.py\""$'\n'
     fi
     
-    CRON_CONTENT+="@reboot python /app/discord_web.py '0' 'starting'"
+    #CRON_CONTENT+="@reboot python /app/discord_web.py '0' 'starting'"
 
     # Recreate the cron file with the specified content
     echo "$CRON_CONTENT" | crontab -
@@ -49,7 +49,7 @@ END
 main() {
     # Recreate the cron file with the specified lines
     recreate_cron_file
-
+    python /app/discord_web.py '0' 'starting'
     # Start the cron daemon in the foreground
     cron -f
 }
