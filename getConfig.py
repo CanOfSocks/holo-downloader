@@ -174,6 +174,9 @@ class ConfigHandler:
 
     def get_remove_ip(self):
         return self.download_options.get('remove_ip', False)
+    
+    def get_remove_url(self):
+        return self.download_options.get('clean_urls', False)
 
     def get_unarchived_folder(self):
         return self.download_options.get("unarchived_dir", None) or self.get_done_folder()
@@ -228,6 +231,7 @@ class ConfigHandler:
             "wait_for_video": None,
             "json_file": None,
             "remove_ip_from_json": self.get_remove_ip(),
+            "clean_urls": self.get_remove_url(),
             "log_level": self.get_log_level(),
             "log_file": self.get_log_file(),
             'write_ffmpeg_command': self.get_ffmpeg_command(),
