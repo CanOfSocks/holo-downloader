@@ -7,17 +7,19 @@ from datetime import datetime, timedelta, timezone
 import os
 from time import sleep
 import re
+import random
 
 getConfig = ConfigHandler()
 
 def vid_executor(streams, command, unarchived = False, frequency = None):    
+    if getConfig.randomise_lists() is True:
+        streams = random_sample(streams)
+    
     if(command == "spawn"):
         if unarchived == True:
             download_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'unarchived.py')
         else:
             download_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloadVid.py')
-
-        from random import uniform
         
         if frequency:
             frequency_sec = cron_frequency(frequency)
@@ -30,7 +32,7 @@ def vid_executor(streams, command, unarchived = False, frequency = None):
             #Popen(command)
             Popen(command, start_new_session=True)
             if i < len(streams) - 1:
-                sleep(uniform(max(sleep_time/2, 1.0),max(sleep_time * 1.25, 1.0)))
+                sleep(random.uniform(max(sleep_time/2, 1.0),max(sleep_time * 1.25, 1.0)))
         return    
         
     elif(command == "bash"):
@@ -226,3 +228,18 @@ def replace_ip_in_json(file_name):
 
     with open(file_name, 'w', encoding="utf8") as file:
         file.write(modified_content)
+        
+def random_sample(data, k):
+    """Returns a random sample of size k from a list, tuple, or dictionary."""
+    if isinstance(data, list):
+        return random.sample(data, k)  # Returns a list
+    
+    elif isinstance(data, tuple):
+        return tuple(random.sample(data, k))  # Returns a tuple
+    
+    elif isinstance(data, dict):
+        sampled_items = dict(random.sample(data.items(), k))  # Returns a dictionary
+        return sampled_items
+    
+    else:
+        raise TypeError("Unsupported data type. Only lists, tuples, and dictionaries are allowed.")

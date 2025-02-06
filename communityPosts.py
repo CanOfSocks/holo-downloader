@@ -8,6 +8,10 @@ def main(command=None):
     com_tab_folder = getConfig.get_community_tab_directory()
     community_tab = getConfig.community_tab
     
+    if getConfig.randomise_lists() is True:
+        import common
+        community_tab = common.random_sample(community_tab)
+    
     if com_tab_folder:
         com_tab_archive = getConfig.get_community_tab_archive()
         for channel in community_tab:

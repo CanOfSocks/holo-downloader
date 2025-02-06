@@ -28,6 +28,8 @@ def main(command=None, unarchived = False, frequency=None):
     else:
         channel_ids_to_match = getConfig.channel_ids_to_match
     if channel_ids_to_match:
+        if getConfig.randomise_lists() is True:
+            channel_ids_to_match = common.random_sample(channel_ids_to_match)
         getVideos(channel_ids_to_match, command, unarchived, frequency=frequency)
 
     

@@ -204,6 +204,9 @@ class ConfigHandler:
     def get_log_file(self):
         return self.download_options.get('log_file', None)
     
+    def randomise_lists(self):
+        return self.download_options.get('randomise_lists', False)
+    
     def get_livestream_dl_options(self, info_dict, output_template):
         options = {
             "ID": info_dict.get('id'),
