@@ -229,8 +229,10 @@ def replace_ip_in_json(file_name):
     with open(file_name, 'w', encoding="utf8") as file:
         file.write(modified_content)
         
-def random_sample(data, k):
+def random_sample(data, k=None):
     """Returns a random sample of size k from a list, tuple, or dictionary."""
+    if k is None:
+        k = len(data)
     if isinstance(data, list):
         return random.sample(data, k)  # Returns a list
     
