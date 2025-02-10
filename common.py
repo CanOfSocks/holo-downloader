@@ -240,7 +240,7 @@ def random_sample(data, k=None):
         return tuple(random.sample(data, k))  # Returns a tuple
     
     elif isinstance(data, dict):
-        sampled_items = dict(random.sample(data.items(), k))  # Returns a dictionary
+        sampled_items = dict(random.sample(list(data.items()), k))  # Returns a dictionary
         return sampled_items
     
     else:
