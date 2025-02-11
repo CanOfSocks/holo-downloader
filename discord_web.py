@@ -38,7 +38,11 @@ def send_webhook(url, id="Unknown", status="error", message=None):
         webhook_response = webhook.execute()
         return
     
-    response = requests.get("https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v={0}".format(id))
+    embed_error = None
+    try:
+        response = requests.get("https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v={0}".format(id), timeout=30)
+    except Exception as e:
+        embed_error = str(e)
     
     color="03b2f8"   
 
@@ -59,7 +63,7 @@ def send_webhook(url, id="Unknown", status="error", message=None):
             color="00ff00"
 
     # Check if the request was successful (status code 200)
-    if response.status_code == 200:
+    if embed_error is None and response.status_code == 200:
         # Parse the JSON data from the response
         data = response.json()
 
@@ -68,7 +72,9 @@ def send_webhook(url, id="Unknown", status="error", message=None):
         embed.set_author(name=data.get('author_name'), url=data.get('author_url'))
 
         embed.set_thumbnail(url=data.get('thumbnail_url'))
-
+        
+    elif embed_error:
+        embed = DiscordEmbed(title, description="Video https://youtu.be/{0} is not accessible due to error: {1}".format(id, embed_error[:250]), color=color)
     else:                
         embed = DiscordEmbed(title, description="Video https://youtu.be/{0} is not accessible, perhaps it has been privated".format(id), color=color)
 
