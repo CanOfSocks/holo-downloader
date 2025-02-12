@@ -22,35 +22,32 @@ url = "https://discord.com/api/webhooks/xxxxxxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyy"
 [unarchived_channel_ids_to_match]
 "Ninomae Ina'nis Ch. hololive-EN" = "UCMwGHR0BTZuLsmjY_NT5Pwg"
 
-[video_fetch]
-
-
 [download_options]
-video_fetch_method = "ytdlp"
-output_path = "%(channel)s/[%(upload_date)s] %(fulltitle)s - %(channel)s (%(id)s)/[%(upload_date)s] %(fulltitle)s - %(channel)s (%(id)s)"
-alternative_path = "%(channel)s/[%(upload_date)s] (%(id)s)/[%(upload_date)s] (%(id)s)"
+output_path = "%(channel)s/[%(release_date,upload_date)s] %(fulltitle).180B (%(id)s)/[%(release_date,upload_date)s] %(fulltitle).180B [%(channel)s] (%(id)s)"
 mux_file = true
 download_threads = 4
-ytarchive_options = "--vp9 --add-metadata --no-frag-files"
 video_quality = "best"
 video_only = false
 download_chat = true
 thumbnail = true
 info_json = true
-remove_ip = true
 description = true
+video_fetch_method = "yt-dlp"
+look_ahead = 48
+cookies_file = "/app/cookies.txt"
 temp_dir = "/app/temp/"
 done_dir = "/app/Done/"
 members_dir = "/app/Members"
-unarchived_dir = "/app/unarchived"
+unarchived_dir = "/app/Done/"
 unarchived_tempdir = "/app/temp/unarchived"
-look_ahead = 48
-cookies_file = "/app/cookies.txt"
-direct_to_ts = false
+remove_ip = true
+log_level = "WARNING"
+randomise_lists = true
+clean_urls = true
 
 [torrent]
-enabled = true
-options = ["-c", "CanOfSocks"]
+enabled = false
+options = ["-t", "udp://xxxx/announce", "-c", "Bittorrent"]
 
 [community_tab_options]
 archive_file = "/app/com-tab-archive.txt"
