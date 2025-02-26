@@ -51,7 +51,10 @@ main() {
     recreate_cron_file
     python /app/discord_web.py '0' 'starting'
     # Start the cron daemon in the foreground
-    cron -f
+    while true; do
+        cron -f
+        sleep 1
+    done
 }
 
 # Execute main function
