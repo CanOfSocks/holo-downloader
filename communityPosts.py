@@ -16,7 +16,7 @@ def main(command=None):
         com_tab_archive = getConfig.get_community_tab_archive()
         for channel in community_tab:
             id = community_tab[channel]
-            command = ["python", "/app/ytct.py", "--dates", "-d", "{0}".format(path.join(com_tab_folder, channel))]
+            command = ["python", "/app/ytct.py", "--reverse", "--dates", "-d", "{0}".format(path.join(com_tab_folder, channel))]
             if getConfig.get_cookies_file():
                 command += ["--cookies", getConfig.get_cookies_file()]
             if com_tab_archive:
