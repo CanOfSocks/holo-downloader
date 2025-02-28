@@ -23,7 +23,12 @@ def main(command=None):
                 command += ["--post-archive", com_tab_archive]
             command.append('"https://www.youtube.com/channel/{0}/community"'.format(id))
             
-            result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            #result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            result = subprocess.run(command, capture_output=True, text=True)
+            log_file = path.join(com_tab_folder, channel, "log.txt")
+            with open(log_file, 'a') as f:
+                f.write(result.stdout)
+                f.write('\n')
 
 if __name__ == "__main__":
     main()
