@@ -18,12 +18,12 @@ Requires [livestream_dl](https://github.com/CanOfSocks/livestream_dl) and [ffmpe
 To use this container, you will need to have a temporary folder, a final folder and a cookie file.
 Clone the repo and build the Docker container from within the root of the repo.
 
-If using a container, you will need to create a copy of the config.py file for a persistent configuration.
+If using a container, you will need to create a copy of the config.toml file for a persistent configuration.
 
 Example with Docker hub:
 ```
 docker pull 'canofsocks/holo-downloader:latest'
-docker run -d --name='holo-downloader' --cpus=".75" -e TZ="Europe/London" -e HOST_CONTAINERNAME="holo-downloader" -e VIDEOSCHEDULE='*/2 * * * *' -e MEMBERSCHEDULE='*/5 * * * *' -e COMMUNITYSCHEDULE='0 */3 * * *' -v '/mnt/holo-downloader/config/config.py':'/app/config.py':'rw' -v '/mnt/holo-downloader/temp/':'/app/temp':'rw' -v '/mnt/holo-downloader/Done/':'/app/Done':'rw' -v '/mnt/holo-downloader/config/cookies.txt':'/app/cookies.txt':'rw' --restart always 'canofsocks/holo-downloader:latest'
+docker run -d --name='holo-downloader' --cpus=".75" -e TZ="Europe/London" -e HOST_CONTAINERNAME="holo-downloader" -e VIDEOSCHEDULE='*/2 * * * *' -e MEMBERSCHEDULE='*/5 * * * *' -e COMMUNITYSCHEDULE='0 */3 * * *' -v '/mnt/holo-downloader/config/config.toml':'/app/config.toml':'rw' -v '/mnt/holo-downloader/temp/':'/app/temp':'rw' -v '/mnt/holo-downloader/Done/':'/app/Done':'rw' -v '/mnt/holo-downloader/config/cookies.txt':'/app/cookies.txt':'rw' --restart always 'canofsocks/holo-downloader:latest'
 ```
 ## Configuration
 Configuration is applied via the [`config.toml`](https://github.com/CanOfSocks/holo-downloader/blob/main/config.toml) file. Currently this must be placed in the same location as the [`getConfig.py`](https://github.com/CanOfSocks/holo-downloader/blob/main/getConfig.py) file. Ideas for making this more flexible are welcome.
