@@ -207,6 +207,9 @@ class ConfigHandler:
     def randomise_lists(self):
         return self.download_options.get('randomise_lists', False)
     
+    def get_remux_container(self):
+        return self.download_options.get('remux_extension', None)
+    
     def get_livestream_dl_options(self, info_dict, output_template):
         options = {
             "ID": info_dict.get('id'),
@@ -239,6 +242,10 @@ class ConfigHandler:
             "log_file": self.get_log_file(),
             'write_ffmpeg_command': self.get_ffmpeg_command(),
         }
+
+        if self.get_remux_container() is not None:
+            options.update({'ext': str(self.get_remux_container())})
+
         if info_dict.get('availability', None) == 'subscriber_only':
             options.update({'output': str(self.get_membership_output_path(output_template))})
         else:
