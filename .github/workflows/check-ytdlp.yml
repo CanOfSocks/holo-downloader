@@ -1,0 +1,36 @@
+name: Check yt-dlp Releases
+
+on:
+  schedule:
+    - cron: '0 */12 * * *'  # Runs daily at midnight UTC
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check for Latest yt-dlp Release
+        id: check_release
+        run: |
+          LATEST_RELEASE=$(curl -s https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest | jq -r .tag_name)
+          echo "Latest release is $LATEST_RELEASE"
+          echo "::set-output name=latest_release::$LATEST_RELEASE"
+
+      - name: Compare with Saved Release
+        id: compare
+        run: |
+          if [ "$LATEST_RELEASE" != "$(cat .yt-dlp-latest 2>/dev/null || echo '')" ]; then
+            echo "$LATEST_RELEASE" > .yt-dlp-latest
+            echo "::set-output name=trigger::true"
+          else
+            echo "::set-output name=trigger::false"
+          fi
+
+      - name: Trigger Docker Image CI
+        if: steps.compare.outputs.trigger == 'true'
+        run: |
+          curl -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token ${{ secrets.GH_TOKEN }}" \
+            https://api.github.com/repos/canofsocks/holo-downloader /dispatches \
+            -d '{"event_type": "yt-dlp_release_update"}'
