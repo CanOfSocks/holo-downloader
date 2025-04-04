@@ -7,6 +7,8 @@ on:
     branches: [ "main" ]
   schedule:
     - cron: "5 0 6 * *"
+  repository_dispatch:
+    types: [yt-dlp_release_update]
   workflow_dispatch:
 
 jobs:
