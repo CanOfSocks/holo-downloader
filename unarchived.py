@@ -64,6 +64,7 @@ def check_yta_raw_age(existing_file):
             
 def is_video_private(id):
     json_out_path = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.info.json".format(id))
+    chat_out_path = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.live_chat.zip".format(id))
     jpg_out_path = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.jpg".format(id))
     #jpg_out_path= "{0}.jpg".format(id)
 
@@ -77,7 +78,7 @@ def is_video_private(id):
 
             if getConfig.get_unarchived_chat_dl() and info_dict.get('live_status') == 'is_live':
                 chat_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'getChatOnly.py')
-                command = ["python", chat_script, '--', json_out_path]
+                command = ["python", chat_script, '--output-path', chat_out_path, '--', json_out_path]
                 #Popen(command)
                 subprocess.Popen(command, start_new_session=True)
             from livestream_dl.download_Live import download_auxiliary_files
@@ -95,7 +96,7 @@ def is_video_private(id):
             return
     except PermissionError as e:
         if os.path.exists(json_out_path):
-            download_private(info_dict_file=json_out_path, thumbnail=jpg_out_path)   
+            download_private(info_dict_file=json_out_path, thumbnail=jpg_out_path, chat=chat_out_path)   
     except ValueError as e:
         print(e)
     except Exception as e:
@@ -147,8 +148,11 @@ def is_video_private(id):
     #existing_file = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.info.json".format(id))
     if os.path.exists(json_out_path):
         # If removed (returns false), the also remove thumbnail if it exists
-        if not check_ytdlp_age(json_out_path) and os.path.exists(jpg_out_path):
-            os.remove(jpg_out_path)
+        if not check_ytdlp_age(json_out_path):
+            if os.path.exists(jpg_out_path):
+                os.remove(jpg_out_path)
+            if os.path.exists(chat_out_path):
+                os.remove(chat_out_path)
             
 
 def get_image(url):
@@ -283,7 +287,7 @@ def run_yta_raw(json_file, output_path = None, ytdlp_json = None):
             discord_web.main(data['metadata']['id'], "done")
         print("Finished downloading yta video: {0}".format(json_file))
         
-def download_private(info_dict_file, thumbnail=None):
+def download_private(info_dict_file, thumbnail=None, chat=None):
     with open(info_dict_file, 'r', encoding='utf-8') as file:
         # Load the JSON data from the file
         info_dict = json.load(file)
@@ -325,6 +329,10 @@ def download_private(info_dict_file, thumbnail=None):
         import traceback
         discord_web.main(info_dict.get('id'), "error", message=str("{0}\n{1}".format(e, traceback.format_exc))[-1000:])
         return
+    
+    if chat is not None and os.path.exists(chat):
+        move(chat, os.path.dirname(options.get("ID")))
+
     discord_web.main(info_dict.get('id'), "done")
     
     if os.path.exists(info_dict_file):

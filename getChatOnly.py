@@ -9,15 +9,16 @@ import logging
 
 getConfig = ConfigHandler()
 
-def main(json_file):
+def main(json_file, output_path=None):
     with open(json_file, 'r', encoding='utf-8') as file:
         # Load the JSON data from the file
         info_dict = json.load(file)
     
     options = {
         "ID": info_dict.get('id'),
-        "output": str(getConfig.get_unarchived_output_path(getConfig.get_ytdlp())),
+        "output": output_path if output_path is not None else str(getConfig.get_unarchived_output_path(getConfig.get_ytdlp())),
         "temp_folder": getConfig.get_unarchived_temp_folder(),
+        "cookies": getConfig.get_cookies_file(),
         "log_level": getConfig.get_log_level(),
         #"log_level": "DEBUG",
         "log_file": getConfig.get_log_file(),
@@ -30,11 +31,14 @@ def main(json_file):
         try:
             lock_file.acquire()
             result = download_live_chat(info_dict=info_dict, options=options)
+            """
             if result is not None and isinstance(result, tuple):
                 out_folder = os.path.dirname(options.get("output"))
                 os.makedirs(out_folder)
                 shutil.move(result[0], out_folder)
+            """
             lock_file.release()
+            return result
         except (IOError, BlockingIOError):
             logging.error("Unable to aquire lock for {0}, must be already downloading".format(lock_file_path))
 
@@ -45,9 +49,13 @@ if __name__ == "__main__":
     # Add a required positional argument 'ID'
     parser.add_argument('json', type=str, help='info.json path (required)')
 
+    parser.add_argument('--output-path', type=str, default=None, help='Optional output path')
+
     # Parse the arguments
     args = parser.parse_args()
 
-    # Access the 'ID' value
+    # Access the values
     json_file = args.json
-    main(json_file=json_file)
+    output_path = args.output_path
+
+    main(json_file=json_file, output_path=output_path)
