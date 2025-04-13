@@ -180,6 +180,9 @@ class ConfigHandler:
 
     def get_unarchived_folder(self):
         return self.download_options.get("unarchived_dir", None) or self.get_done_folder()
+    
+    def get_unarchived_chat_dl(self):
+        return self.download_options.get("unarchived_download_chat", False)
 
     def get_output_template_yta_raw(self):
         if self.download_options.get("output_folder", None):

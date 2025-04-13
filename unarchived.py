@@ -74,6 +74,12 @@ def is_video_private(id):
             with open(json_out_path, 'w', encoding='utf-8') as json_file:
                 json.dump(info_dict, json_file, ensure_ascii=False, indent=4)   
                 print(os.path.abspath(json_out_path)) 
+
+            if getConfig.get_unarchived_chat_dl() and info_dict.get('live_status') == 'is_live':
+                chat_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'getChatOnly.py')
+                command = ["python", chat_script, '--', json_out_path]
+                #Popen(command)
+                subprocess.Popen(command, start_new_session=True)
             from livestream_dl.download_Live import download_auxiliary_files
             file = download_auxiliary_files(info_dict=info_dict, options={'write_thumbnail': True})[0].get('thumbnail',None)
             if file is not None and not str(file.suffix).endswith("jpg"):

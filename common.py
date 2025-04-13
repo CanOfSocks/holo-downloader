@@ -245,3 +245,40 @@ def random_sample(data, k=None):
     
     else:
         raise TypeError("Unsupported data type. Only lists, tuples, and dictionaries are allowed.")
+    
+import os
+import time
+
+if os.name == 'nt':
+    import msvcrt
+else:
+    import fcntl
+
+class FileLock:
+    def __init__(self, path):
+        self.path = path
+        self.file = None
+
+    def acquire(self, timeout=None):
+        self.file = open(self.path, 'a+')
+        if os.name == 'nt':
+            msvcrt.locking(self.file.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            fcntl.flock(self.file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def release(self):
+        if self.file:
+            if os.name == 'nt':
+                self.file.seek(0)
+                msvcrt.locking(self.file.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(self.file, fcntl.LOCK_UN)
+            self.file.close()
+            self.file = None
+
+    def __enter__(self):
+        self.acquire()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.release()
