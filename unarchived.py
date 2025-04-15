@@ -295,11 +295,7 @@ def download_private(info_dict_file, thumbnail=None, chat=None):
     from livestream_dl import download_Live
 
     # Add livechat to downloaded files dictionary so it is moved appropriately at the end
-    if chat is not None and os.path.exists(chat):
-        download_Live.file_names.update({
-            'live_chat': download_Live.FileInfo(chat, file_type='live_chat')
-        })
-
+    
     options = {
         "ID": info_dict.get('id'),
         "resolution": 'best',
@@ -328,8 +324,13 @@ def download_private(info_dict_file, thumbnail=None, chat=None):
         'write_ffmpeg_command': getConfig.get_ffmpeg_command(),
     }
     print("Output path: {0}".format(options.get('output')))
-    if thumbnail:
+    if thumbnail and os.path.exists(thumbnail):
         download_Live.file_names['thumbnail'] = download_Live.FileInfo(thumbnail, file_type='thumbnail')
+    if chat is not None and os.path.exists(chat):
+        download_Live.file_names.update({
+            'live_chat': download_Live.FileInfo(chat, file_type='live_chat')
+        })
+
     try:
         download_Live.download_segments(info_dict=info_dict, resolution='best', options=options)   
     except Exception as e:
