@@ -293,6 +293,13 @@ def download_private(info_dict_file, thumbnail=None, chat=None):
         info_dict = json.load(file)
     discord_web.main(info_dict.get('id'), "recording")
     from livestream_dl import download_Live
+
+    # Add livechat to downloaded files dictionary so it is moved appropriately at the end
+    if chat is not None and os.path.exists(chat):
+        download_Live.file_names.update({
+            'live_chat': download_Live.FileInfo(chat, file_type='live_chat')
+        })
+
     options = {
         "ID": info_dict.get('id'),
         "resolution": 'best',
@@ -330,8 +337,7 @@ def download_private(info_dict_file, thumbnail=None, chat=None):
         discord_web.main(info_dict.get('id'), "error", message=str("{0}\n{1}".format(e, traceback.format_exc))[-1000:])
         return
     
-    if chat is not None and os.path.exists(chat):
-        move(chat, os.path.dirname(options.get("ID")))
+    
 
     discord_web.main(info_dict.get('id'), "done")
     
