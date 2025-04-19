@@ -198,6 +198,9 @@ class ConfigHandler:
     def get_keep_ts_files(self):
         return self.download_options.get('keep_ts_files', False)
     
+    def get_ytdlp_options(self):
+        return self.download_options.get('ytdlp_options', None)
+    
     def get_discord_webhook(self):
         return self.webhook.get("url", None)
     
@@ -253,6 +256,11 @@ class ConfigHandler:
             options.update({'output': str(self.get_membership_output_path(output_template))})
         else:
             options.update({'output': str(self.get_done_output_path(output_template))})
+
+        if self.get_ytdlp_options() is not None:
+            import json
+            options.update({'ytdlp_options': json.loads(self.get_ytdlp_options())})
+
             
         return options
 
