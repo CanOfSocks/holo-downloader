@@ -73,6 +73,10 @@ def download_video_info(video_url):
         'no_warnings': True       
     }
 
+    if getConfig.get_ytdlp_options() is not None:
+        import json
+        options.update({'ytdlp_options': json.loads(getConfig.get_ytdlp_options())})
+
     with yt_dlp.YoutubeDL(options) as ydl:
         info_dict = ydl.extract_info(video_url, download=False)
         info_dict = ydl.sanitize_info(info_dict)
