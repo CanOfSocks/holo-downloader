@@ -32,7 +32,7 @@ download_chat = true
 thumbnail = true
 info_json = true
 description = true
-video_fetch_method = "yt-dlp"
+video_fetch_method = "ytdlp"
 look_ahead = 48
 cookies_file = "/app/cookies.txt"
 temp_dir = "/app/temp/"
@@ -44,6 +44,7 @@ remove_ip = true
 log_level = "WARNING"
 randomise_lists = true
 clean_urls = true
+# proxy = ""
 
 [torrent]
 enabled = false
