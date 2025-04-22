@@ -1,0 +1,17 @@
+services:
+    holo-downloader:
+        image: canofsocks/holo-downloader:latest
+        container_name: holo-downloader
+        restart: unless-stopped
+        environment:
+            - TZ=Etc/UTC
+            - HOST_CONTAINERNAME=holo-downloader
+            - 'VIDEOSCHEDULE=*/2 * * * *'
+            - 'MEMBERSCHEDULE=*/5 * * * *'
+            - 'COMMUNITYSCHEDULE=0 */3 * * *'
+        volumes:
+            - $PWD/config/config.toml:/app/config.toml:rw
+            - $PWD/config/cookies.txt:/app/cookies.txt:rw
+            - $PWD/download/temp/:/app/temp:rw
+            - $PWD/download/done/:/app/Done:rw
+            - $PWD/download/communityposts:/app/CommunityPosts:rw
