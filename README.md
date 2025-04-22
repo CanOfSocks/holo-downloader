@@ -107,6 +107,9 @@ There are also options for temporary folders:
 * ```randomise_lists``` - Randomises channel fetch and video execution lists each runtime.
 * ```remove_ip``` - Removes any IP addresses from info.json files
 * ```clean_urls``` - Removes stream urls that could potentially be used for identification and replaces them with a dummy URL. This has little effect longterm due to expiry of most URLs.
+* ```remux_extension``` - Sets the extension for FFmpeg to merge the final file into
+* ```ytdlp_options``` - A JSON formatted string for options to add to yt-dlp python module options
+* ```proxy``` - Set proxies to use for downloading videos. Currently does not include video checks. See: [https://github.com/CanOfSocks/holo-downloader?tab=readme-ov-file#other-download-options](https://github.com/CanOfSocks/holo-downloader?tab=readme-ov-file#other-download-options)
 
 
 ### Scheduling
