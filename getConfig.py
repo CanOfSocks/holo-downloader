@@ -204,6 +204,14 @@ class ConfigHandler:
     def get_discord_webhook(self):
         return self.webhook.get("url", None)
     
+    def get_proxy(self):
+        proxies = self.download_options.get('proxies', None)
+        if proxies is not None:
+            from livestream_dl import runner
+            proxies = runner.process_proxies(proxies)
+            return proxies
+        return None
+    
     def get_log_level(self):
         return str(self.download_options.get('log_level', "INFO")).upper()
     
@@ -247,6 +255,7 @@ class ConfigHandler:
             "log_level": self.get_log_level(),
             "log_file": self.get_log_file(),
             'write_ffmpeg_command': self.get_ffmpeg_command(),
+            "proxy": self.get_proxy(),
         }
 
         if self.get_remux_container() is not None:
