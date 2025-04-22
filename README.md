@@ -39,7 +39,7 @@ To add channels, add to the channel_ids_to_match block with a name and the chann
 "Fauna" = "UCO_aKKYxn4tvrqPjcTzZ6EQ"
 ```
 ### Filtering
-For all of the filters, __if a filter is present then it will not be filtered__. For example, if no description filter is available, then no description filtering will be executed and filtering will rely on any remaining filters.
+For all of the filters, __if a filter is present then it will not be filtered__. For example, if no description filter is available, then no description filtering will be executed and filtering will rely on any remaining filters. Filters are applied in an inclusive or format - if either (or both) title/description filter matches, it will be downloaded.
 
 For title and description filtering, you will need to add the channel id along with a REGEX string to the respecive block. For example:
 ```
@@ -109,7 +109,7 @@ There are also options for temporary folders:
 * ```clean_urls``` - Removes stream urls that could potentially be used for identification and replaces them with a dummy URL. This has little effect longterm due to expiry of most URLs.
 * ```remux_extension``` - Sets the extension for FFmpeg to merge the final file into
 * ```ytdlp_options``` - A JSON formatted string for options to add to yt-dlp python module options
-* ```proxy``` - Set proxies to use for downloading videos. Currently does not include video checks. See: [https://github.com/CanOfSocks/holo-downloader?tab=readme-ov-file#other-download-options](https://github.com/CanOfSocks/holo-downloader?tab=readme-ov-file#other-download-options)
+* ```proxy``` - Set proxies to use for downloading videos. Currently does not include video checks. Must be contained between double quotes, eg. `proxy: "http://10.0.1.2:3128"` See: [https://github.com/CanOfSocks/holo-downloader?tab=readme-ov-file#other-download-options](https://github.com/CanOfSocks/holo-downloader?tab=readme-ov-file#other-download-options)
 * ```unarchived_download_chat``` - Downloads live chat while a livestream is live and keeps it if the stream goes private/removed after stream recovery activates.
 
 
