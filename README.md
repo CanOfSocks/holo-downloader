@@ -110,6 +110,7 @@ There are also options for temporary folders:
 * ```remux_extension``` - Sets the extension for FFmpeg to merge the final file into
 * ```ytdlp_options``` - A JSON formatted string for options to add to yt-dlp python module options
 * ```proxy``` - Set proxies to use for downloading videos. Currently does not include video checks. See: [https://github.com/CanOfSocks/holo-downloader?tab=readme-ov-file#other-download-options](https://github.com/CanOfSocks/holo-downloader?tab=readme-ov-file#other-download-options)
+* ```unarchived_download_chat``` - Downloads live chat while a livestream is live and keeps it if the stream goes private/removed after stream recovery activates.
 
 
 ### Scheduling
