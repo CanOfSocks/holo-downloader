@@ -60,7 +60,7 @@ The membership tab only scans the first 10 videos for possible live videos to re
 ```
 
 ### Webhook
-This block is used to define webhooks for notifications. This currently only supports a single discord webhook.
+This block is used to define webhooks for notifications. This currently only supports a single discord webhook. Most output from the application will be sent to the webhook; stdout is mostly empty at this time.
 ```
 [webhook]
 url = "https://discord.com/api/webhooks/xxxxxxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyy"
