@@ -59,6 +59,10 @@ The membership tab only scans the first 10 videos for possible live videos to re
 "Gawr Gura Ch. hololive-EN" = "UCoSrY_IQQVpmIRZ9Xf-y93g"
 ```
 
+### Unarchived (privated) streams
+Similar to regular channels, this block defines any channels that are monitored for streams that become privated/unavailable after they go live. This works by grabbing the video info of an ongoing stream to a temporary directory, updating it with each scheduled run. After the stream has finished, the video info is kept for up to 6 hours after the last video info was collected as the stream URLs that the stream recovery function of livestream_dl will work with.
+**The cleanup for this function is not perfect with some temporary files may not be cleaned up properly. It is recommended to use the ```unarchived_tempdir``` option and remove any files more than 24 hours old on a regular schedule using your own preferred method.**
+
 ### Webhook
 This block is used to define webhooks for notifications. This currently only supports a single discord webhook. Most output from the application will be sent to the webhook; stdout is mostly empty at this time.
 ```
