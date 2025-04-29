@@ -1,0 +1,35 @@
+networks:
+  holo:
+    driver: bridge
+
+services:
+  holo-downloader:
+    container_name: holo-downloader
+    image: canofsocks/holo-downloader:potoken
+    restart: always
+    networks:
+      - holo
+    environment:
+      TZ: "Australia/Sydney"
+      HOST_CONTAINERNAME: "holo-downloader"
+      UPDATEYTDLP: "yes"
+      VIDEOSCHEDULE: "*/5 * * * *"
+      MEMBERSCHEDULE: "5,20,35,50 * * * *"
+      COMMUNITYSCHEDULE: "0 */6 * * *"
+      UNARCHIVEDSCHEDULE: "12 */2 * * *"
+    volumes:
+      - /root/HoloArchive/config/config.toml:/app/config.toml:rw
+      - /mnt/cache/HoloArchive/temp/:/app/temp:rw
+      - /mnt/HoloArchive/Public:/app/Done:rw
+      - /mnt/HoloArchive/Members:/app/Members:rw
+      - /root/HoloArchive/config/cookies.txt:/app/cookies.txt:rw
+      - /mnt/HoloArchive/CommunityPosts:/app/CommunityPosts:rw
+      - /root/HoloArchive/config/CommunityPosts.txt:/app/com-tab-archive.txt:rw
+
+  bgutil-provider:
+    container_name: bgutil-provider
+    image: brainicism/bgutil-ytdlp-pot-provider
+    ports:
+      - "4416:4416"
+    networks:
+      - holo
