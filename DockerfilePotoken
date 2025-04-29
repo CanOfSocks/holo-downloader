@@ -1,0 +1,2 @@
+FROM canofsocks/holo-downloader:latest
+RUN pip install --no-cache-dir -U bgutil-ytdlp-pot-provider
