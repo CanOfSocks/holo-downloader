@@ -20,10 +20,10 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag canofsocks/holo-downloader:latest
+      run: docker build . --file Dockerfile --no-cache --tag canofsocks/holo-downloader:latest
     - name: Push the Docker Image
       run: docker login -u canofsocks -p ${{ secrets.DOCKER_TOKEN }} && docker push canofsocks/holo-downloader:latest
     - name: Build the Potoken image
-      run: docker build . --file DockerfilePotoken --tag canofsocks/holo-downloader:potoken
+      run: docker build . --file DockerfilePotoken --no-cache --tag canofsocks/holo-downloader:potoken
     - name: Push the Potoken Image
       run: docker login -u canofsocks -p ${{ secrets.DOCKER_TOKEN }} && docker push canofsocks/holo-downloader:potoken
