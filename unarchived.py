@@ -97,7 +97,7 @@ def is_video_private(id):
                 file.unlink()
             return
     except PermissionError as e:
-        logging.warning(e)
+        logging.debug("Experience permission error while checking {0}: {1}".format(id, e))
         if os.path.exists(json_out_path):
             download_private(info_dict_file=json_out_path, thumbnail=jpg_out_path, chat=chat_out_path)   
     except ValueError as e:
@@ -294,6 +294,7 @@ def download_private(info_dict_file, thumbnail=None, chat=None):
     with open(info_dict_file, 'r', encoding='utf-8') as file:
         # Load the JSON data from the file
         info_dict = json.load(file)
+    logging.info("Attempting to download video: {0}".format(info_dict.get('id', "")))
     discord_web.main(info_dict.get('id'), "recording")
     from livestream_dl import download_Live
 

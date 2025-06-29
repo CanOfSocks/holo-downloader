@@ -24,7 +24,7 @@ def getVideos(channel_ids_to_match, command=None, unarchived = False, frequency=
     if unarchived:
         all_lives = common.combine_unarchived(all_lives)
 
-    common.vid_executor(all_lives, command, frequency)
+    common.vid_executor(streams=all_lives, command=command, frequency=frequency, unarchived=unarchived)
        
 def main(command=None, unarchived = False, frequency=None):
     if unarchived:
