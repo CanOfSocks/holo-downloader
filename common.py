@@ -19,7 +19,7 @@ def vid_executor(streams, command, unarchived = False, frequency = None):
         streams = random_sample(streams)
     
     if(command == "spawn"):
-        if unarchived == True:
+        if unarchived is True:
             download_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'unarchived.py')
         else:
             download_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloadVid.py')
