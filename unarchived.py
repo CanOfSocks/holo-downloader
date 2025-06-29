@@ -15,6 +15,8 @@ from shutil import move
 import discord_web
 from json import load
 
+import traceback
+
 from livestream_dl import getUrls
 import logging
 
@@ -71,7 +73,10 @@ def is_video_private(id):
     #jpg_out_path= "{0}.jpg".format(id)
 
     try:
-        info_dict, live_status = getUrls.get_Video_Info(id=id,  wait=(5, 1800), cookies=getConfig.get_cookies_file(), proxy=getConfig.get_proxy(), additional_options=getConfig.get_ytdlp_options())
+        additional_ytdlp_options = None
+        if getConfig.get_ytdlp_options():
+            additional_ytdlp_options = json.loads(getConfig.get_ytdlp_options())
+        info_dict, live_status = getUrls.get_Video_Info(id=id,  wait=(5, 1800), cookies=getConfig.get_cookies_file(), proxy=getConfig.get_proxy(), additional_options=additional_ytdlp_options)
         if info_dict.get('live_status') == 'is_live' or info_dict.get('live_status') == 'post_live':
             os.makedirs(os.path.dirname(json_out_path), exist_ok=True)
             with open(json_out_path, 'w', encoding='utf-8') as json_file:
@@ -97,13 +102,13 @@ def is_video_private(id):
                 file.unlink()
             return
     except PermissionError as e:
-        logging.debug("Experience permission error while checking {0}: {1}".format(id, e))
+        logging.debug("Experienced permission error while checking {0}: {1}".format(id, e))
         if os.path.exists(json_out_path):
             download_private(info_dict_file=json_out_path, thumbnail=jpg_out_path, chat=chat_out_path)   
     except ValueError as e:
-        logging.error(e)
+        logging.error("Experienced value error while checking {0}: {1}".format(id, e))
     except Exception as e:
-        logging.error(e)
+        logging.error("Unexpected exception occurred: {0}\n{1}".format(e,traceback.format_exc()))
 
     """
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
