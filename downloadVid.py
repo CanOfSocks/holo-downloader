@@ -7,6 +7,7 @@ from getConfig import ConfigHandler
 from pathlib import Path
 import subprocess
 import discord_web
+import traceback
 from time import sleep, asctime
 
 import argparse
@@ -46,7 +47,7 @@ def downloader(id,outputTemplate, info_dict):
     try:
         download_Live.download_segments(info_dict, getConfig.get_quality(), options)
     except Exception as e:
-        logging.error(e)
+        logging.exception("Error occured {0}".format(id))
         discord_web.main(id, "error", message=str(e)[-500:])
         global kill_all
         kill_all = True

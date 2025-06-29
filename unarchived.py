@@ -106,9 +106,9 @@ def is_video_private(id):
         if os.path.exists(json_out_path):
             download_private(info_dict_file=json_out_path, thumbnail=jpg_out_path, chat=chat_out_path)   
     except ValueError as e:
-        logging.error("Experienced value error while checking {0}: {1}".format(id, e))
+        logging.exception("Experienced value error while checking {0}: {1}".format(id, e))
     except Exception as e:
-        logging.error("Unexpected exception occurred: {0}\n{1}".format(e,traceback.format_exc()))
+        logging.exception("Unexpected exception occurred: {0}\n{1}".format(e,traceback.format_exc()))
 
     """
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -343,6 +343,7 @@ def download_private(info_dict_file, thumbnail=None, chat=None):
     try:
         download_Live.download_segments(info_dict=info_dict, resolution='best', options=options)   
     except Exception as e:
+        logging.exception(e)
         import traceback
         discord_web.main(info_dict.get('id'), "error", message=str("{0}\n{1}".format(e, traceback.format_exc))[-1000:])
         return

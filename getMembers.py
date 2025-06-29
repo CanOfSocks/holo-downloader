@@ -20,7 +20,7 @@ def getVideos(members_only, command=None, frequency=None):
             lives = common.get_upcoming_or_live_videos(members_only[channel], "membership")
             all_lives += lives
         except Exception as e:
-            logging.error(("Error fetching membership streams for {0}. Check cookies. \n{1}".format(channel,e)))
+            logging.exception(("Error fetching membership streams for {0}. Check cookies. \n{1}".format(channel,e)))
             discord_web.main(members_only[channel], "membership-error", message=str(e))
     common.vid_executor(all_lives, command)
 

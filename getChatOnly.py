@@ -19,7 +19,7 @@ def main(json_file, output_path=None, logger=None):
             # Load the JSON data from the file
             info_dict = json.load(file)
     except Exception as e:
-        logging.error(e)
+        logging.exception(e)
     
     options = {
         "ID": info_dict.get('id'),
