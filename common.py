@@ -34,6 +34,7 @@ def vid_executor(streams, command, unarchived = False, frequency = None):
         for i, live in enumerate(streams):
             command = ["python", download_script, '--', live]
             #Popen(command)
+            logging.debug("Executing: {0}".format(' '.join(command)))
             Popen(command, start_new_session=True)
             if i < len(streams) - 1:
                 logging.debug("Sleeping for {0}".format(sleep_time))

@@ -19,6 +19,8 @@ from livestream_dl import getUrls
 import logging
 
 getConfig = ConfigHandler()
+from livestream_dl.download_Live import setup_logging
+setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file())
 
 def check_ytdlp_age(existing_file):    
     from time import time
@@ -95,6 +97,7 @@ def is_video_private(id):
                 file.unlink()
             return
     except PermissionError as e:
+        logging.debug(e)
         if os.path.exists(json_out_path):
             download_private(info_dict_file=json_out_path, thumbnail=jpg_out_path, chat=chat_out_path)   
     except ValueError as e:
@@ -367,9 +370,6 @@ def is_script_running(script_name, id):
     return False
     
 def main(id=None):
-    from livestream_dl.download_Live import setup_logging
-    setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file())
-
     # Get script name
     script_name = sys.argv[0]
 
