@@ -97,7 +97,7 @@ def is_video_private(id):
                 file.unlink()
             return
     except PermissionError as e:
-        logging.debug(e)
+        logging.warning(e)
         if os.path.exists(json_out_path):
             download_private(info_dict_file=json_out_path, thumbnail=jpg_out_path, chat=chat_out_path)   
     except ValueError as e:
