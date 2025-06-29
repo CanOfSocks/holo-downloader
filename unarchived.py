@@ -69,7 +69,7 @@ def is_video_private(id):
     #jpg_out_path= "{0}.jpg".format(id)
 
     try:
-        info_dict, live_status = getUrls.get_Video_Info(id=id,  wait=(5, 1800))
+        info_dict, live_status = getUrls.get_Video_Info(id=id,  wait=(5, 1800), cookies=getConfig.get_cookies_file(), proxy=getConfig.get_proxy(), additional_options=getConfig.get_ytdlp_options())
         if info_dict.get('live_status') == 'is_live' or info_dict.get('live_status') == 'post_live':
             os.makedirs(os.path.dirname(json_out_path), exist_ok=True)
             with open(json_out_path, 'w', encoding='utf-8') as json_file:
