@@ -16,7 +16,7 @@ import discord_web
 from json import load
 
 from livestream_dl import getUrls
-
+import logging
 
 getConfig = ConfigHandler()
 
@@ -32,7 +32,7 @@ def check_ytdlp_age(existing_file):
     if data and 'epoch' in data:
         current_time = time()
         if ((current_time - data['epoch']) / 3600) > 6 or ((current_time - os.path.getmtime(existing_file)) / 3600.0) > 6:
-            print("JSON for {0} is older than 6 hours, removing...".format(os.path.basename(existing_file)))
+            logging.info("JSON for {0} is older than 6 hours, removing...".format(os.path.basename(existing_file)))
             os.remove(existing_file)
     # Return False if removed, otherwise True
             return False
@@ -53,7 +53,7 @@ def check_yta_raw_age(existing_file):
         current_time = time()
         from datetime import datetime
         if ((current_time - datetime.fromisoformat(data['createTime']).timestamp()) / 3600) > 6 or (current_time - os.path.getmtime(existing_file) / 3600) > 6:
-            print("{1}: YTA-raw JSON for {0} is older than 6 hours, removing...".format(os.path.basename(existing_file)))
+            logging.info("{1}: YTA-raw JSON for {0} is older than 6 hours, removing...".format(os.path.basename(existing_file)))
             os.remove(existing_file)
     # Return False if removed, otherwise True
             return False
@@ -74,7 +74,7 @@ def is_video_private(id):
             os.makedirs(os.path.dirname(json_out_path), exist_ok=True)
             with open(json_out_path, 'w', encoding='utf-8') as json_file:
                 json.dump(info_dict, json_file, ensure_ascii=False, indent=4)   
-                print(os.path.abspath(json_out_path)) 
+                logging.debug(os.path.abspath(json_out_path)) 
 
             if getConfig.get_unarchived_chat_dl() and info_dict.get('live_status') == 'is_live':
                 chat_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'getChatOnly.py')
@@ -91,16 +91,16 @@ def is_video_private(id):
                     "-q:v", "2",
                     jpg_out_path        # Output file
                 ], check=True)
-                print(file.absolute())
+                logging.debug("Deleting: ".format(file.absolute()))
                 file.unlink()
             return
     except PermissionError as e:
         if os.path.exists(json_out_path):
             download_private(info_dict_file=json_out_path, thumbnail=jpg_out_path, chat=chat_out_path)   
     except ValueError as e:
-        print(e)
+        logging.error(e)
     except Exception as e:
-        print(e)
+        logging.error(e)
 
     """
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -268,13 +268,13 @@ def run_yta_raw(json_file, output_path = None, ytdlp_json = None):
     else:
         output = ['--output', os.path.join(getConfig.get_unarchived_temp_folder(), '[%(upload_date)s] %(title)s [%(channel)s] (%(id)s)')]
     command += ['--output', output]
-    #print(' '.join(command))
+    logging.debug("Command: {0}".format(' '.join(command)))
     try:
         
         result = subprocess.run(command, check=True, text=True)
     except subprocess.CalledProcessError as e:
-        #print(e.stdout.decode())
-        #print(e.stderr.decode())
+        logging.debug(e.stdout.decode())
+        logging.debug(e.stderr.decode())
         discord_web.main(data['metadata']['id'], "error", message=str(e.stderr)[-1000:])
         raise Exception(("Error downloading unarchived video, Code: {0}".format(e.returncode)))
     if result.returncode == 0:        
@@ -285,7 +285,7 @@ def run_yta_raw(json_file, output_path = None, ytdlp_json = None):
         os.remove(json_file)
         if data:
             discord_web.main(data['metadata']['id'], "done")
-        print("Finished downloading yta video: {0}".format(json_file))
+        logging.info("Finished downloading yta video: {0}".format(json_file))
         
 def download_private(info_dict_file, thumbnail=None, chat=None):
     with open(info_dict_file, 'r', encoding='utf-8') as file:
@@ -323,7 +323,7 @@ def download_private(info_dict_file, thumbnail=None, chat=None):
         "log_file": getConfig.get_log_file(),
         'write_ffmpeg_command': getConfig.get_ffmpeg_command(),
     }
-    print("Output path: {0}".format(options.get('output')))
+    logging.info("Output path: {0}".format(options.get('output')))
     if thumbnail and os.path.exists(thumbnail):
         download_Live.file_names['thumbnail'] = download_Live.FileInfo(thumbnail, file_type='thumbnail')
     if chat is not None and os.path.exists(chat):
@@ -349,8 +349,8 @@ def download_private(info_dict_file, thumbnail=None, chat=None):
         os.remove(thumbnail)
         
 def is_script_running(script_name, id):
-    #current = psutil.Process()
-    #print("PID: {0}, command line: {1}, argument: {2}".format(current.pid, current.cmdline(), current.cmdline()[2:]))
+    current = psutil.Process()
+    logging.debug("PID: {0}, command line: {1}, argument: {2}".format(current.pid, current.cmdline(), current.cmdline()[2:]))
     current_pid = psutil.Process().pid
     
     for process in psutil.process_iter():
@@ -367,13 +367,17 @@ def is_script_running(script_name, id):
     return False
     
 def main(id=None):
-    # If system args were also none, raise exception
+    from livestream_dl.download_Live import setup_logging
+    setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file())
+
+    # Get script name
     script_name = sys.argv[0]
+
     if id is None:
         raise Exception("No video ID provided, unable to continue")
     
     if is_script_running(script_name, id):
-        #print("{0} already running, exiting...".format(id))
+        logging.debug("{0} already running, exiting...".format(id))
         return 0
     
     is_video_private(id)

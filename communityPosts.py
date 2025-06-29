@@ -3,8 +3,11 @@ import subprocess
 from getConfig import ConfigHandler
 from os import path
 
+getConfig = ConfigHandler()
+from livestream_dl.download_Live import setup_logging
+setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file())
+
 def main(command=None):
-    getConfig = ConfigHandler()
     com_tab_folder = getConfig.get_community_tab_directory()
     community_tab = getConfig.community_tab
     

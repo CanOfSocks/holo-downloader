@@ -2,6 +2,11 @@
 import argparse
 import common
 from getConfig import ConfigHandler
+import logging
+
+getConfig = ConfigHandler()
+from livestream_dl.download_Live import setup_logging
+setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file())
     
 def getVideos(members_only, command=None, frequency=None):
     from random import uniform
@@ -11,17 +16,17 @@ def getVideos(members_only, command=None, frequency=None):
     for channel in members_only:
         sleep(uniform(5.0, 10.0))
         try:
-            #print("Looking for: {0}".format(channel))
+            logging.debug("Looking for: {0}".format(channel))
             lives = common.get_upcoming_or_live_videos(members_only[channel], "membership")
             all_lives += lives
         except Exception as e:
-            print(("Error fetching membership streams for {0}. Check cookies. \n{1}".format(channel,e)))
+            logging.error(("Error fetching membership streams for {0}. Check cookies. \n{1}".format(channel,e)))
             discord_web.main(members_only[channel], "membership-error", message=str(e))
     common.vid_executor(all_lives, command)
 
-def main(command=None, frequency=None):
-    getConfig = ConfigHandler()
+def main(command=None, frequency=None):  
     getVideos(getConfig.members_only, command, frequency)
+
 if __name__ == "__main__":
 # Create the parser
     parser = argparse.ArgumentParser(description="Process optional command and frequency values.")

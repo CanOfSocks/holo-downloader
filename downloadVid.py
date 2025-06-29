@@ -13,6 +13,11 @@ import argparse
 
 getConfig = ConfigHandler()
 
+import logging
+
+from livestream_dl.download_Live import setup_logging
+setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file())
+
 #id = sys.argv[1]
 #id = "kJGsWORSg-4"
 #outputFile = None
@@ -41,7 +46,7 @@ def downloader(id,outputTemplate, info_dict):
     try:
         download_Live.download_segments(info_dict, getConfig.get_quality(), options)
     except Exception as e:
-        print(e)
+        logging.error(e)
         discord_web.main(id, "error", message=str(e)[-500:])
         global kill_all
         kill_all = True
@@ -83,12 +88,12 @@ def download_video_info(video_url):
         outputFile = str(ydl.prepare_filename(info_dict))
             
         
-    print("Output file: {0}".format(outputFile))
+    logging.info("Output file: {0}".format(outputFile))
     return outputFile, info_dict
 
 def is_script_running(script_name, id):
     current = psutil.Process()
-    #print("PID: {0}, command line: {1}, argument: {2}".format(current.pid, current.cmdline(), current.cmdline()[2:]))
+    logging.debug("PID: {0}, command line: {1}, argument: {2}".format(current.pid, current.cmdline(), current.cmdline()[2:]))
     current_pid = psutil.Process().pid
     
     for process in psutil.process_iter():
@@ -105,19 +110,19 @@ def is_script_running(script_name, id):
     return False
     
 def main(id=None):
-    script_name = sys.argv[0]
-    # If id was no included as a variable, try and retrieve from sys args
+    
+    script_name = sys.argv[0]    
 
-    # If system args were also none, raise exception
+    # If ID is none, raise exception
     if id is None:
-        raise Exception("No video ID provided, unable to continue")
+        raise ValueError("No video ID provided, unable to continue")
     if is_script_running(script_name, id):
-        #print("{0} already running, exiting...".format(id))
+        logging.debug("{0} already running, exiting...".format(id))
         return 0
     
     discord_web.main(id, "waiting")
     outputFile, info_dict = download_video_info(id)
-    #print("Output file: {0}".format(outputFile))
+    logging.debug("Output file: {0}".format(outputFile))
     if outputFile is None:
         discord_web.main(id, "error")
         raise Exception(("Unable to retrieve information about video {0}".format(id)))

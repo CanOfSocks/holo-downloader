@@ -1,10 +1,15 @@
 #!/usr/local/bin/python
 from getConfig import ConfigHandler
 import argparse
+import logging
 
 getConfig = ConfigHandler()
 
+from livestream_dl.download_Live import setup_logging
+setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), force=True)
+
 def main(command=None, unarchived=False, frequency=None):
+    
     method = getConfig.get_fetch_method()
     if(method == "ytdlp"):
         import getYTDLP
@@ -13,7 +18,7 @@ def main(command=None, unarchived=False, frequency=None):
         import getJson
         getJson.main(command,unarchived=unarchived,frequency=frequency)
     else:
-        print("Invalid method: {0}".format(method))
+        logging.error("Invalid method: {0}".format(method))
 
 if __name__ == "__main__":
     # Create the parser

@@ -8,8 +8,11 @@ import os
 from time import sleep
 import re
 import random
+import logging
 
 getConfig = ConfigHandler()
+from livestream_dl.download_Live import setup_logging
+setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file())
 
 def vid_executor(streams, command, unarchived = False, frequency = None):    
     if getConfig.randomise_lists() is True:
@@ -24,6 +27,7 @@ def vid_executor(streams, command, unarchived = False, frequency = None):
         if frequency:
             frequency_sec = cron_frequency(frequency)
             sleep_time = frequency_sec/(max(len(streams) + 1),2)
+            
         else:
             sleep_time = 60
         
@@ -32,15 +36,16 @@ def vid_executor(streams, command, unarchived = False, frequency = None):
             #Popen(command)
             Popen(command, start_new_session=True)
             if i < len(streams) - 1:
+                logging.debug("Sleeping for {0}".format(sleep_time))
                 sleep(random.uniform(max(sleep_time/2, 1.0),max(sleep_time * 1.25, 1.0)))
         return    
         
     elif(command == "bash"):
         bash_array = ' '.join(streams)
-        print(bash_array)
+        logging.info(bash_array)
         return bash_array            
     else:
-        print(streams)
+        logging.info(streams)
         return streams
     
 def titleFilter(live,channel_id):
@@ -56,7 +61,7 @@ def titleFilter(live,channel_id):
         else:
             return False
     except:
-        print("Filter failed")
+        logging.error("Filter failed")
         return None
     
 def descriptionFilter(live,channel_id):
@@ -80,7 +85,7 @@ def descriptionFilter(live,channel_id):
         with YoutubeDL(ydl_opts) as ydl:
             url = "https://www.youtube.com/watch?v={0}".format(live.get('id'))
             info = ydl.extract_info(url, download=False)
-            #print(info)
+            logging.debug(info)
             desc = info.get('description')
     
     #if not desc:
@@ -174,13 +179,13 @@ def get_upcoming_or_live_videos(channel_id, tab=None):
             url = "https://www.youtube.com/channel/{0}/{1}".format(channel_id, tab)
             ydl_opts.update({'playlist_items': '1:10'})
         info = ydl.extract_info(url, download=False)
-        #print(info)
+        logging.debug(info)
         upcoming_or_live_videos = []
         for video in info['entries']:
             
             if (video.get('live_status') == 'is_live' or video.get('live_status') == 'post_live' or (video.get('live_status') == 'is_upcoming' and withinFuture(video.get('release_timestamp')))) and filtering(video,video.get('channel_id')):
-                #print("live_status = {0}".format(video.get('live_status')))
-                #print(video)
+                logging.debug("live_status = {0}".format(video.get('live_status')))
+                logging.debug(video)
                 upcoming_or_live_videos.append(video.get('id'))
 
 

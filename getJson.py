@@ -6,8 +6,12 @@ import common
 #import json
 from datetime import datetime
 from getConfig import ConfigHandler
+import logging
 
 getConfig = ConfigHandler()
+
+from livestream_dl.download_Live import setup_logging
+setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file())
 
 url = "https://holo.dev/api/v1/lives/open"
 
@@ -89,7 +93,7 @@ def getStreams(unarchived=False):
                             if(common.withinFuture(live.start_at.timestamp()) and common.filtering(live, live.get('channel_id'))):
                                 matching_streams.append(live.get('id'))
     else:
-        print("Error retrieving streams: {0}".format(response.status_code))
+        logging.error("Error retrieving streams: {0}".format(response.status_code))
     # Print the list of matching streams as a JSON representation
     #matching_streams_json = json.dumps(matching_streams)
     return matching_streams

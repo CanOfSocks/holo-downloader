@@ -3,6 +3,11 @@ import argparse
 import common
 import time
 from getConfig import ConfigHandler
+import logging
+
+getConfig = ConfigHandler()
+from livestream_dl.download_Live import setup_logging
+setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file())
 
 
 def getVideos(channel_ids_to_match, command=None, unarchived = False, frequency=None):
@@ -10,11 +15,11 @@ def getVideos(channel_ids_to_match, command=None, unarchived = False, frequency=
     all_lives = []
     for channel in channel_ids_to_match:
         try:
-            #print("Looking for: {0}".format(channel))
+            logging.debug("Looking for: {0}".format(channel))
             lives = common.get_upcoming_or_live_videos(channel_ids_to_match[channel], "streams")
             all_lives += lives
         except Exception as e:
-            print(("Error fetching streams for {0}. Check cookies. \n{1}".format(channel,e)))
+            logging.error(("Error fetching streams for {0}. Check cookies. \n{1}".format(channel,e)))
         time.sleep(1)
     if unarchived:
         all_lives = common.combine_unarchived(all_lives)
@@ -22,7 +27,6 @@ def getVideos(channel_ids_to_match, command=None, unarchived = False, frequency=
     common.vid_executor(all_lives, command)
        
 def main(command=None, unarchived = False, frequency=None):
-    getConfig = ConfigHandler()
     if unarchived:
         channel_ids_to_match = getConfig.unarchived_channel_ids_to_match
     else:

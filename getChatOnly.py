@@ -4,15 +4,22 @@ from getConfig import ConfigHandler
 import json
 import argparse
 import os
-import shutil
 import logging
 
 getConfig = ConfigHandler()
 
-def main(json_file, output_path=None):
-    with open(json_file, 'r', encoding='utf-8') as file:
-        # Load the JSON data from the file
-        info_dict = json.load(file)
+from livestream_dl.download_Live import setup_logging
+setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file())
+    
+
+def main(json_file, output_path=None, logger=None):
+    
+    try:
+        with open(json_file, 'r', encoding='utf-8') as file:
+            # Load the JSON data from the file
+            info_dict = json.load(file)
+    except Exception as e:
+        logging.error(e)
     
     options = {
         "ID": info_dict.get('id'),
