@@ -5,7 +5,7 @@ from os import path
 
 getConfig = ConfigHandler()
 from livestream_dl.download_Live import setup_logging
-setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file())
+setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), file_options=getConfig.get_log_file_options())
 
 def main(command=None):
     com_tab_folder = getConfig.get_community_tab_directory()

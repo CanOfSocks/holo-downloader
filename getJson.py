@@ -11,7 +11,7 @@ import logging
 getConfig = ConfigHandler()
 
 from livestream_dl.download_Live import setup_logging
-setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file())
+setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), file_options=getConfig.get_log_file_options())
 
 url = "https://holo.dev/api/v1/lives/open"
 

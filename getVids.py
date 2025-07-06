@@ -6,7 +6,7 @@ import logging
 getConfig = ConfigHandler()
 
 from livestream_dl.download_Live import setup_logging
-setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), force=True)
+setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), force=True, file_options=getConfig.get_log_file_options())
 
 def main(command=None, unarchived=False, frequency=None):
     

@@ -218,6 +218,22 @@ class ConfigHandler:
     def get_log_file(self):
         return self.download_options.get('log_file', None)
     
+    def get_log_file_rotate_size(self):
+        return self.download_options.get('log_file_max_size', None)
+    
+    def get_log_file_rotate_time(self):
+        return self.download_options.get('log_file_rotate_when', None)
+    
+    def get_log_file_backups(self):
+        return self.download_options.get('log_file_keep_backup', None)
+    
+    def get_log_file_options(self):
+        return {
+                "maxBytes": self.get_log_file_rotate_size(),
+                "when": self.get_log_file_rotate_time(),
+                "backupCount": self.get_log_file_backups(),
+            }
+    
     def randomise_lists(self):
         return self.download_options.get('randomise_lists', False)
     
@@ -256,6 +272,7 @@ class ConfigHandler:
             "log_file": self.get_log_file(),
             'write_ffmpeg_command': self.get_ffmpeg_command(),
             "proxy": self.get_proxy(),
+            "log_file_options": self.get_log_file_options(),
         }
 
         if self.get_remux_container() is not None:

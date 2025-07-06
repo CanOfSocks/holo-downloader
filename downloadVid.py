@@ -17,7 +17,7 @@ getConfig = ConfigHandler()
 import logging
 
 from livestream_dl.download_Live import setup_logging
-setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file())
+setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), file_options=getConfig.get_log_file_options())
 
 #id = sys.argv[1]
 #id = "kJGsWORSg-4"
