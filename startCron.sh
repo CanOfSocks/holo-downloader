@@ -78,6 +78,8 @@ if [[ -n "$PUID" && -n "$PGID" ]]; then
 
     echo "Switching to user $USERNAME"
     exec gosu "$USERNAME" "$0" "$@"
+    runner=$!
+    wait "$runner"
 else
     echo "PUID/PGID not set — running as default container user"
     main "$@"
