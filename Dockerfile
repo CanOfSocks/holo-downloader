@@ -2,7 +2,7 @@ FROM python:3.12-slim as builder
 
 # Install dependencies and download tools in one step
 RUN apt-get update && apt-get install --no-install-recommends -y \
-    wget unzip xz-utils procps cron git && \
+    wget unzip xz-utils procps cron git gosu && \
     apt-get clean -y
 
 # Download and extract ffmpeg

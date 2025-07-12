@@ -1,5 +1,9 @@
 #!/bin/bash
 
+set -e
+
+USERNAME=holouser
+
 # Function to recreate the cron file and add specified lines
 recreate_cron_file() {
     # Initialize the CRON_CONTENT variable with static entries
@@ -58,4 +62,23 @@ main() {
 }
 
 # Execute main function
-main "$@"
+# Drop privileges if PUID and PGID are set
+if [[ -n "$PUID" && -n "$PGID" ]]; then
+    echo "Detected PUID=$PUID and PGID=$PGID"
+
+    # Create group if it doesn't exist
+    if ! getent group "$USERNAME" > /dev/null; then
+        groupadd -g "$PGID" "$USERNAME"
+    fi
+
+    # Create user if it doesn't exist
+    if ! id -u "$USERNAME" > /dev/null 2>&1; then
+        useradd -m -u "$PUID" -g "$PGID" -s /bin/bash "$USERNAME"
+    fi
+
+    echo "Switching to user $USERNAME"
+    exec gosu "$USERNAME" "$0" "$@"
+else
+    echo "PUID/PGID not set — running as default container user"
+    main "$@"
+fi
