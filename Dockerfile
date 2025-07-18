@@ -2,7 +2,7 @@ FROM python:3.12-slim as builder
 
 # Install dependencies and download tools in one step
 RUN apt-get update && apt-get install --no-install-recommends -y \
-    wget unzip xz-utils procps cron git gosu && \
+    wget unzip xz-utils procps busybox git && \
     apt-get clean -y
 
 # Download and extract ffmpeg
@@ -43,7 +43,7 @@ WORKDIR /app
 COPY . .
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-         procps cron git && \
+         procps busybox git && \
          apt-get clean -y
 
 # Set permissions for Python scripts and Cron file
