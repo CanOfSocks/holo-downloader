@@ -9,11 +9,13 @@ import subprocess
 import argparse
 #from yt_dlp.utils import DownloadError
 
-import psutil
+#import psutil
 import sys
 from shutil import move
 import discord_web
 from json import load
+
+from common import FileLock
 
 import traceback
 
@@ -357,7 +359,7 @@ def download_private(info_dict_file, thumbnail=None, chat=None):
         
     if os.path.exists(thumbnail):
         os.remove(thumbnail)
-        
+"""        
 def is_script_running(script_name, id):
     current = psutil.Process()
     logging.debug("PID: {0}, command line: {1}, argument: {2}".format(current.pid, current.cmdline(), current.cmdline()[2:]))
@@ -375,19 +377,36 @@ def is_script_running(script_name, id):
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             pass
     return False
-    
+"""
 def main(id=None):
     # Get script name
-    script_name = sys.argv[0]
+    ##script_name = sys.argv[0]
 
     if id is None:
         raise Exception("No video ID provided, unable to continue")
-    
+    """
     if is_script_running(script_name, id):
         logging.debug("{0} already running, exiting...".format(id))
         return 0
+    """
+    if os.path.exists("/dev/shm"):
+        lock_file_path = "/dev/shm/unarchived-{0}".format(id)
+    else:
+        lock_file_path = os.path.join(getConfig.get_temp_folder(), "unarchived-{0}.lockfile".format(id))
+    with FileLock(lock_file_path) as lock_file:
+        try:
+            lock_file.acquire()
+            is_video_private(id)
+            """
+            if result is not None and isinstance(result, tuple):
+                out_folder = os.path.dirname(options.get("output"))
+                os.makedirs(out_folder)
+                shutil.move(result[0], out_folder)
+            """
+            lock_file.release()
+        except (IOError, BlockingIOError):
+            logging.error("Unable to aquire lock for {0}, must be already downloading".format(lock_file_path))
     
-    is_video_private(id)
 
 
 if __name__ == "__main__":
