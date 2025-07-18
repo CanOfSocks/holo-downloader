@@ -47,7 +47,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
          apt-get clean -y
 
 # Set permissions for Python scripts and Cron file
-RUN chmod +x *.py /app/startCron.sh /app/entrypoint.sh
+RUN chmod +x *.py /app/startCron.sh
 
 # Install remaining dependencies
 RUN pip install --no-cache-dir -r requirements.txt
