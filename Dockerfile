@@ -60,4 +60,4 @@ RUN (sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" /usr/
 ENV VIDEOSCHEDULE='*/2 * * * *'
 ENV MEMBERSCHEDULE='*/5 * * * *'
 
-ENTRYPOINT [ "bash", "-c", "/app/startCron.sh" ]
+ENTRYPOINT [ "bash", "-c", "/app/entrypoint.sh" ]
