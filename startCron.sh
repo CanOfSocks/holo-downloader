@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Choose location for user crontab (BusyBox default is /etc/crontabs)
-CRON_DIR="/etc/crontabs"
+CRON_DIR="/app/crontabs"
 CRON_FILE="$CRON_DIR/$(whoami)"
 
 # Ensure crontab directory exists
