@@ -143,3 +143,4 @@ While some components have been marked as added, testing of full functionalility
 - [x] Configurable checking frequency
 - [x] Improve error detection
 - [x] ytarchive-raw integration (implemented similar functionality through livestream_dl)
+- [ ] Allow for non-root users for docker instances
