@@ -14,38 +14,39 @@ SHELL=/bin/bash
 #BASH_ENV=/root/project_env.sh
 END
 )
-    cron_content+=$'0 */3 * * * /usr/sbin/update-ca-certificates\n'
+    cron_content+=$'\n0 */3 * * * su -c \"/usr/sbin/update-ca-certificates\" '$user' > /proc/1/fd/1 2>/proc/1/fd/2\n'
 
     if [ -n "${VIDEOSCHEDULE}" ]; then
-        cron_content+="${VIDEOSCHEDULE} /app/getVids.py --command 'spawn' --frequency '${VIDEOSCHEDULE}' > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
+        cron_content+="${VIDEOSCHEDULE} su -c \"/app/getVids.py --command 'spawn' --frequency '${VIDEOSCHEDULE}'\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     else
-        cron_content+="*/2 * * * * /app/getVids.py --command 'spawn' > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
+        cron_content+="*/2 * * * * su -c \"/app/getVids.py --command 'spawn'\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     fi
 
     if [ -n "${MEMBERSCHEDULE}" ]; then
-        cron_content+="${MEMBERSCHEDULE} /app/getMembers.py --command 'spawn' --frequency '${MEMBERSCHEDULE}' > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
+        cron_content+="${MEMBERSCHEDULE} su -c \"/app/getMembers.py --command 'spawn' --frequency '${MEMBERSCHEDULE}'\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     else
-        cron_content+="*/5 * * * * /app/getMembers.py --command 'spawn' > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
+        cron_content+="*/5 * * * * su -c \"/app/getMembers.py --command 'spawn'\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     fi
 
     if [ -n "${COMMUNITYSCHEDULE}" ]; then
-        cron_content+="${COMMUNITYSCHEDULE} /app/communityPosts.py > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
+        cron_content+="${COMMUNITYSCHEDULE} su -c \"/app/communityPosts.py\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     else 
-        cron_content+="0 */3 * * * /app/communityPosts.py > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
+        cron_content+="0 */3 * * * su -c \"/app/communityPosts.py\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     fi
 
     if [ -n "${UNARCHIVEDSCHEDULE}" ]; then
-        cron_content+="${UNARCHIVEDSCHEDULE} /app/getVids.py --command 'spawn' --unarchived --frequency '${UNARCHIVEDSCHEDULE}' > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
+        cron_content+="${UNARCHIVEDSCHEDULE} su -c \"/app/getVids.py --command 'spawn' --unarchived --frequency '${UNARCHIVEDSCHEDULE}'\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     else
-        cron_content+="*/30 * * * * /app/getVids.py --command 'spawn' --unarchived > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
+        cron_content+="*/30 * * * * su -c \"/app/getVids.py --command 'spawn' --unarchived\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     fi
 
     if [ -n "${UPDATEYTDLP}" ]; then
-        cron_content+="0 0 * * * /usr/local/bin/pip install -U yt-dlp && sed -i '/if fmt.get(\\'targetDurationSec\\'):$/,/    continue$/s/^/#/' \"\$(pip show yt-dlp | grep Location | awk '{print \$2}')/yt_dlp/extractor/youtube.py\""$'\n'
+        cron_content+="0 0 * * * su -c \"/usr/local/bin/pip install -U yt-dlp && sed -i '/if fmt.get(\\\\'targetDurationSec\\\\'):$/,/    continue$/s/^/#/' \\\"\$(pip show yt-dlp | grep Location | awk '{print \\\$2}')/yt_dlp/extractor/youtube.py\\\"\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     fi
 
-    echo "$cron_content" | crontab -u "$user" -
+    echo "$cron_content" | crontab -
 }
+
 
 main() {
     if [[ -n "$PUID" && -n "$PGID" ]]; then
