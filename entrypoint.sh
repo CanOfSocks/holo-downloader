@@ -18,11 +18,12 @@ if [[ -n "$PUID" && -n "$PGID" ]]; then
 
     # Optional: Fix permissions
     chown "$PUID:$PGID" /app
-
     # Run command as created user
+    echo "Running /app/startCron.sh as $USERNAME (UID=$PUID)"
     su -c "/app/startCron.sh" "$USERNAME"
 else
     # Run command as current user (probably root)
+    echo "No user specified, running as root"
     "/app/startCron.sh"
 fi
 
