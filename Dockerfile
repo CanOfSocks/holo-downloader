@@ -2,7 +2,7 @@ FROM python:3.12-slim as builder
 
 # Install dependencies and download tools in one step
 RUN apt-get update && apt-get install --no-install-recommends -y \
-    wget unzip xz-utils procps busybox git && \
+    wget unzip xz-utils procps cron git && \
     apt-get clean -y
 
 # Download and extract ffmpeg
@@ -43,7 +43,7 @@ WORKDIR /app
 COPY . .
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-         procps busybox git && \
+         procps cron git && \
          apt-get clean -y
 
 # Set permissions for Python scripts and Cron file
@@ -60,4 +60,4 @@ RUN (sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" /usr/
 ENV VIDEOSCHEDULE='*/2 * * * *'
 ENV MEMBERSCHEDULE='*/5 * * * *'
 
-ENTRYPOINT [ "bash", "-c", "/app/entrypoint.sh" ]
+ENTRYPOINT [ "bash", "-c", "/app/startCron.sh" ]
