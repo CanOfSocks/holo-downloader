@@ -1,7 +1,8 @@
 #!/usr/local/bin/python
 import yt_dlp
-import psutil
-import sys
+#import psutil
+import os
+#import sys
 import threading
 from getConfig import ConfigHandler
 from pathlib import Path
@@ -9,6 +10,7 @@ import subprocess
 import discord_web
 import traceback
 from time import sleep, asctime
+from common import FileLock
 
 import argparse
 
@@ -91,7 +93,7 @@ def download_video_info(video_url):
         
     logging.info("Output file: {0}".format(outputFile))
     return outputFile, info_dict
-
+"""
 def is_script_running(script_name, id):
     current = psutil.Process()
     logging.debug("PID: {0}, command line: {1}, argument: {2}".format(current.pid, current.cmdline(), current.cmdline()[2:]))
@@ -109,26 +111,45 @@ def is_script_running(script_name, id):
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             pass
     return False
-    
+"""    
 def main(id=None):
     
-    script_name = sys.argv[0]    
+    #script_name = sys.argv[0]    
 
     # If ID is none, raise exception
     if id is None:
         raise ValueError("No video ID provided, unable to continue")
+    
+    if os.path.exists("/dev/shm"):
+        lock_file_path = "/dev/shm/videoDL-{0}".format(id)
+    else:
+        lock_file_path = os.path.join(getConfig.get_temp_folder(), "videoDL-{0}.lockfile".format(id))
+    with FileLock(lock_file_path) as lock_file:
+        try:
+            lock_file.acquire()
+            discord_web.main(id, "waiting")
+            outputFile, info_dict = download_video_info(id)
+            logging.debug("Output file: {0}".format(outputFile))
+            if outputFile is None:
+                discord_web.main(id, "error")
+                raise Exception(("Unable to retrieve information about video {0}".format(id)))
+            
+            downloader(id,outputFile, info_dict)
+            """
+            if result is not None and isinstance(result, tuple):
+                out_folder = os.path.dirname(options.get("output"))
+                os.makedirs(out_folder)
+                shutil.move(result[0], out_folder)
+            """
+            lock_file.release()
+        except (IOError, BlockingIOError):
+            logging.error("Unable to aquire lock for {0}, must be already downloading".format(lock_file_path))
+    """
     if is_script_running(script_name, id):
         logging.debug("{0} already running, exiting...".format(id))
         return 0
+    """
     
-    discord_web.main(id, "waiting")
-    outputFile, info_dict = download_video_info(id)
-    logging.debug("Output file: {0}".format(outputFile))
-    if outputFile is None:
-        discord_web.main(id, "error")
-        raise Exception(("Unable to retrieve information about video {0}".format(id)))
-    
-    downloader(id,outputFile, info_dict)
 
 if __name__ == "__main__":
     # Create the parser

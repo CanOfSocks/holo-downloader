@@ -281,6 +281,16 @@ class FileLock:
                 fcntl.flock(self.file, fcntl.LOCK_UN)
             self.file.close()
             self.file = None
+            # Remove the lock file after releasing the lock
+            try:
+                os.remove(self.path)
+            except FileNotFoundError:
+                pass  # The file was already removed
+            except OSError as e:
+                # Log other file removal errors
+                logging.warning(f"Warning: Could not remove lock file: {e}")
+            except Exception as e:
+                logging.exception("Unexpected exception occurred trying to remove lock file")
 
     def __enter__(self):
         self.acquire()

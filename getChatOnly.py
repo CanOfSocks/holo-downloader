@@ -12,7 +12,7 @@ from livestream_dl.download_Live import setup_logging
 setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), file_options=getConfig.get_log_file_options())
     
 
-def main(json_file, output_path=None, logger=None):
+def main(json_file, output_path=None):
     
     try:
         with open(json_file, 'r', encoding='utf-8') as file:
@@ -31,9 +31,9 @@ def main(json_file, output_path=None, logger=None):
         "log_file": getConfig.get_log_file(),
     }
     if os.path.exists("/dev/shm"):
-        lock_file_path = "/dev/shm/{0}".format(options.get("ID"))
+        lock_file_path = "/dev/shm/chat-{0}".format(options.get("ID"))
     else:
-        lock_file_path = os.path.join(options.get("temp_folder"), "{0}.lockfile".format(options.get("ID")))
+        lock_file_path = os.path.join(options.get("temp_folder"), "chat-{0}.lockfile".format(options.get("ID")))
     with common.FileLock(lock_file_path) as lock_file:
         try:
             lock_file.acquire()
