@@ -10,6 +10,25 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     python3 -m venv $VIRTUAL_ENV && \
     $VIRTUAL_ENV/bin/pip install --no-cache-dir --upgrade pip setuptools wheel
 
+# Install latest Jellyfin FFmpeg binary release from GitHub
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    curl wget tar xz-utils ca-certificates && \
+    set -e; \
+    # Get the latest release tag from GitHub redirect
+    latest_tag=$(curl -Ls -o /dev/null -w %{url_effective} https://github.com/jellyfin/jellyfin-ffmpeg/releases/latest | awk -F'/' '{print $NF}'); \
+    echo "Latest tag: $latest_tag"; \
+    # Build the asset URL
+    asset_url="https://github.com/jellyfin/jellyfin-ffmpeg/releases/download/$latest_tag/jellyfin-ffmpeg_${latest_tag#v}_portable_linux64-gpl.tar.xz"; \
+    echo "Downloading: $asset_url"; \
+    # Download and extract
+    wget -O ffmpeg.tar.xz "$asset_url" && \
+    mkdir -p /opt/jellyfin-ffmpeg && \
+    tar -xf ffmpeg.tar.xz -C /opt/jellyfin-ffmpeg --strip-components=1 && \
+    rm ffmpeg.tar.xz && \
+    ln -sf /opt/jellyfin-ffmpeg/ffmpeg /usr/local/bin/ffmpeg && \
+    ln -sf /opt/jellyfin-ffmpeg/ffprobe /usr/local/bin/ffprobe
+
+
 # Clone repo and apply patches
 RUN git clone "https://github.com/CanOfSocks/livestream_dl" /app/livestream_dl && \
     wget -q -O "/app/ytct.py" https://raw.githubusercontent.com/HoloArchivists/youtube-community-tab/master/ytct.py
@@ -31,8 +50,8 @@ ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # Copy venv and ffmpeg/ffprobe
 COPY --from=builder /opt/venv $VIRTUAL_ENV
-
-
+COPY --from=builder /usr/bin/ffmpeg /usr/bin/
+COPY --from=builder /usr/bin/ffprobe /usr/bin/
 
 # Symlink virtualenv Python to global path
 RUN ln -sf $VIRTUAL_ENV/bin/python /usr/local/bin/python && \
@@ -44,17 +63,6 @@ COPY --from=builder /app/livestream_dl /app/livestream_dl
 COPY --from=builder /app/ytct.py /app/ytct.py
 COPY . /app
 WORKDIR /app
-
-# Install Jellyfin FFmpeg
-RUN curl -m 15 -fsSL https://repo.jellyfin.org/debian/jellyfin_team.gpg.key | \
-    gpg --dearmor --batch --yes -o /etc/apt/trusted.gpg.d/debian-jellyfin.gpg && \
-    os_id=$(awk -F'=' '/^ID=/{ print $NF }' /etc/os-release) && \
-    os_codename=$(awk -F'=' '/^VERSION_CODENAME=/{ print $NF }' /etc/os-release) && \
-    echo "deb [arch=$(dpkg --print-architecture)] https://repo.jellyfin.org/$os_id $os_codename main" > /etc/apt/sources.list.d/jellyfin.list && \
-    apt-get update && \
-    apt-get install --no-install-recommends --no-install-suggests -y jellyfin-ffmpeg7 && \
-    ln -s /usr/lib/jellyfin-ffmpeg/ffmpeg /usr/bin/ffmpeg && \
-    ln -s /usr/lib/jellyfin-ffmpeg/ffprobe /usr/bin/ffprobe
 
 # Install minimal runtime deps
 RUN apt-get update && apt-get install --no-install-recommends -y procps cron git && apt-get clean -y
