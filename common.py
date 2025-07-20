@@ -193,7 +193,7 @@ def get_upcoming_or_live_videos(channel_id, tab=None):
         return list(set(upcoming_or_live_videos))
     
 def combine_unarchived(ids):
-    yta_pattern = r"^.([0-9A-Za-z_-]{10}[048AEIMQUYcgkosw])-yta\.info\.json$"
+    yta_pattern = r"^.([0-9A-Za-z_-]{10}[048AEIMQUYcgkosw])\.info\.json$"
     directory = getConfig.get_unarchived_temp_folder()
     if not os.path.exists(directory):
         os.makedirs(directory, exist_ok=True)
