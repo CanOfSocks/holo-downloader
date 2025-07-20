@@ -4,12 +4,22 @@ set -e
 
 USERNAME=holouser
 
+# Function to send SIGTERM to all processes except this one
+terminate() {
+    echo "Caught SIGTERM. Terminating all child processes..."
+    kill -TERM $(ps -eo pid | grep -v '^ *1$' | grep -v '^ *PID' | tr -d ' ') 2>/dev/null
+    wait
+}
+
+# Trap SIGTERM and SIGINT
+trap terminate SIGTERM SIGINT
+
 # Function to recreate the cron file and add specified lines for a given user
 recreate_cron_file() {
     local user="${1:-$(whoami)}"
     local cron_content
     cron_content=$(cat <<END
-PATH=/app:/usr/local/bin:/usr/bin
+PATH=/app:/opt/venv/bin:/usr/local/bin:/usr/bin
 SHELL=/bin/bash
 #BASH_ENV=/root/project_env.sh
 END
@@ -80,15 +90,5 @@ main() {
         sleep 1
     done
 }
-
-# Function to send SIGTERM to all processes except this one
-terminate() {
-    echo "Caught SIGTERM. Terminating all child processes..."
-    kill -TERM $(ps -eo pid | grep -v '^ *1$' | grep -v '^ *PID' | tr -d ' ') 2>/dev/null
-    wait
-}
-
-# Trap SIGTERM and SIGINT
-trap terminate SIGTERM SIGINT
 
 main "$@"
