@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     echo "Downloading: $asset_url"; \
     wget -O ffmpeg.tar.xz "$asset_url" && \
     mkdir -p /opt/jellyfin-ffmpeg && \
-    tar -xf ffmpeg.tar.xz -C /opt/jellyfin-ffmpeg --strip-components=1 && \
+    tar -vxf ffmpeg.tar.xz -C /opt/jellyfin-ffmpeg --strip-components=1 && \
     rm ffmpeg.tar.xz && \
     ln -sf /opt/jellyfin-ffmpeg/ffmpeg /usr/bin/ffmpeg && \
     ln -sf /opt/jellyfin-ffmpeg/ffprobe /usr/bin/ffprobe
