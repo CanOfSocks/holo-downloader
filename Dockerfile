@@ -14,13 +14,10 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 RUN apt-get update && apt-get install --no-install-recommends -y \
     curl wget tar xz-utils ca-certificates && \
     set -e; \
-    # Get the latest release tag from GitHub redirect
     latest_tag=$(curl -Ls -o /dev/null -w %{url_effective} https://github.com/jellyfin/jellyfin-ffmpeg/releases/latest | awk -F'/' '{print $NF}'); \
     echo "Latest tag: $latest_tag"; \
-    # Build the asset URL
     asset_url="https://github.com/jellyfin/jellyfin-ffmpeg/releases/download/$latest_tag/jellyfin-ffmpeg_${latest_tag#v}_portable_linux64-gpl.tar.xz"; \
     echo "Downloading: $asset_url"; \
-    # Download and extract
     wget -O ffmpeg.tar.xz "$asset_url" && \
     mkdir -p /opt/jellyfin-ffmpeg && \
     tar -xf ffmpeg.tar.xz -C /opt/jellyfin-ffmpeg --strip-components=1 && \
