@@ -38,7 +38,7 @@ RUN (sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" "$VIR
 
 
 # Final image
-FROM debian:stable-slim
+FROM python:3.12-slim
 
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
