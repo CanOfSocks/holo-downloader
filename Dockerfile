@@ -10,18 +10,6 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     python3 -m venv $VIRTUAL_ENV && \
     $VIRTUAL_ENV/bin/pip install --no-cache-dir --upgrade pip setuptools wheel
 
-# Install Jellyfin FFmpeg
-RUN curl -m 15 -fsSL https://repo.jellyfin.org/debian/jellyfin_team.gpg.key | \
-    gpg --dearmor --batch --yes -o /etc/apt/trusted.gpg.d/debian-jellyfin.gpg && \
-    os_id=$(awk -F'=' '/^ID=/{ print $NF }' /etc/os-release) && \
-    os_codename=$(awk -F'=' '/^VERSION_CODENAME=/{ print $NF }' /etc/os-release) && \
-    echo "deb [arch=$(dpkg --print-architecture)] https://repo.jellyfin.org/$os_id $os_codename main" > /etc/apt/sources.list.d/jellyfin.list && \
-    apt-get update && \
-    apt-get install --no-install-recommends --no-install-suggests -y jellyfin-ffmpeg7 && \
-    rm -rf /var/lib/apt/lists/* && \
-    ln -s /usr/lib/jellyfin-ffmpeg/ffmpeg /usr/bin/ffmpeg && \
-    ln -s /usr/lib/jellyfin-ffmpeg/ffprobe /usr/bin/ffprobe
-
 # Clone repo and apply patches
 RUN git clone "https://github.com/CanOfSocks/livestream_dl" /app/livestream_dl && \
     wget -q -O "/app/ytct.py" https://raw.githubusercontent.com/HoloArchivists/youtube-community-tab/master/ytct.py
@@ -54,6 +42,17 @@ COPY --from=builder /app/livestream_dl /app/livestream_dl
 COPY --from=builder /app/ytct.py /app/ytct.py
 COPY . /app
 WORKDIR /app
+
+# Install Jellyfin FFmpeg
+RUN curl -m 15 -fsSL https://repo.jellyfin.org/debian/jellyfin_team.gpg.key | \
+    gpg --dearmor --batch --yes -o /etc/apt/trusted.gpg.d/debian-jellyfin.gpg && \
+    os_id=$(awk -F'=' '/^ID=/{ print $NF }' /etc/os-release) && \
+    os_codename=$(awk -F'=' '/^VERSION_CODENAME=/{ print $NF }' /etc/os-release) && \
+    echo "deb [arch=$(dpkg --print-architecture)] https://repo.jellyfin.org/$os_id $os_codename main" > /etc/apt/sources.list.d/jellyfin.list && \
+    apt-get update && \
+    apt-get install --no-install-recommends --no-install-suggests -y jellyfin-ffmpeg7 && \
+    ln -s /usr/lib/jellyfin-ffmpeg/ffmpeg /usr/bin/ffmpeg && \
+    ln -s /usr/lib/jellyfin-ffmpeg/ffprobe /usr/bin/ffprobe
 
 # Install minimal runtime deps
 RUN apt-get update && apt-get install --no-install-recommends -y procps cron git && apt-get clean -y
