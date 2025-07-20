@@ -79,4 +79,14 @@ main() {
     done
 }
 
+# Function to send SIGTERM to all processes except this one
+terminate() {
+    echo "Caught SIGTERM. Terminating all child processes..."
+    kill -TERM $(ps -eo pid | grep -v '^ *1$' | grep -v '^ *PID' | tr -d ' ') 2>/dev/null
+    wait
+}
+
+# Trap SIGTERM and SIGINT
+trap terminate SIGTERM SIGINT
+
 main "$@"
