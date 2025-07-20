@@ -125,6 +125,10 @@ For example:
 
 By default, videos are checked every 2 minutes and membership videos every 5 minutes.
 
+### Running as non-root user (WIP)
+Attempts are being made to allow for each script to be run as a user and group specified by environment variables `PUID` and `PGID`. Currently both a user and group must be specified. 
+An outstanding issue is yt-dlp receives permission errors when attempting to update the thumbnail when refreshing data, causing false positive stream removal detection.
+
 ### To-Do
 While some components have been marked as added, testing of full functionalility may be required
 - [x] Option to mux file or not
@@ -137,5 +141,6 @@ While some components have been marked as added, testing of full functionalility
 - [x] Membership only filtering
 - [x] Automatic torrent creation
 - [x] Configurable checking frequency
-- [ ] Improve error detection
-- [ ] ytarchive-raw integration
+- [x] Improve error detection
+- [x] ytarchive-raw integration (implemented similar functionality through livestream_dl)
+- [ ] Allow for non-root users for docker instances
