@@ -20,11 +20,8 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     echo "Downloading: $asset_url"; \
     wget -O ffmpeg.tar.xz "$asset_url" && \
     mkdir -p /opt/jellyfin-ffmpeg && \
-    tar -vxf ffmpeg.tar.xz -C /opt/jellyfin-ffmpeg --strip-components=1 && \
-    rm ffmpeg.tar.xz && \
-    ln -sf /opt/jellyfin-ffmpeg/ffmpeg /usr/bin/ffmpeg && \
-    ln -sf /opt/jellyfin-ffmpeg/ffprobe /usr/bin/ffprobe
-
+    tar -C /usr/bin -xvf ffmpeg.tar.xz && \
+    rm ffmpeg.tar.xz
 
 # Clone repo and apply patches
 RUN git clone "https://github.com/CanOfSocks/livestream_dl" /app/livestream_dl && \
