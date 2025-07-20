@@ -94,7 +94,11 @@ def is_video_private(id):
                 #Popen(command)
                 subprocess.Popen(command, start_new_session=True)
             from livestream_dl.download_Live import download_auxiliary_files
-            file = download_auxiliary_files(info_dict=info_dict, options={'write_thumbnail': True})[0].get('thumbnail',None)
+            aux_options = {
+                'write_thumbnail': True,
+                'temp_folder': getConfig.get_unarchived_temp_folder(),                
+            }
+            file = download_auxiliary_files(info_dict=info_dict, options=aux_options)[0].get('thumbnail',None)
             if file is not None and not str(file.suffix).endswith("jpg"):
                 subprocess.run([
                     "ffmpeg", "-y",

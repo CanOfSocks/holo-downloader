@@ -19,7 +19,7 @@ recreate_cron_file() {
     local user="${1:-$(whoami)}"
     local cron_content
     cron_content=$(cat <<END
-PATH=/app:/opt/venv/bin:/usr/local/bin:/usr/bin
+PATH=/app:$VIRTUAL_ENV/bin:/usr/local/bin:/usr/bin
 SHELL=/bin/bash
 #BASH_ENV=/root/project_env.sh
 END
@@ -70,12 +70,11 @@ main() {
             useradd -u "$PUID" -g "$PGID" -m -s /bin/bash "$USERNAME"
         fi
 
-        chown "$PUID:$PGID" /app
+        chown "$PUID:$PGID" /app $VIRTUAL_ENV
 
         echo "Creating crontab for user $USERNAME"
         recreate_cron_file "$USERNAME"
 
-        echo "Running discord_web.py as $USERNAME"
         su -c "python /app/discord_web.py '0' 'starting'" "$USERNAME"
     else
         echo "No PUID and PGID set, installing crontab for root"
