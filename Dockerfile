@@ -1,14 +1,9 @@
-FROM python:3.12-slim AS builder
+FROM python:3.12-slim as builder
 
-# Create and use a virtual environment
-ENV VIRTUAL_ENV=/opt/venv
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-
-# Install system deps
+# Install dependencies and download tools in one step
 RUN apt-get update && apt-get install --no-install-recommends -y \
-    python3-venv curl gnupg ca-certificates lsb-release wget unzip xz-utils procps cron git && \
-    python3 -m venv $VIRTUAL_ENV && \
-    $VIRTUAL_ENV/bin/pip install --no-cache-dir --upgrade pip setuptools wheel
+    wget unzip xz-utils procps cron git && \
+    apt-get clean -y
 
 # Install latest Jellyfin FFmpeg binary release from GitHub
 RUN apt-get update && apt-get install --no-install-recommends -y \
@@ -23,50 +18,43 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     tar -C /usr/bin -xvf ffmpeg.tar.xz && \
     rm ffmpeg.tar.xz
 
-# Clone repo and apply patches
-RUN git clone "https://github.com/CanOfSocks/livestream_dl" /app/livestream_dl && \
-    wget -q -O "/app/ytct.py" https://raw.githubusercontent.com/HoloArchivists/youtube-community-tab/master/ytct.py
+# Clone the repository
+RUN git clone "https://github.com/CanOfSocks/livestream_dl" /app/livestream_dl
 
-# Copy requirements and install Python deps into venv
-COPY requirements.txt /app/requirements.txt
-RUN $VIRTUAL_ENV/bin/pip install --no-cache-dir -r /app/requirements.txt && \
-    $VIRTUAL_ENV/bin/pip install --no-cache-dir -e "git+https://github.com/HoloArchivists/youtube-community-tab.git#egg=youtube-community-tab&subdirectory=youtube-community-tab"
+# Apply patches
+RUN wget -q -O "/app/ytct.py" https://raw.githubusercontent.com/HoloArchivists/youtube-community-tab/master/ytct.py
 
-# Patch yt-dlp
-RUN (sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" "$VIRTUAL_ENV/lib/python3.12/site-packages/chat_downloader/sites/youtube.py") && \
-    (sed -i '/if fmt.get('\'targetDurationSec\''):$/,/    continue$/s/^/#/' "$VIRTUAL_ENV/lib/python3.12/site-packages/yt_dlp/extractor/youtube/_video.py")
-
-
-# Final image
+# Final minimal image setup
 FROM python:3.12-slim
 
-ENV VIRTUAL_ENV=/opt/venv
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-# Copy venv and ffmpeg/ffprobe
-COPY --from=builder /opt/venv $VIRTUAL_ENV
+# Copy only the necessary files from the builder stage
 COPY --from=builder /usr/bin/ffmpeg /usr/bin/
 COPY --from=builder /usr/bin/ffprobe /usr/bin/
-
-# Symlink virtualenv Python to global path
-RUN ln -sf $VIRTUAL_ENV/bin/python /usr/local/bin/python && \
-    ln -sf $VIRTUAL_ENV/bin/pip /usr/local/bin/pip
-
-RUN chmod -R a+rX $VIRTUAL_ENV
-# Copy app files
 COPY --from=builder /app/livestream_dl /app/livestream_dl
 COPY --from=builder /app/ytct.py /app/ytct.py
-COPY . /app
+
 WORKDIR /app
 
-# Install minimal runtime deps
-RUN apt-get update && apt-get install --no-install-recommends -y procps cron git && apt-get clean -y
+# Copy application files
+COPY . .
 
-# Set permissions
+RUN apt-get update && apt-get install --no-install-recommends -y \
+         procps cron git && \
+         apt-get clean -y
+
+# Set permissions for Python scripts and Cron file
 RUN chmod +x *.py /app/startCron.sh
 
-# Env and entrypoint
+# Install remaining dependencies
+RUN pip install --no-cache-dir -r /app/livestream_dl/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+RUN pip install --no-cache-dir -e "git+https://github.com/HoloArchivists/youtube-community-tab.git#egg=youtube-community-tab&subdirectory=youtube-community-tab"
+
+# Modify yt-dlp
+RUN (sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" /usr/local/lib/python*/site-packages/chat_downloader/sites/youtube.py) ; (sed -i '/if fmt.get('\'targetDurationSec\''):$/,/    continue$/s/^/#/' "$(pip show yt-dlp | grep Location | awk '{print $2}')/yt_dlp/extractor/youtube/_video.py")
+
+# Set environment variables and cron schedule
 ENV VIDEOSCHEDULE='*/2 * * * *'
 ENV MEMBERSCHEDULE='*/5 * * * *'
-ENV PATH="/opt/venv/bin:$PATH"
 
 ENTRYPOINT [ "bash", "-c", "/app/startCron.sh" ]

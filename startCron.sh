@@ -19,7 +19,7 @@ recreate_cron_file() {
     local user="${1:-$(whoami)}"
     local cron_content
     cron_content=$(cat <<END
-PATH=/app:$VIRTUAL_ENV/bin:/usr/local/bin:/usr/bin
+PATH=/app:/usr/local/bin:/usr/bin
 SHELL=/bin/bash
 #BASH_ENV=/root/project_env.sh
 END
@@ -70,7 +70,7 @@ main() {
             useradd -u "$PUID" -g "$PGID" -m -s /bin/bash "$USERNAME"
         fi
 
-        chown "$PUID:$PGID" /app $VIRTUAL_ENV /app/*
+        chown "$PUID:$PGID" /app /app/*
 
         echo "Creating crontab for user $USERNAME"
         recreate_cron_file "$USERNAME"
@@ -82,9 +82,9 @@ main() {
         python /app/discord_web.py '0' 'starting'
     fi
     
-    # Activate virtual environment as backup
-    source $VIRTUAL_ENV/bin/activate
+    
     while true; do
+        echo "[$(date)] Starting cron"
         cron -f
         sleep 1
     done
