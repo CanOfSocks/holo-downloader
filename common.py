@@ -193,20 +193,23 @@ def get_upcoming_or_live_videos(channel_id, tab=None):
         return list(set(upcoming_or_live_videos))
     
 def combine_unarchived(ids):
-    yta_pattern = r"^.([0-9A-Za-z_-]{10}[048AEIMQUYcgkosw])\.info\.json$"
+    yta_pattern = r"^([0-9A-Za-z_-]{10}[048AEIMQUYcgkosw])\.info\.json$"
     directory = getConfig.get_unarchived_temp_folder()
     if not os.path.exists(directory):
         os.makedirs(directory, exist_ok=True)
-    files = [f for f in os.listdir(directory) if (os.path.isfile(os.path.join(directory, f)) and os.path.join(directory, f).endswith('.info.json'))]
-    id_set = set()
-    
-    for id in ids:
-        id_set.add(id)
+    files = [
+        f for f in os.listdir(directory)
+        if os.path.isfile(os.path.join(directory, f))
+    ]
+    logging.debug("Existing files: {0}".format(files))
+    id_set = set(ids)
+
     for file in files:
-        if re.match(yta_pattern, file):
-            continue
-        id = file.replace('.info.json', '')
-        id_set.add(id)
+        match = re.match(yta_pattern, file)
+        if match:
+            group1 = match.group(1)  
+            logging.debug("[Unarchived] Found ID {0} from filename {1}".format(group1, file))          
+            id_set.add(str(group1))
     
     return list(id_set)
 
