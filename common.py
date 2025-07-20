@@ -253,7 +253,6 @@ def random_sample(data, k=None):
         raise TypeError("Unsupported data type. Only lists, tuples, and dictionaries are allowed.")
     
 import os
-import time
 
 if os.name == 'nt':
     import msvcrt
@@ -298,3 +297,10 @@ class FileLock:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.release()
+
+def setup_umask():
+    try:
+        if os.name != 'nt' and os.getenv("UMASK", None) is not None:
+            os.umask(int(umask_str, 8))
+    except Exception as e:
+        logging.exception("Unable to setup UMASK: {0}".format(e))

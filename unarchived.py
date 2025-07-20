@@ -15,7 +15,7 @@ from shutil import move
 import discord_web
 from json import load
 
-from common import FileLock
+from common import FileLock, setup_umask
 
 import traceback
 
@@ -23,6 +23,9 @@ from livestream_dl import getUrls
 import logging
 
 getConfig = ConfigHandler()
+
+setup_umask()
+
 from livestream_dl.download_Live import setup_logging
 setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), file_options=getConfig.get_log_file_options())
 
@@ -104,9 +107,12 @@ def is_video_private(id):
                 file.unlink()
             return
     except PermissionError as e:
-        logging.debug("Experienced permission error while checking {0}: {1}".format(id, e))
-        if os.path.exists(json_out_path):
-            download_private(info_dict_file=json_out_path, thumbnail=jpg_out_path, chat=chat_out_path)   
+        if "is private" in str(e) or "is a membership" in str(e):
+            logging.debug("Experienced permission error while checking {0}: {1}".format(id, e))
+            if os.path.exists(json_out_path):
+                download_private(info_dict_file=json_out_path, thumbnail=jpg_out_path, chat=chat_out_path) 
+        else:
+            logging.exception("Unexpected permission error occurred: {0}".format(e))
     except ValueError as e:
         if "Video has been processed, please use yt-dlp directly" in str(e):
             logging.debug("({0}) {1}".format(id, e))
