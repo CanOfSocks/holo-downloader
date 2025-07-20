@@ -46,7 +46,7 @@ def check_ytdlp_age(existing_file):
         os.remove(existing_file)
         return False
     return True
-
+"""
 def check_yta_raw_age(existing_file):   
     from time import time
     current_time = time()
@@ -59,7 +59,7 @@ def check_yta_raw_age(existing_file):
         current_time = time()
         from datetime import datetime
         if ((current_time - datetime.fromisoformat(data['createTime']).timestamp()) / 3600) > 6 or (current_time - os.path.getmtime(existing_file) / 3600) > 6:
-            logging.info("{1}: YTA-raw JSON for {0} is older than 6 hours, removing...".format(os.path.basename(existing_file)))
+            logging.info("JSON {0} ({1}) is older than 6 hours, removing...".format(os.path.basename(existing_file), existing_file))
             os.remove(existing_file)
     # Return False if removed, otherwise True
             return False
@@ -67,7 +67,7 @@ def check_yta_raw_age(existing_file):
         os.remove(existing_file)
         return False
     return True            
-            
+"""
 def is_video_private(id):
     json_out_path = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.info.json".format(id))
     chat_out_path = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.live_chat.zip".format(id))
