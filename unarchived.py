@@ -38,7 +38,7 @@ def check_ytdlp_age(existing_file):
     if data and 'epoch' in data:
         current_time = time()
         if ((current_time - data['epoch']) / 3600) > 6 or ((current_time - os.path.getmtime(existing_file)) / 3600.0) > 6:
-            logging.info("JSON for {0} is older than 6 hours, removing...".format(os.path.basename(existing_file)))
+            logging.info("JSON {0} is older than 6 hours, removing...".format(os.path.basename(existing_file)))
             os.remove(existing_file)
     # Return False if removed, otherwise True
             return False
