@@ -27,14 +27,18 @@ RUN (sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" "$VIR
 # Final image
 FROM debian:stable-slim
 
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # Copy venv and ffmpeg/ffprobe
-COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /opt/venv $VIRTUAL_ENV
+
+
 
 # Symlink virtualenv Python to global path
-RUN ln -sf /opt/venv/bin/python /usr/local/bin/python && \
-    ln -sf /opt/venv/bin/pip /usr/local/bin/pip
+RUN ln -sf $VIRTUAL_ENV/bin/python /usr/local/bin/python && \
+    ln -sf $VIRTUAL_ENV/bin/pip /usr/local/bin/pip
 
-RUN chmod -R a+rX /opt/venv
+RUN chmod -R a+rX $VIRTUAL_ENV
 # Copy app files
 COPY --from=builder /app/livestream_dl /app/livestream_dl
 COPY --from=builder /app/ytct.py /app/ytct.py
