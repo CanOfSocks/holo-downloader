@@ -29,8 +29,6 @@ FROM debian:stable-slim
 
 # Copy venv and ffmpeg/ffprobe
 COPY --from=builder /opt/venv /opt/venv
-COPY --from=builder /usr/bin/ffmpeg /usr/bin/
-COPY --from=builder /usr/bin/ffprobe /usr/bin/
 
 # Symlink virtualenv Python to global path
 RUN ln -sf /opt/venv/bin/python /usr/local/bin/python && \
