@@ -1,4 +1,4 @@
-FROM python:3.12-slim as builder
+FROM python:3.12-slim AS builder
 
 # Create and use a virtual environment
 ENV VIRTUAL_ENV=/opt/venv
