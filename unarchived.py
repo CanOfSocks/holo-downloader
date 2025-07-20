@@ -108,7 +108,10 @@ def is_video_private(id):
         if os.path.exists(json_out_path):
             download_private(info_dict_file=json_out_path, thumbnail=jpg_out_path, chat=chat_out_path)   
     except ValueError as e:
-        logging.exception("Experienced value error while checking {0}: {1}".format(id, e))
+        if "Video has been processed, please use yt-dlp directly" in str(e):
+            logging.debug("({0}) {1}".format(id, e))
+        else:
+            logging.exception("Experienced value error while checking {0}: {1}".format(id, e))
     except Exception as e:
         logging.exception("Unexpected exception occurred: {0}\n{1}".format(e,traceback.format_exc()))
 
