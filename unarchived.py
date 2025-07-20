@@ -106,20 +106,18 @@ def is_video_private(id):
                 logging.debug("Deleting: ".format(file.absolute()))
                 file.unlink()
             return
-    except PermissionError as e:
-        if "is private" in str(e) or "is a membership" in str(e):
-            logging.debug("Experienced permission error while checking {0}: {1}".format(id, e))
-            if os.path.exists(json_out_path):
-                download_private(info_dict_file=json_out_path, thumbnail=jpg_out_path, chat=chat_out_path) 
-        else:
-            logging.exception("Unexpected permission error occurred: {0}".format(e))
-    except ValueError as e:
-        if "Video has been processed, please use yt-dlp directly" in str(e):
-            logging.debug("({0}) {1}".format(id, e))
-        else:
-            logging.exception("Experienced value error while checking {0}: {1}".format(id, e))
+    except getUrls.VideoInaccessibleError as e:        
+        logging.debug("Experienced permission error while checking {0}: {1}".format(id, e))
+        if os.path.exists(json_out_path):
+            download_private(info_dict_file=json_out_path, thumbnail=jpg_out_path, chat=chat_out_path) 
+    except getUrls.VideoProcessedError as e:
+        logging.debug("({0}) {1}".format(id, e))
     except Exception as e:
         logging.exception("Unexpected exception occurred: {0}\n{1}".format(e,traceback.format_exc()))
+        try:
+            discord_web.main(info_dict.get('id'), "error", message=str("{0}\n{1}".format(e, traceback.format_exc))[-1000:])
+        except Exception as e:
+            logging.exception("Unable to send discord error message")
 
     #existing_file = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.info.json".format(id))
     if os.path.exists(json_out_path):
