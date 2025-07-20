@@ -70,7 +70,7 @@ main() {
             useradd -u "$PUID" -g "$PGID" -m -s /bin/bash "$USERNAME"
         fi
 
-        chown "$PUID:$PGID" /app $VIRTUAL_ENV
+        chown "$PUID:$PGID" /app $VIRTUAL_ENV /app/*
 
         echo "Creating crontab for user $USERNAME"
         recreate_cron_file "$USERNAME"
