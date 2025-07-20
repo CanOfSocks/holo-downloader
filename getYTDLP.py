@@ -20,7 +20,6 @@ def getVideos(channel_ids_to_match, command=None, unarchived = False, frequency=
             all_lives += lives
         except Exception as e:
             logging.exception(("Error fetching streams for {0}. Check cookies. \n{1}".format(channel,e)))
-        time.sleep(1)
     if unarchived:
         all_lives = common.combine_unarchived(all_lives)
 
