@@ -111,11 +111,11 @@ def is_video_private(id):
                 file.unlink()
             return
     except getUrls.VideoInaccessibleError as e:        
-        logging.debug("Experienced permission error while checking {0}: {1}".format(id, e))
+        logging.info("Experienced Video Inaccessible Error error while checking {0}: {1}".format(id, e))
         if os.path.exists(json_out_path):
             download_private(info_dict_file=json_out_path, thumbnail=jpg_out_path, chat=chat_out_path) 
     except getUrls.VideoProcessedError as e:
-        logging.debug("({0}) {1}".format(id, e))
+        logging.info("({0}) {1}".format(id, e))
     except Exception as e:
         logging.exception("Unexpected exception occurred: {0}\n{1}".format(e,traceback.format_exc()))
         try:

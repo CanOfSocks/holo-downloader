@@ -121,7 +121,7 @@ def main(id=None):
     if id is None:
         raise ValueError("No video ID provided, unable to continue")
     
-    if os.path.exists("/dev/shm"):
+    if os.path.exists("/dev/shm/"):
         lock_file_path = "/dev/shm/videoDL-{0}".format(id)
     else:
         lock_file_path = os.path.join(getConfig.get_temp_folder(), "videoDL-{0}.lockfile".format(id))

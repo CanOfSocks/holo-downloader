@@ -21,6 +21,7 @@ def main(json_file, output_path=None):
             info_dict = json.load(file)
     except Exception as e:
         logging.exception(e)
+        return
     
     options = {
         "ID": info_dict.get('id'),
