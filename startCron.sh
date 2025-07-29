@@ -27,27 +27,27 @@ END
     cron_content+=$'\n0 */3 * * * su -c \"/usr/sbin/update-ca-certificates\" '$user' > /proc/1/fd/1 2>/proc/1/fd/2\n'
 
     if [ -n "${VIDEOSCHEDULE}" ]; then
-        cron_content+="${VIDEOSCHEDULE} su -c \"python /app/getVids.py --command 'spawn' --frequency '${VIDEOSCHEDULE}'\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
+        cron_content+="${VIDEOSCHEDULE} su -c \"${UMASK:+umask $UMASK;} python /app/getVids.py --command 'spawn' --frequency '${VIDEOSCHEDULE}'\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     else
-        cron_content+="*/2 * * * * su -c \"python /app/getVids.py --command 'spawn'\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
+        cron_content+="*/2 * * * * su -c \"${UMASK:+umask $UMASK;} python /app/getVids.py --command 'spawn'\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     fi
 
     if [ -n "${MEMBERSCHEDULE}" ]; then
-        cron_content+="${MEMBERSCHEDULE} su -c \"python /app/getMembers.py --command 'spawn' --frequency '${MEMBERSCHEDULE}'\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
+        cron_content+="${MEMBERSCHEDULE} su -c \"${UMASK:+umask $UMASK;} python /app/getMembers.py --command 'spawn' --frequency '${MEMBERSCHEDULE}'\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     else
-        cron_content+="*/5 * * * * su -c \"python /app/getMembers.py --command 'spawn'\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
+        cron_content+="*/5 * * * * su -c \"${UMASK:+umask $UMASK;} python /app/getMembers.py --command 'spawn'\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     fi
 
     if [ -n "${COMMUNITYSCHEDULE}" ]; then
-        cron_content+="${COMMUNITYSCHEDULE} su -c \"python /app/communityPosts.py\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
+        cron_content+="${COMMUNITYSCHEDULE} su -c \"${UMASK:+umask $UMASK;} python /app/communityPosts.py\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     else 
-        cron_content+="0 */3 * * * su -c \"python /app/communityPosts.py\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
+        cron_content+="0 */3 * * * su -c \"${UMASK:+umask $UMASK;} python /app/communityPosts.py\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     fi
 
     if [ -n "${UNARCHIVEDSCHEDULE}" ]; then
-        cron_content+="${UNARCHIVEDSCHEDULE} su -c \"python /app/getVids.py --command 'spawn' --unarchived --frequency '${UNARCHIVEDSCHEDULE}'\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
+        cron_content+="${UNARCHIVEDSCHEDULE} su -c \"${UMASK:+umask $UMASK;} python /app/getVids.py --command 'spawn' --unarchived --frequency '${UNARCHIVEDSCHEDULE}'\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     else
-        cron_content+="*/30 * * * * su -c \"python /app/getVids.py --command 'spawn' --unarchived\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
+        cron_content+="*/30 * * * * su -c \"${UMASK:+umask $UMASK;} python /app/getVids.py --command 'spawn' --unarchived\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     fi
 
     if [ -n "${UPDATEYTDLP}" ]; then
