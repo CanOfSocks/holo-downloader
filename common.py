@@ -304,6 +304,8 @@ class FileLock:
 def setup_umask():
     try:
         if os.name != 'nt' and os.getenv("UMASK", None) is not None:
-            os.umask(int(os.getenv("UMASK", "002"), 8))
+            umask = int(os.getenv("UMASK", "002"), 8)
+            logging.debug("Setting UMASK to {0}".format(umask))
+            os.umask(umask)
     except Exception as e:
         logging.exception("Unable to setup UMASK: {0}".format(e))
