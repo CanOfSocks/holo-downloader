@@ -2,6 +2,7 @@
 import subprocess
 from getConfig import ConfigHandler
 from os import path
+import logging
 
 getConfig = ConfigHandler()
 from livestream_dl.download_Live import setup_logging
@@ -34,4 +35,8 @@ def main(command=None):
                 f.write('\n')
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        logging.exception("An unhandled error occurred when fetching community posts")
+        raise

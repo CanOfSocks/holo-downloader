@@ -4,8 +4,11 @@ import requests
 import sys
 from discord_webhook import DiscordWebhook, DiscordEmbed
 from getConfig import ConfigHandler
+import logging
 
 getConfig = ConfigHandler()
+from livestream_dl.download_Live import setup_logging
+setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), file_options=getConfig.get_log_file_options())
 
 def send_webhook(url, id="Unknown", status="error", message=None):
     if url is None:
@@ -101,4 +104,8 @@ def main(id, status, message = None):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    try:
+        main(sys.argv[1], sys.argv[2])
+    except Exception as e:
+        logging.exception("An unhandled error occurred when trying to send a message to Discord")
+        raise

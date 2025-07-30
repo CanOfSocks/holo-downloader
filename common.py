@@ -51,7 +51,7 @@ def vid_executor(streams, command, unarchived = False, frequency = None):
         return streams
     
 def titleFilter(live,channel_id):
-    titFilter = getConfig.get_title_filter().get(channel_id)
+    titFilter = getConfig.get_title_filter().get(channel_id, None)
     if titFilter is None:
         return None
     
@@ -67,7 +67,7 @@ def titleFilter(live,channel_id):
         return None
     
 def descriptionFilter(live,channel_id):
-    descFilter = getConfig.get_desc_filter().get(channel_id)    
+    descFilter = getConfig.get_desc_filter().get(channel_id, None)    
     #If filter not present, return None
     if descFilter is None:
         return None

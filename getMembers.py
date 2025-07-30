@@ -28,20 +28,24 @@ def main(command=None, frequency=None):
     getVideos(getConfig.members_only, command, frequency)
 
 if __name__ == "__main__":
-# Create the parser
-    parser = argparse.ArgumentParser(description="Process optional command and frequency values.")
+    try:
+        # Create the parser
+        parser = argparse.ArgumentParser(description="Process optional command and frequency values.")
 
-    # Add an optional named argument '--command' with default as None
-    parser.add_argument('--command', type=str, default=None, help='The command value (optional, default: None)')
+        # Add an optional named argument '--command' with default as None
+        parser.add_argument('--command', type=str, default=None, help='The command value (optional, default: None)')
 
-    # Add an optional named argument '--frequency' with default as None
-    parser.add_argument('--frequency', type=str, default=None, help='The frequency value (optional, default: None)')
+        # Add an optional named argument '--frequency' with default as None
+        parser.add_argument('--frequency', type=str, default=None, help='The frequency value (optional, default: None)')
 
-    # Parse the arguments
-    args = parser.parse_args()
+        # Parse the arguments
+        args = parser.parse_args()
 
-    # Access the arguments
-    command = args.command
-    frequency = args.frequency
+        # Access the arguments
+        command = args.command
+        frequency = args.frequency
 
-    main(command, frequency)
+        main(command, frequency)
+    except Exception as e:
+        logging.exception("An unexpected error occurred when attempting to members videos")
+        raise

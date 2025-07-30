@@ -37,19 +37,23 @@ def main(command=None, unarchived = False, frequency=None):
 
     
 if __name__ == "__main__":
-    # Create the parser
-    parser = argparse.ArgumentParser(description="Process command and an optional unarchived flag.")
+    try:
+        # Create the parser
+        parser = argparse.ArgumentParser(description="Process command and an optional unarchived flag.")
 
-    # Add an optional named argument '--command' (default to None if not provided)
-    parser.add_argument('--command', type=str, default=None, help='The command (optional, default: None)')
+        # Add an optional named argument '--command' (default to None if not provided)
+        parser.add_argument('--command', type=str, default=None, help='The command (optional, default: None)')
 
-    # Add an optional flag '--unarchived' (set to True if provided, otherwise False)
-    parser.add_argument('--unarchived', action='store_true', help='Flag to indicate unarchived (default: False)')
+        # Add an optional flag '--unarchived' (set to True if provided, otherwise False)
+        parser.add_argument('--unarchived', action='store_true', help='Flag to indicate unarchived (default: False)')
 
-    # Parse the arguments
-    args = parser.parse_args()
-    # Access the arguments
-    command = args.command
-    unarchived = args.unarchived
-    
-    main(command=command, unarchived=unarchived)
+        # Parse the arguments
+        args = parser.parse_args()
+        # Access the arguments
+        command = args.command
+        unarchived = args.unarchived
+        
+        main(command=command, unarchived=unarchived)
+    except Exception as e:
+        logging.exception("An unexpected error occurred when attempting to fetch videos via yt-dlp")
+        raise

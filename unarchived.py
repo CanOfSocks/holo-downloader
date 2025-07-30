@@ -246,15 +246,19 @@ def main(id=None):
 
 
 if __name__ == "__main__":
-    # Create the parser
-    parser = argparse.ArgumentParser(description="Process an video by ID")
+    try:
+        # Create the parser
+        parser = argparse.ArgumentParser(description="Process an video by ID")
 
-    # Add a required positional argument 'ID'
-    parser.add_argument('ID', type=str, help='The video ID (required)')
+        # Add a required positional argument 'ID'
+        parser.add_argument('ID', type=str, help='The video ID (required)')
 
-    # Parse the arguments
-    args = parser.parse_args()
+        # Parse the arguments
+        args = parser.parse_args()
 
-    # Access the 'ID' value
-    id = args.ID
-    main(id=id)
+        # Access the 'ID' value
+        id = args.ID
+        main(id=id)
+    except Exception as e:
+        logging.exception("An unhandled error occurred when trying to run the unarchived stream checker")
+        raise

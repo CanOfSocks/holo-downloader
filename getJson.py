@@ -107,19 +107,23 @@ def main(command=None, unarchived=False, frequency=None):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Process a command and optionally an unarchive value.")
+    try:
+        parser = argparse.ArgumentParser(description="Process a command and optionally an unarchive value.")
 
-    # Add the required positional argument 'command'
-    parser.add_argument('command', type=str, help='The command value')
+        # Add the required positional argument 'command'
+        parser.add_argument('command', type=str, help='The command value')
 
-    # Add an optional named argument '--unarchive' with default as None
-    parser.add_argument('--unarchived', action='store_true', help='Flag to indicate unarchived (default: False)')
+        # Add an optional named argument '--unarchive' with default as None
+        parser.add_argument('--unarchived', action='store_true', help='Flag to indicate unarchived (default: False)')
 
-    # Parse the arguments
-    args = parser.parse_args()
+        # Parse the arguments
+        args = parser.parse_args()
 
-    # Access the arguments
-    command = args.command
-    unarchived = args.unarchive  # Will be None if not provided
+        # Access the arguments
+        command = args.command
+        unarchived = args.unarchive  # Will be None if not provided
 
-    main(command=command, unarchived=unarchived)
+        main(command=command, unarchived=unarchived)
+    except Exception as e:
+        logging.exception("An unexpected error occurred when attempting to fetch videos from Holo.dev")
+        raise

@@ -52,19 +52,22 @@ def main(json_file, output_path=None):
             logging.error("Unable to aquire lock for {0}, must be already downloading".format(lock_file_path))
 
 if __name__ == "__main__":
-    # Create the parser
-    parser = argparse.ArgumentParser(description="Download chat of a video using info.json")
+    try:
+        # Create the parser
+        parser = argparse.ArgumentParser(description="Download chat of a video using info.json")
 
-    # Add a required positional argument 'ID'
-    parser.add_argument('json', type=str, help='info.json path (required)')
+        # Add a required positional argument 'ID'
+        parser.add_argument('json', type=str, help='info.json path (required)')
 
-    parser.add_argument('--output-path', type=str, default=None, help='Optional output path')
+        parser.add_argument('--output-path', type=str, default=None, help='Optional output path')
 
-    # Parse the arguments
-    args = parser.parse_args()
+        # Parse the arguments
+        args = parser.parse_args()
 
-    # Access the values
-    json_file = args.json
-    output_path = args.output_path
+        # Access the values
+        json_file = args.json
+        output_path = args.output_path
 
-    main(json_file=json_file, output_path=output_path)
+        main(json_file=json_file, output_path=output_path)
+    except Exception as e:
+        logging.exception("An unhandled error occurred when trying to download chat")
