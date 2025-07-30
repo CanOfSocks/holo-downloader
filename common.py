@@ -9,6 +9,7 @@ from time import sleep
 import re
 import random
 import logging
+import json
 
 getConfig = ConfigHandler()
 from livestream_dl.download_Live import setup_logging
@@ -180,11 +181,10 @@ def get_upcoming_or_live_videos(channel_id, tab=None):
             url = "https://www.youtube.com/channel/{0}/{1}".format(channel_id, tab)
             ydl_opts.update({'playlist_items': '1:10'})
         info = ydl.extract_info(url, download=False)
-        logging.debug(info)
+        logging.debug(json.dumps(info))
         upcoming_or_live_videos = []
         for video in info['entries']:
-            
-            if (video.get('live_status') == 'is_live' or video.get('live_status') == 'post_live' or (video.get('live_status') == 'is_upcoming' and withinFuture(video.get('release_timestamp')))) and filtering(video,video.get('channel_id')):
+            if (video.get('live_status') == 'is_live' or video.get('live_status') == 'post_live' or (video.get('live_status') == 'is_upcoming' and withinFuture(video.get('release_timestamp', None)))) and filtering(video,video.get('channel_id')):
                 logging.debug("live_status = {0}".format(video.get('live_status')))
                 logging.debug(video)
                 upcoming_or_live_videos.append(video.get('id'))

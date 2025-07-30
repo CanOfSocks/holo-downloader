@@ -3,7 +3,7 @@ import requests
 
 import argparse
 import common
-#import json
+import json
 from datetime import datetime
 from getConfig import ConfigHandler
 import logging
@@ -60,7 +60,7 @@ def getStreams(unarchived=False):
     if response.status_code == 200:
         # Parse the JSON data from the response
         data = response.json()
-
+        logging.debug("Received videos:\n{0}".format(json.dumps(data)))
         videos = []
         # Check if the "lives" key exists in the JSON data
         if 'lives' in data:
