@@ -185,8 +185,8 @@ def get_upcoming_or_live_videos(channel_id, tab=None):
         upcoming_or_live_videos = []
         for video in info['entries']:
             if (video.get('live_status') == 'is_live' or video.get('live_status') == 'post_live' or (video.get('live_status') == 'is_upcoming' and withinFuture(video.get('release_timestamp', None)))) and filtering(video,video.get('channel_id')):
-                logging.debug("live_status = {0}".format(video.get('live_status')))
-                logging.debug(video)
+                logging.debug("({1}) live_status = {0}".format(video.get('live_status'),video.get('id')))
+                logging.debug(json.dumps(video))
                 upcoming_or_live_videos.append(video.get('id'))
 
 
