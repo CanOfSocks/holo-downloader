@@ -48,8 +48,9 @@ def main(json_file, output_path=None):
             """
             lock_file.release()
             return result
-        except (IOError, BlockingIOError):
-            logging.error("Unable to aquire lock for {0}, must be already downloading".format(lock_file_path))
+        except (IOError, BlockingIOError) as e:
+            logging.info("Unable to aquire lock for {0}, must be already downloading".format(lock_file_path))
+            pass
 
 if __name__ == "__main__":
     try:
