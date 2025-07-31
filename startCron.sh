@@ -24,7 +24,7 @@ SHELL=/bin/bash
 #BASH_ENV=/root/project_env.sh
 END
 )
-    cron_content+=$'\n0 */3 * * * su -c \"/usr/sbin/update-ca-certificates\" '$user' > /proc/1/fd/1 2>/proc/1/fd/2\n'
+    cron_content+=$'\n'$"0 */3 * * * su -c \"/usr/sbin/update-ca-certificates\" '$user' > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
 
     if [ -n "${VIDEOSCHEDULE}" ]; then
         cron_content+="${VIDEOSCHEDULE} su -c \"${UMASK:+umask $UMASK;} python /app/getVids.py --command 'spawn' --frequency '${VIDEOSCHEDULE}'\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'

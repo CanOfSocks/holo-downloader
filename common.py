@@ -157,40 +157,43 @@ def get_upcoming_or_live_videos(channel_id, tab=None):
         #'verbose': True
         #'match_filter': filters
     }
-    
-    with YoutubeDL(ydl_opts) as ydl:
-        if tab == "membership":
-            if channel_id.startswith("UUMO"):
-                url = "https://www.youtube.com/playlist?list={0}".format(channel_id)
-            elif channel_id.startswith("UC") or channel_id.startswith("UU"):
-                url = "https://www.youtube.com/playlist?list={0}".format("UUMO" + channel_id[2:])
+    try:
+        with YoutubeDL(ydl_opts) as ydl:
+            if tab == "membership":
+                if channel_id.startswith("UUMO"):
+                    url = "https://www.youtube.com/playlist?list={0}".format(channel_id)
+                elif channel_id.startswith("UC") or channel_id.startswith("UU"):
+                    url = "https://www.youtube.com/playlist?list={0}".format("UUMO" + channel_id[2:])
+                else:
+                    url = "https://www.youtube.com/channel/{0}/{1}".format(channel_id, tab)
+                    ydl_opts.update({'playlist_items': '1:10'})
+            elif tab == "streams":
+                if channel_id.startswith("UU"):
+                    url = "https://www.youtube.com/playlist?list={0}".format(channel_id)
+                elif channel_id.startswith("UC"):
+                    url = "https://www.youtube.com/playlist?list={0}".format("UU" + channel_id[2:])
+                elif channel_id.startswith("UUMO"):
+                    url = "https://www.youtube.com/playlist?list={0}".format("UU" + channel_id[4:])
+                else:
+                    url = "https://www.youtube.com/channel/{0}/{1}".format(channel_id, tab)
+                    ydl_opts.update({'playlist_items': '1:10'})
             else:
                 url = "https://www.youtube.com/channel/{0}/{1}".format(channel_id, tab)
                 ydl_opts.update({'playlist_items': '1:10'})
-        elif tab == "streams":
-            if channel_id.startswith("UU"):
-                url = "https://www.youtube.com/playlist?list={0}".format(channel_id)
-            elif channel_id.startswith("UC"):
-                url = "https://www.youtube.com/playlist?list={0}".format("UU" + channel_id[2:])
-            elif channel_id.startswith("UUMO"):
-                url = "https://www.youtube.com/playlist?list={0}".format("UU" + channel_id[4:])
-            else:
-                url = "https://www.youtube.com/channel/{0}/{1}".format(channel_id, tab)
-                ydl_opts.update({'playlist_items': '1:10'})
-        else:
-            url = "https://www.youtube.com/channel/{0}/{1}".format(channel_id, tab)
-            ydl_opts.update({'playlist_items': '1:10'})
-        info = ydl.extract_info(url, download=False)
-        logging.debug(json.dumps(info))
-        upcoming_or_live_videos = []
-        for video in info['entries']:
-            if (video.get('live_status') == 'is_live' or video.get('live_status') == 'post_live' or (video.get('live_status') == 'is_upcoming' and withinFuture(video.get('release_timestamp', None)))) and filtering(video,video.get('channel_id')):
-                logging.debug("({1}) live_status = {0}".format(video.get('live_status'),video.get('id')))
-                logging.debug(json.dumps(video))
-                upcoming_or_live_videos.append(video.get('id'))
+            info = ydl.extract_info(url, download=False)
+            logging.debug(json.dumps(info))
+            upcoming_or_live_videos = []
+            for video in info['entries']:
+                if (video.get('live_status') == 'is_live' or video.get('live_status') == 'post_live' or (video.get('live_status') == 'is_upcoming' and withinFuture(video.get('release_timestamp', None)))) and filtering(video,video.get('channel_id')):
+                    logging.debug("({1}) live_status = {0}".format(video.get('live_status'),video.get('id')))
+                    logging.debug(json.dumps(video))
+                    upcoming_or_live_videos.append(video.get('id'))
 
 
-        return list(set(upcoming_or_live_videos))
+            return list(set(upcoming_or_live_videos))
+    except Exception as e:
+        logging.exception("An unexpected error occurred when trying to fetch videos")
+        raise
     
 def combine_unarchived(ids):
     yta_pattern = r"^([0-9A-Za-z_-]{10}[048AEIMQUYcgkosw])\.info\.json$"
