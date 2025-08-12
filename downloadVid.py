@@ -73,18 +73,17 @@ def downloader(id,outputTemplate, info_dict):
 
 def download_video_info(video_url):
     options = {
-        'wait_for_video': (1,300),
-        'retries': 25,
-        'skip_download': True,
+    #    'wait_for_video': (1,300),
+    #   'retries': 25,
+    #    'skip_download': True,
         'outtmpl': getConfig.get_ytdlp(),
-        'cookiefile': getConfig.get_cookies_file(),        
+    #    'cookiefile': getConfig.get_cookies_file(),        
         'quiet': True,
         'no_warnings': True       
     }
-
-    if getConfig.get_ytdlp_options() is not None:
-        import json
-        options.update({'ytdlp_options': json.loads(getConfig.get_ytdlp_options())})
+    import json
+    #if getConfig.get_ytdlp_options() is not None:
+    #    options.update({'ytdlp_options': json.loads(getConfig.get_ytdlp_options())})
 
     with yt_dlp.YoutubeDL(options) as ydl:
         #info_dict = ydl.extract_info(video_url, download=False)

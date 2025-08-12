@@ -190,7 +190,7 @@ class ConfigHandler:
         return None
 
     def get_fetch_method(self):
-        return self.download_options.get('video_fetch_method', "rss")
+        return self.download_options.get('video_fetch_method', "ytdlp")
     
     def get_ffmpeg_command(self):
         return self.download_options.get('write_ffmpeg_command', False)
