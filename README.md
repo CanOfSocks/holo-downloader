@@ -106,6 +106,9 @@ There are also options for temporary folders:
 * ```look_ahead``` - How many hours into the future to wait for a video e.g. 48 hours. Streams with a start time further in the future than this value will be ignored
 * ```log_file``` - Log file to write to
 * ```log_level``` - Log level to use. Can be DEBUG, INFO, WARNING, ERROR, CRITICAL
+* ```log_file_max_size``` - Maximum size of log before rotating [https://docs.python.org/3/library/logging.handlers.html#timedrotatingfilehandler](https://docs.python.org/3/library/logging.handlers.html#timedrotatingfilehandler)
+* ```log_file_rotate_when``` - What time to rotate the log file 
+* ```log_file_keep_backup``` - Number of log files to keep
 * ```keep_ts_files``` - Preserves .ts files made during recording
 * ```write_ffmpeg_command``` - Writes the ffmpeg command used for merging to a file
 * ```randomise_lists``` - Randomises channel fetch and video execution lists each runtime.
@@ -113,9 +116,26 @@ There are also options for temporary folders:
 * ```clean_urls``` - Removes stream urls that could potentially be used for identification and replaces them with a dummy URL. This has little effect longterm due to expiry of most URLs.
 * ```remux_extension``` - Sets the extension for FFmpeg to merge the final file into
 * ```ytdlp_options``` - A JSON formatted string for options to add to yt-dlp python module options
-* ```proxy``` - Set proxies to use for downloading videos. Currently does not include video checks. Must be contained between double quotes, eg. `proxy: "http://10.0.1.2:3128"` See: [https://github.com/CanOfSocks/holo-downloader?tab=readme-ov-file#other-download-options](https://github.com/CanOfSocks/holo-downloader?tab=readme-ov-file#other-download-options)
+* ```proxy``` - Set proxies to use for downloading videos. Currently does not include video checks. Must be contained between double quotes, eg. `proxy: "http://10.0.1.2:3128"` See: [https://github.com/CanOfSocks/livestream_dl?tab=readme-ov-file#usage](https://github.com/CanOfSocks/livestream_dl?tab=readme-ov-file#usage)
 * ```unarchived_download_chat``` - Downloads live chat while a livestream is live and keeps it if the stream goes private/removed after stream recovery activates.
+* ```keep_ts_files``` - Keeps temporary .ts files
 
+#### Community tab options
+The container also includes the [Youtube Community Tab](https://github.com/HoloArchivists/youtube-community-tab) to grab community posts.
+Like the video downloads, it has its own fields:
+```
+[community_tab]
+"Saba" = "UCxsZ6NCzjU_t4YSxQLBcM5A"
+
+[community_tab_options]
+archive_file = "/app/com-tab-archive.txt"
+community_dir = "/app/CommunityPosts"
+```
+Each channel is defined under community_tab.
+
+The community_tab_options are:
+* ```archive_file``` - Post archive to prevent downloading the same post multiple times
+* ```community_dir``` - Output folder. Each channel has its own sub-folder under this directory
 
 ### Scheduling
 For container usage, you can change the frequency of how often videos and membership streams are checked for by adding docker environment variables ```VIDEOSCHEDULE``` and ```MEMBERSCHEDULE```. This must be in the cron format. For help: [crontab.guru](https://crontab.guru).
