@@ -15,16 +15,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: downcase username
-        run: |
-          echo "USERNAME=${GITHUB_REPOSITORY_OWNER,,}" >>${GITHUB_ENV}
+
       - name: Checkout repo
         uses: actions/checkout@v3
       
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
-          username: ${USERNAME}
+          username: canofsocks
           password: ${{ secrets.DOCKER_TOKEN }}
           
       - name: Log into GHCR
