@@ -33,7 +33,7 @@ if __name__ == "__main__":
         parser = argparse.ArgumentParser(description="Process optional command and frequency values.")
 
         # Add an optional named argument '--command' with default as None
-        parser.add_argument('--command', type=str, default=None, help='The command value (optional, default: None)')
+        parser.add_argument('--command', type=str, choices=['ytdlp', 'json', ], default=None, help='The command value (optional, default: None)')
 
         # Add an optional named argument '--frequency' with default as None
         parser.add_argument('--frequency', type=str, default=None, help='The frequency value (optional, default: None)')
