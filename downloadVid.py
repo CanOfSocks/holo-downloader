@@ -129,6 +129,27 @@ def main(id=None):
         lock_file_path = "/dev/shm/videoDL-{0}".format(id)
     else:
         lock_file_path = os.path.join(getConfig.get_temp_folder(), "videoDL-{0}.lockfile".format(id))
+
+    lock = FileLock(lock_file_path)
+
+    try:
+        lock.acquire()
+        discord_web.main(id, "waiting")
+        outputFile, info_dict = download_video_info(id)
+        logging.debug("Output file: {0}".format(outputFile))
+        if outputFile is None:
+            discord_web.main(id, "error")
+            raise Exception(("Unable to retrieve information about video {0}".format(id)))
+        
+        downloader(id,outputFile, info_dict)        
+    except (IOError, BlockingIOError):
+        logging.info("Unable to acquire lock for {0}, must be already downloading".format(lock_file_path))
+    finally:
+        try:
+            lock.release()
+        except Exception:
+            pass
+    '''
     with FileLock(lock_file_path) as lock_file:
         try:
             lock_file.acquire()
@@ -148,7 +169,8 @@ def main(id=None):
             """
             lock_file.release()
         except (IOError, BlockingIOError):
-            logging.error("Unable to aquire lock for {0}, must be already downloading".format(lock_file_path))
+            logging.info("Unable to aquire lock for {0}, must be already downloading".format(lock_file_path))
+    '''
     """
     if is_script_running(script_name, id):
         logging.debug("{0} already running, exiting...".format(id))

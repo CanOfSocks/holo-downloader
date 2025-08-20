@@ -36,21 +36,38 @@ def main(json_file, output_path=None):
         lock_file_path = "/dev/shm/chat-{0}".format(options.get("ID"))
     else:
         lock_file_path = os.path.join(options.get("temp_folder"), "chat-{0}.lockfile".format(options.get("ID")))
+    
+    lock = common.FileLock(lock_file_path)
+
+    try:
+        lock.acquire()
+        result = download_live_chat(info_dict=info_dict, options=options)
+        return result
+    except (IOError, BlockingIOError):
+        logging.info("Unable to acquire lock for {0}, must be already downloading".format(lock_file_path))
+        return None
+    finally:
+        try:
+            lock.release()
+        except Exception:
+            pass
+    '''
     with common.FileLock(lock_file_path) as lock_file:
         try:
             lock_file.acquire()
-            result = download_live_chat(info_dict=info_dict, options=options)
-            """
-            if result is not None and isinstance(result, tuple):
-                out_folder = os.path.dirname(options.get("output"))
-                os.makedirs(out_folder)
-                shutil.move(result[0], out_folder)
-            """
-            lock_file.release()
-            return result
         except (IOError, BlockingIOError) as e:
             logging.info("Unable to aquire lock for {0}, must be already downloading".format(lock_file_path))
-            pass
+            return None
+        result = download_live_chat(info_dict=info_dict, options=options)
+        """
+        if result is not None and isinstance(result, tuple):
+            out_folder = os.path.dirname(options.get("output"))
+            os.makedirs(out_folder)
+            shutil.move(result[0], out_folder)
+        """
+        lock_file.release()
+        return result
+    '''
 
 if __name__ == "__main__":
     try:
