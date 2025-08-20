@@ -21,7 +21,7 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
-          username: ${{ github.repository_owner }}
+          username: canofsocks
           password: ${{ secrets.DOCKER_TOKEN }}
           
       - name: Log into GHCR
