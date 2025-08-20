@@ -27,7 +27,7 @@ if __name__ == "__main__":
         parser = argparse.ArgumentParser(description="Process command and an optional unarchived flag.")
 
         # Add an optional named argument '--command' (default to None if not provided)
-        parser.add_argument('--command', type=str, choices=['ytdlp', 'json', ], default=None, help='The command (optional, default: None)')
+        parser.add_argument('--command', type=str, choices=['spawn', 'bash', ], default=None, help='The command (optional, default: None)')
 
         # Add an optional flag '--unarchived' (set to True if provided, otherwise False)
         parser.add_argument('--unarchived', action='store_true', help='Flag to indicate unarchived (default: False)')
