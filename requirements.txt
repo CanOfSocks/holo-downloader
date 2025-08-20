@@ -4,3 +4,4 @@ chat-downloader>=0.2.8
 psutil>=5.9.4
 py3createtorrent>=1.2.0
 croniter>=3.0.3
+bgutil-ytdlp-pot-provider>=1.2.2
