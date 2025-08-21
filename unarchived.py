@@ -245,8 +245,9 @@ def main(id=None):
             pass
     
     '''
-    with FileLock(lock_file_path) as lock_file:
-        try:
+    try:
+        with FileLock(lock_file_path) as lock_file:
+        
             lock_file.acquire()
             is_video_private(id)
             """
@@ -256,11 +257,11 @@ def main(id=None):
                 shutil.move(result[0], out_folder)
             """
             lock_file.release()
-        except IOError as e:
-            logging.warning("Unable to aquire lock for {0}, must be already downloading".format(lock_file_path))
-            pass
-        except BlockingIOError as e:
-            logging.warning("Unable to aquire lock for {0}, must be already downloading".format(lock_file_path))
+    except IOError as e:
+        logging.warning("Unable to aquire lock for {0}, must be already downloading".format(lock_file_path))
+        pass
+    except BlockingIOError as e:
+        logging.warning("Unable to aquire lock for {0}, must be already downloading".format(lock_file_path))
     
 
 if __name__ == "__main__":

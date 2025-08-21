@@ -52,21 +52,23 @@ def main(json_file, output_path=None):
         except Exception:
             pass
     '''
-    with common.FileLock(lock_file_path) as lock_file:
-        try:
+    try:
+        with common.FileLock(lock_file_path) as lock_file:
+        
             lock_file.acquire()
-        except (IOError, BlockingIOError) as e:
-            logging.info("Unable to aquire lock for {0}, must be already downloading".format(lock_file_path))
-            return None
-        result = download_live_chat(info_dict=info_dict, options=options)
-        """
-        if result is not None and isinstance(result, tuple):
-            out_folder = os.path.dirname(options.get("output"))
-            os.makedirs(out_folder)
-            shutil.move(result[0], out_folder)
-        """
-        lock_file.release()
-        return result
+        
+            result = download_live_chat(info_dict=info_dict, options=options)
+            """
+            if result is not None and isinstance(result, tuple):
+                out_folder = os.path.dirname(options.get("output"))
+                os.makedirs(out_folder)
+                shutil.move(result[0], out_folder)
+            """
+            lock_file.release()
+            return result
+    except (IOError, BlockingIOError) as e:
+        logging.info("Unable to aquire lock for {0}, must be already downloading".format(lock_file_path))
+        return None
     
 
 if __name__ == "__main__":
