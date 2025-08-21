@@ -111,7 +111,7 @@ if __name__ == "__main__":
         parser = argparse.ArgumentParser(description="Process a command and optionally an unarchive value.")
 
         # Add the required positional argument 'command'
-        parser.add_argument('command', type=str, help='The command value')
+        parser.add_argument('--command', type=str, choices=['spawn', 'bash', 'print'], default=None, help='The command (optional, default: None)')
 
         # Add an optional named argument '--unarchive' with default as None
         parser.add_argument('--unarchived', action='store_true', help='Flag to indicate unarchived (default: False)')

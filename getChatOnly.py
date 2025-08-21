@@ -36,7 +36,7 @@ def main(json_file, output_path=None):
         lock_file_path = "/dev/shm/chat-{0}".format(options.get("ID"))
     else:
         lock_file_path = os.path.join(options.get("temp_folder"), "chat-{0}.lockfile".format(options.get("ID")))
-    
+    '''
     lock = common.FileLock(lock_file_path)
 
     try:
@@ -67,7 +67,7 @@ def main(json_file, output_path=None):
         """
         lock_file.release()
         return result
-    '''
+    
 
 if __name__ == "__main__":
     try:

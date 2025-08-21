@@ -230,7 +230,7 @@ def main(id=None):
     else:
         lock_file_path = os.path.join(getConfig.get_temp_folder(), "unarchived-{0}.lockfile".format(id))
     
-
+    '''
     lock = FileLock(lock_file_path)
 
     try:
@@ -261,7 +261,7 @@ def main(id=None):
             pass
         except BlockingIOError as e:
             logging.warning("Unable to aquire lock for {0}, must be already downloading".format(lock_file_path))
-    '''
+    
 
 if __name__ == "__main__":
     try:

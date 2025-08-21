@@ -131,7 +131,7 @@ def main(id=None):
         lock_file_path = os.path.join(getConfig.get_temp_folder(), "videoDL-{0}.lockfile".format(id))
 
     lock = FileLock(lock_file_path)
-
+    '''
     try:
         lock.acquire()
         discord_web.main(id, "waiting")
@@ -170,7 +170,7 @@ def main(id=None):
             lock_file.release()
         except (IOError, BlockingIOError):
             logging.info("Unable to aquire lock for {0}, must be already downloading".format(lock_file_path))
-    '''
+    
     """
     if is_script_running(script_name, id):
         logging.debug("{0} already running, exiting...".format(id))
