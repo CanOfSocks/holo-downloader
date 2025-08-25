@@ -42,6 +42,7 @@ jobs:
           tags: |
             type=edge,branch=main
             type=raw,value=potoken
+            type=raw,value=latest
             type=schedule
             type=ref,event=branch
             type=ref,event=pr
