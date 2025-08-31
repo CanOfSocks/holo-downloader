@@ -160,6 +160,7 @@ def download_private(info_dict_file, thumbnail=None, chat=None):
         "write_description": getConfig.get_description(),
         "keep_database_file": False,
         "recovery": True,
+        "force_recover_merge": getConfig.get_unarchived_force_merge(),
         "database_in_memory": False,
         "direct_to_ts": False,
         "wait_for_video": None,

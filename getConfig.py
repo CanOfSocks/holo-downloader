@@ -183,6 +183,9 @@ class ConfigHandler:
     
     def get_unarchived_chat_dl(self):
         return self.download_options.get("unarchived_download_chat", False)
+    
+    def get_unarchived_force_merge(self):
+        return self.download_options.get("unarchived_force_merge", False)
 
     def get_output_template_yta_raw(self):
         if self.download_options.get("output_folder", None):
