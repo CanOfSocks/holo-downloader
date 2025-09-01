@@ -169,8 +169,8 @@ def main(id=None):
                 shutil.move(result[0], out_folder)
             """
             lock_file.release()
-    except (IOError, BlockingIOError):
-        logging.info("Unable to aquire lock for {0}, must be already downloading".format(lock_file_path))
+    except (IOError, BlockingIOError) as e:
+        logging.info("Unable to aquire lock for {0}, must be already downloading: {1}".format(lock_file_path, e))
     
     """
     if is_script_running(script_name, id):

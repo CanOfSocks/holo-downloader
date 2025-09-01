@@ -258,11 +258,9 @@ def main(id=None):
                 shutil.move(result[0], out_folder)
             """
             lock_file.release()
-    except IOError as e:
-        logging.warning("Unable to aquire lock for {0}, must be already downloading".format(lock_file_path))
-        pass
-    except BlockingIOError as e:
-        logging.warning("Unable to aquire lock for {0}, must be already downloading".format(lock_file_path))
+    except (IOError, BlockingIOError) as e:
+        logging.warning("Unable to aquire lock for {0}, must be already downloading: {1}".format(lock_file_path, e))
+
     
 
 if __name__ == "__main__":
