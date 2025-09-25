@@ -45,6 +45,9 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 # Set permissions for Python scripts and Cron file
 RUN chmod +x *.py /app/startCron.sh
 
+# Install Deno
+RUN curl -fsSL https://deno.land/install.sh | sh
+
 # Install remaining dependencies
 RUN pip install --no-cache-dir -r /app/livestream_dl/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
