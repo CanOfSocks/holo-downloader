@@ -36,6 +36,7 @@ COPY --from=builder /usr/bin/ffmpeg /usr/bin/
 COPY --from=builder /usr/bin/ffprobe /usr/bin/
 COPY --from=builder /app/livestream_dl /app/livestream_dl
 COPY --from=builder /app/ytct.py /app/ytct.py
+COPY --from=builder /usr/bin/deno /usr/bin/
 
 WORKDIR /app
 
