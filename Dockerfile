@@ -24,6 +24,9 @@ RUN git clone "https://github.com/CanOfSocks/livestream_dl" /app/livestream_dl
 # Apply patches
 RUN wget -q -O "/app/ytct.py" https://raw.githubusercontent.com/HoloArchivists/youtube-community-tab/master/ytct.py
 
+# Install Deno
+RUN curl -fsSL https://deno.land/install.sh | sh -y
+
 # Final minimal image setup
 FROM python:3.12-slim
 
@@ -44,9 +47,6 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 
 # Set permissions for Python scripts and Cron file
 RUN chmod +x *.py /app/startCron.sh
-
-# Install Deno
-RUN curl -fsSL https://deno.land/install.sh | sh
 
 # Install remaining dependencies
 RUN pip install --no-cache-dir -r /app/livestream_dl/requirements.txt
