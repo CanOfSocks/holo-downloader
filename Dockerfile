@@ -24,8 +24,9 @@ RUN git clone "https://github.com/CanOfSocks/livestream_dl" /app/livestream_dl
 # Apply patches
 RUN wget -q -O "/app/ytct.py" https://raw.githubusercontent.com/HoloArchivists/youtube-community-tab/master/ytct.py
 
+ARG DENO_INSTALL=/usr
 # Install Deno
-RUN curl -fsSL https://deno.land/install.sh | sh -y
+RUN curl -fsSL https://deno.land/install.sh | sh
 
 # Final minimal image setup
 FROM python:3.12-slim
