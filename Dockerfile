@@ -39,7 +39,7 @@ WORKDIR /app
 COPY . .
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-         procps cron git && \
+         procps cron git curl && \
          apt-get clean -y
 
 # Set permissions for Python scripts and Cron file
