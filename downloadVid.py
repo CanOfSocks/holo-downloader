@@ -51,7 +51,7 @@ def downloader(id,outputTemplate, info_dict):
         download_Live.download_segments(info_dict, getConfig.get_quality(), options)
     except Exception as e:
         logging.exception("Error occured {0}".format(id))
-        discord_web.main(id, "error", message=str(e)[-500:])
+        #discord_web.main(id, "error", message=str(e)[-500:])
         global kill_all
         kill_all = True
         sleep(1.0)
@@ -155,19 +155,23 @@ def main(id=None):
         
             lock_file.acquire()
             discord_web.main(id, "waiting")
-            outputFile, info_dict = download_video_info(id)
-            logging.debug("Output file: {0}".format(outputFile))
-            if outputFile is None:
-                discord_web.main(id, "error")
-                raise Exception(("Unable to retrieve information about video {0}".format(id)))
-            
-            downloader(id,outputFile, info_dict)
-            """
-            if result is not None and isinstance(result, tuple):
-                out_folder = os.path.dirname(options.get("output"))
-                os.makedirs(out_folder)
-                shutil.move(result[0], out_folder)
-            """
+            try:
+                outputFile, info_dict = download_video_info(id)
+                logging.debug("Output file: {0}".format(outputFile))
+                if outputFile is None:
+                    raise LookupError(("Unable to retrieve information about video {0}".format(id)))
+                
+                downloader(id,outputFile, info_dict)
+                """
+                if result is not None and isinstance(result, tuple):
+                    out_folder = os.path.dirname(options.get("output"))
+                    os.makedirs(out_folder)
+                    shutil.move(result[0], out_folder)
+                """
+            except Exception as e:
+                discord_web.main(id, "error", message=f"{type(e).__name__}: {str(e)}"[-500:])
+                logging.exception("Error downloading video")
+
             lock_file.release()
     except (IOError, BlockingIOError) as e:
         logging.info("Unable to aquire lock for {0}, must be already downloading: {1}".format(lock_file_path, e))
