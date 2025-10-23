@@ -91,7 +91,7 @@ def download_video_info(video_url):
         additional_ytdlp_options = None
         if getConfig.get_ytdlp_options():
             additional_ytdlp_options = json.loads(getConfig.get_ytdlp_options())
-        info_dict, live_status = getUrls.get_Video_Info(id=video_url,  wait=(1,300), cookies=getConfig.get_cookies_file(), proxy=getConfig.get_proxy(), additional_options=additional_ytdlp_options)
+        info_dict, live_status = getUrls.get_Video_Info(id=video_url,  wait=(1,300), cookies=getConfig.get_cookies_file(), proxy=getConfig.get_proxy(), additional_options=additional_ytdlp_options, include_dash=getConfig.get_include_dash(), include_m3u8=getConfig.get_include_m3u8())
         #info_dict = ydl.sanitize_info(info_dict)
         outputFile = str(ydl.prepare_filename(info_dict))
             

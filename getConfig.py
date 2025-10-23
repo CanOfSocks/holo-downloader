@@ -207,6 +207,12 @@ class ConfigHandler:
     def get_ytdlp_options(self):
         return self.download_options.get('ytdlp_options', None)
     
+    def get_include_dash(self):
+        return self.download_options.get('include_dash', False)
+    
+    def get_include_m3u8(self):
+        return self.download_options.get('include_m3u8', False)
+    
     def get_discord_webhook(self):
         return self.webhook.get("url", None)
     
@@ -279,6 +285,8 @@ class ConfigHandler:
             'write_ffmpeg_command': self.get_ffmpeg_command(),
             "proxy": self.get_proxy(),
             "log_file_options": self.get_log_file_options(),
+            "dash": self.get_include_dash(),
+            "m3u8": self.get_include_m3u8(),
         }
 
         if self.get_remux_container() is not None:
