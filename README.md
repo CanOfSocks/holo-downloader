@@ -119,6 +119,8 @@ There are also options for temporary folders:
 * ```proxy``` - Set proxies to use for downloading videos. Currently does not include video checks. Must be contained between double quotes, eg. `proxy: "http://10.0.1.2:3128"` See: [https://github.com/CanOfSocks/livestream_dl?tab=readme-ov-file#usage](https://github.com/CanOfSocks/livestream_dl?tab=readme-ov-file#usage)
 * ```unarchived_download_chat``` - Downloads live chat while a livestream is live and keeps it if the stream goes private/removed after stream recovery activates.
 * ```keep_ts_files``` - Keeps temporary .ts files
+* ```include_dash``` - Enable "dash" urls as a fallback - true/false
+* ```include_m3u8``` - Enable "m3u8" urls as a fallback - true/false
 
 #### Community tab options
 The container also includes the [Youtube Community Tab](https://github.com/HoloArchivists/youtube-community-tab) to grab community posts.
