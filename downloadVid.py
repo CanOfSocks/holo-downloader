@@ -14,6 +14,31 @@ from common import FileLock, setup_umask
 
 import argparse
 
+import signal
+from time import sleep
+import platform
+
+kill_all = threading.Event()
+
+# Preserve original keyboard interrupt logic as true behaviour is known
+original_sigint = signal.getsignal(signal.SIGINT)
+
+def handle_shutdown(signum, frame):
+    kill_all.set()
+    sleep(0.5)
+    if callable(original_sigint):
+        original_sigint(signum, frame)
+
+# common
+signal.signal(signal.SIGINT, handle_shutdown)
+
+if platform.system() == "Windows":
+    # SIGTERM won’t fire — but SIGBREAK will on Ctrl-Break
+    signal.signal(signal.SIGBREAK, handle_shutdown)
+else:
+    # normal POSIX termination
+    signal.signal(signal.SIGTERM, handle_shutdown)
+
 getConfig = ConfigHandler()
 
 import logging
@@ -25,7 +50,8 @@ setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.
 #id = sys.argv[1]
 #id = "kJGsWORSg-4"
 #outputFile = None
-kill_all = False
+
+
 
 def createTorrent(output):
     if not getConfig.getTorrent():
@@ -48,12 +74,10 @@ def downloader(id,outputTemplate, info_dict):
     discord_notify = threading.Thread(target=discord_web.main, args=(id, "recording"), daemon=True)
     discord_notify.start()    
     try:
-        download_Live.download_segments(info_dict, getConfig.get_quality(), options)
+        download_Live.download_segments(info_dict=info_dict, resolution=getConfig.get_quality(), options=options, thread_event=kill_all)
     except Exception as e:
         logging.exception("Error occured {0}".format(id))
         #discord_web.main(id, "error", message=str(e)[-500:])
-        global kill_all
-        kill_all = True
         sleep(1.0)
         raise Exception(("{2} - Error downloading video: {0}, Code: {1}".format(id, e, asctime())))
         return
