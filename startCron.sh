@@ -51,7 +51,7 @@ END
     fi
 
     if [ -n "${UPDATEYTDLP}" ]; then
-        cron_content+="0 0 * * * su -c \"pip install -U yt-dlp && sed -i '/if fmt.get(\\\\'targetDurationSec\\\\'):$/,/    continue$/s/^/#/' \\\"\$(pip show yt-dlp | grep Location | awk '{print \\\$2}')/yt_dlp/extractor/youtube/_video.py\\\"\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
+        cron_content+="0 0 * * * su -c \"pip install -U yt-dlp && sed -i '/if[[:space:]]\\+fmt_stream\\.get(\\\\'targetDurationSec\\\\'):/,/^[[:space:]]*continue$/s/^[[:space:]]*/&#/' \\\"\$(pip show yt-dlp | grep Location | awk '{print \\\$2}')/yt_dlp/extractor/youtube/_video.py\\\"\" $user > /proc/1/fd/1 2>/proc/1/fd/2"$'\n'
     fi
 
     echo "$cron_content" | crontab -
