@@ -1,4 +1,4 @@
-FROM python:3.12-slim as builder
+FROM python:3.13-slim as builder
 
 # Install dependencies and download tools in one step
 RUN apt-get update && apt-get install --no-install-recommends -y \
