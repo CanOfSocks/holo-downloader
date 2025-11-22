@@ -1,4 +1,4 @@
-FROM python:3.13-slim as builder
+FROM python:3.13-slim AS builder
 
 # Install dependencies and download tools in one step
 RUN apt-get update && apt-get install --no-install-recommends -y \
@@ -29,7 +29,7 @@ ARG DENO_INSTALL=/usr
 RUN curl -fsSL https://deno.land/install.sh | sh
 
 # Final minimal image setup
-FROM python:3.12-slim
+FROM python:3.13-slim
 
 # Copy only the necessary files from the builder stage
 COPY --from=builder /usr/bin/ffmpeg /usr/bin/
