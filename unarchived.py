@@ -22,12 +22,27 @@ import traceback
 from livestream_dl import getUrls
 import logging
 
+import threading
+import signal
+from time import sleep
+
+kill_all = threading.Event()
+
+# Preserve original keyboard interrupt logic as true behaviour is known
+original_sigint = signal.getsignal(signal.SIGINT)
+
+def handle_shutdown(signum, frame):
+    kill_all.set()
+    sleep(0.5)
+    if callable(original_sigint):
+        original_sigint(signum, frame)
+
 getConfig = ConfigHandler()
 
 setup_umask()
 
 from livestream_dl.download_Live import setup_logging
-setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), file_options=getConfig.get_log_file_options())
+logger = setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), file_options=getConfig.get_log_file_options())
 
 def check_ytdlp_age(existing_file):    
     from time import time
@@ -41,7 +56,7 @@ def check_ytdlp_age(existing_file):
     if data and 'epoch' in data:
         current_time = time()
         if ((current_time - data['epoch']) / 3600) > 6 or ((current_time - os.path.getmtime(existing_file)) / 3600.0) > 6:
-            logging.info("JSON {0} is older than 6 hours, removing...".format(os.path.basename(existing_file)))
+            logger.info("JSON {0} is older than 6 hours, removing...".format(os.path.basename(existing_file)))
             os.remove(existing_file)
     # Return False if removed, otherwise True
             return False
@@ -76,7 +91,8 @@ def is_video_private(id):
     chat_out_path = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.live_chat.zip".format(id))
     jpg_out_path = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.jpg".format(id))
     #jpg_out_path= "{0}.jpg".format(id)
-
+    from livestream_dl.download_Live import LiveStreamDownloader
+    downloader = LiveStreamDownloader(kill_all=kill_all, logger=logger)
     try:
         additional_ytdlp_options = None
         if getConfig.get_ytdlp_options():
@@ -86,19 +102,20 @@ def is_video_private(id):
             os.makedirs(os.path.dirname(json_out_path), exist_ok=True)
             with open(json_out_path, 'w', encoding='utf-8') as json_file:
                 json.dump(info_dict, json_file, ensure_ascii=False, indent=4)   
-                logging.debug("Created {0}".format(os.path.abspath(json_out_path)))
+                logger.debug("Created {0}".format(os.path.abspath(json_out_path)))
 
             if getConfig.get_unarchived_chat_dl() and info_dict.get('live_status') == 'is_live':
                 chat_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'getChatOnly.py')
                 command = ["python", chat_script, '--output-path', chat_out_path, '--', json_out_path]
                 #Popen(command)
                 subprocess.Popen(command, start_new_session=True)
-            from livestream_dl.download_Live import download_auxiliary_files
+            
             aux_options = {
                 'write_thumbnail': True,
                 'temp_folder': getConfig.get_unarchived_temp_folder(),                
             }
-            file = download_auxiliary_files(info_dict=info_dict, options=aux_options)[0].get('thumbnail',None)
+            
+            file = downloader.download_auxiliary_files(info_dict=info_dict, options=aux_options)[0].get('thumbnail',None)
             if file is not None and not str(file.suffix).endswith("jpg"):
                 subprocess.run([
                     "ffmpeg", "-y",
@@ -107,21 +124,21 @@ def is_video_private(id):
                     "-q:v", "2",
                     jpg_out_path        # Output file
                 ], check=True)
-                logging.debug("Deleting: ".format(file.absolute()))
+                logger.debug("Deleting: ".format(file.absolute()))
                 file.unlink()
             return
     except getUrls.VideoInaccessibleError as e:        
-        logging.info("Experienced Video Inaccessible Error error while checking {0}: {1}".format(id, e))
+        logger.info("Experienced Video Inaccessible Error error while checking {0}: {1}".format(id, e))
         if os.path.exists(json_out_path):
             download_private(info_dict_file=json_out_path, thumbnail=jpg_out_path, chat=chat_out_path) 
     except getUrls.VideoProcessedError as e:
-        logging.info("({0}) {1}".format(id, e))
+        logger.info("({0}) {1}".format(id, e))
     except Exception as e:
-        logging.exception("Unexpected exception occurred: {0}\n{1}".format(e,traceback.format_exc()))
+        logger.exception("Unexpected exception occurred: {0}\n{1}".format(e,traceback.format_exc()))
         try:
             discord_web.main(info_dict.get('id'), "error", message=str("{0}\n{1}".format(e, traceback.format_exc))[-1000:])
         except Exception as e:
-            logging.exception("Unable to send discord error message")
+            logger.exception("Unable to send discord error message")
 
     #existing_file = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.info.json".format(id))
     if os.path.exists(json_out_path):
@@ -137,10 +154,10 @@ def download_private(info_dict_file, thumbnail=None, chat=None):
     with open(info_dict_file, 'r', encoding='utf-8') as file:
         # Load the JSON data from the file
         info_dict = json.load(file)
-    logging.info("Attempting to download video: {0}".format(info_dict.get('id', "")))
+    logger.info("Attempting to download video: {0}".format(info_dict.get('id', "")))
     discord_web.main(info_dict.get('id'), "recording")
     from livestream_dl import download_Live
-
+    downloader = download_Live.LiveStreamDownloader(kill_all=kill_all, logger=logger)
     # Add livechat to downloaded files dictionary so it is moved appropriately at the end
     
     options = {
@@ -172,18 +189,18 @@ def download_private(info_dict_file, thumbnail=None, chat=None):
         "log_file": getConfig.get_log_file(),
         'write_ffmpeg_command': getConfig.get_ffmpeg_command(),
     }
-    logging.info("Output path: {0}".format(options.get('output')))
+    logger.info("Output path: {0}".format(options.get('output')))
     if thumbnail and os.path.exists(thumbnail):
-        download_Live.file_names['thumbnail'] = download_Live.FileInfo(thumbnail, file_type='thumbnail')
+        downloader.file_names['thumbnail'] = downloader.FileInfo(thumbnail, file_type='thumbnail')
     if chat is not None and os.path.exists(chat):
-        download_Live.file_names.update({
-            'live_chat': download_Live.FileInfo(chat, file_type='live_chat')
+        downloader.file_names.update({
+            'live_chat': downloader.FileInfo(chat, file_type='live_chat')
         })
 
     try:
-        download_Live.download_segments(info_dict=info_dict, resolution='best', options=options)   
+        downloader.download_segments(info_dict=info_dict, resolution='best', options=options)   
     except Exception as e:
-        logging.exception(e)
+        logger.exception(e)
         import traceback
         discord_web.main(info_dict.get('id'), "error", message=str("{0}\n{1}".format(e, traceback.format_exc))[-1000:])
         return
@@ -227,6 +244,8 @@ def main(id=None):
         logging.debug("{0} already running, exiting...".format(id))
         return 0
     """
+    global logger
+    logger = setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), file_options=getConfig.get_log_file_options(), logger_name=id)
     if os.path.exists("/dev/shm"):
         lock_file_path = "/dev/shm/unarchived-{0}".format(id)
     else:
@@ -260,7 +279,7 @@ def main(id=None):
             """
             lock_file.release()
     except (IOError, BlockingIOError) as e:
-        logging.warning("Unable to aquire lock for {0}, must be already downloading: {1}".format(lock_file_path, e))
+        logger.warning("Unable to aquire lock for {0}, must be already downloading: {1}".format(lock_file_path, e))
 
     
 
@@ -279,5 +298,5 @@ if __name__ == "__main__":
         id = args.ID
         main(id=id)
     except Exception as e:
-        logging.exception("An unhandled error occurred when trying to run the unarchived stream checker")
+        logger.exception("An unhandled error occurred when trying to run the unarchived stream checker")
         raise

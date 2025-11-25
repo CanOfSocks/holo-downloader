@@ -45,7 +45,7 @@ import logging
 
 setup_umask()
 from livestream_dl.download_Live import setup_logging
-setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), file_options=getConfig.get_log_file_options())
+logger = setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), file_options=getConfig.get_log_file_options())
 
 #id = sys.argv[1]
 #id = "kJGsWORSg-4"
@@ -74,9 +74,10 @@ def downloader(id,outputTemplate, info_dict):
     discord_notify = threading.Thread(target=discord_web.main, args=(id, "recording"), daemon=True)
     discord_notify.start()    
     try:
-        download_Live.download_segments(info_dict=info_dict, resolution=getConfig.get_quality(), options=options, thread_event=kill_all)
+        downloader = download_Live.LiveStreamDownloader(kill_all=kill_all, logger=logger)
+        downloader.download_segments(info_dict=info_dict, resolution=getConfig.get_quality(), options=options)
     except Exception as e:
-        logging.exception("Error occured {0}".format(id))
+        logger.exception("Error occured {0}".format(id))
         #discord_web.main(id, "error", message=str(e)[-500:])
         sleep(1.0)
         raise Exception(("{2} - Error downloading video: {0}, Code: {1}".format(id, e, asctime())))
@@ -119,8 +120,8 @@ def download_video_info(video_url):
         #info_dict = ydl.sanitize_info(info_dict)
         outputFile = str(ydl.prepare_filename(info_dict))
             
-    logging.debug("({0}) Info.json: {1}".format(video_url, json.dumps(info_dict)))
-    logging.info("Output file: {0}".format(outputFile))
+    logger.debug("({0}) Info.json: {1}".format(video_url, json.dumps(info_dict)))
+    logger.info("Output file: {0}".format(outputFile))
     return outputFile, info_dict
 """
 def is_script_running(script_name, id):
@@ -148,6 +149,8 @@ def main(id=None):
     # If ID is none, raise exception
     if id is None:
         raise ValueError("No video ID provided, unable to continue")
+    global logger
+    logger = setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), file_options=getConfig.get_log_file_options(), logger_name=id)
     
     if os.path.exists("/dev/shm/"):
         lock_file_path = "/dev/shm/videoDL-{0}".format(id)
@@ -181,7 +184,7 @@ def main(id=None):
             discord_web.main(id, "waiting")
             try:
                 outputFile, info_dict = download_video_info(id)
-                logging.debug("Output file: {0}".format(outputFile))
+                logger.debug("Output file: {0}".format(outputFile))
                 if outputFile is None:
                     raise LookupError(("Unable to retrieve information about video {0}".format(id)))
                 
@@ -194,11 +197,11 @@ def main(id=None):
                 """
             except Exception as e:
                 discord_web.main(id, "error", message=f"{type(e).__name__}: {str(e)}"[-500:])
-                logging.exception("Error downloading video")
+                logger.exception("Error downloading video")
 
             lock_file.release()
     except (IOError, BlockingIOError) as e:
-        logging.info("Unable to aquire lock for {0}, must be already downloading: {1}".format(lock_file_path, e))
+        logger.info("Unable to aquire lock for {0}, must be already downloading: {1}".format(lock_file_path, e))
     
     """
     if is_script_running(script_name, id):
@@ -222,5 +225,5 @@ if __name__ == "__main__":
         id = args.ID
         main(id=id)
     except Exception as e:
-        logging.exception("An unhandled error occurred when attempting to download a video")
+        logger.exception("An unhandled error occurred when attempting to download a video")
         raise

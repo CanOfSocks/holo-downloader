@@ -1,4 +1,4 @@
-from livestream_dl.download_Live import download_live_chat
+from livestream_dl.download_Live import LiveStreamDownloader
 import common
 from getConfig import ConfigHandler
 import json
@@ -6,21 +6,37 @@ import argparse
 import os
 import logging
 
+import threading
+import signal
+from time import sleep
+
+kill_all = threading.Event()
+
+# Preserve original keyboard interrupt logic as true behaviour is known
+original_sigint = signal.getsignal(signal.SIGINT)
+
+def handle_shutdown(signum, frame):
+    kill_all.set()
+    sleep(0.5)
+    if callable(original_sigint):
+        original_sigint(signum, frame)
+
 getConfig = ConfigHandler()
 
 common.setup_umask()
 from livestream_dl.download_Live import setup_logging
-setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), file_options=getConfig.get_log_file_options())
+logger = setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), file_options=getConfig.get_log_file_options())
     
 
 def main(json_file, output_path=None):
-    
+    global logger
+    logger = setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), file_options=getConfig.get_log_file_options(),logger_name=info_dict.get('id'))
     try:
         with open(json_file, 'r', encoding='utf-8') as file:
             # Load the JSON data from the file
             info_dict = json.load(file)
     except Exception as e:
-        logging.exception(e)
+        logger.exception(e)
         return
     
     options = {
@@ -56,8 +72,8 @@ def main(json_file, output_path=None):
         with common.FileLock(lock_file_path) as lock_file:
         
             lock_file.acquire()
-        
-            result = download_live_chat(info_dict=info_dict, options=options)
+            downloader = LiveStreamDownloader(kill_all=kill_all, logger=logger)
+            result = downloader.download_live_chat(info_dict=info_dict, options=options)
             """
             if result is not None and isinstance(result, tuple):
                 out_folder = os.path.dirname(options.get("output"))
@@ -67,7 +83,7 @@ def main(json_file, output_path=None):
             lock_file.release()
             return result
     except (IOError, BlockingIOError) as e:
-        logging.info("Unable to aquire lock for {0}, must be already downloading: {1}".format(lock_file_path, e))
+        logger.info("Unable to aquire lock for {0}, must be already downloading: {1}".format(lock_file_path, e))
     return None
     
 
@@ -90,4 +106,4 @@ if __name__ == "__main__":
 
         main(json_file=json_file, output_path=output_path)
     except Exception as e:
-        logging.exception("An unhandled error occurred when trying to download chat")
+        logger.exception("An unhandled error occurred when trying to download chat")
