@@ -107,7 +107,7 @@ def main(id: str, status: str, message: Optional[str] = None, config: ConfigHand
         config = ConfigHandler()
 
     if logger is None:
-        initialize_logging(app_config, "discord")
+        initialize_logging(config, "discord")
 
     webhook_url = config.get_discord_webhook()
     
