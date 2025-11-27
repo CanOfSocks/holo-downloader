@@ -4,56 +4,97 @@ import common
 import time
 from getConfig import ConfigHandler
 import logging
+from typing import Optional, Dict, List, Any
+from common import initialize_logging
 
-getConfig = ConfigHandler()
-from livestream_dl.download_Live import setup_logging
-setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), file_options=getConfig.get_log_file_options())
-
-
-def getVideos(channel_ids_to_match, command=None, unarchived = False, frequency=None):
+def getVideos(channel_ids_to_match: Dict[str, str], command: Optional[str] = None, unarchived: bool = False, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging.Logger = None) -> None:
+    """
+    Fetches streams for the given channels and executes a command on them.
     
-    all_lives = []
+    :param channel_ids_to_match: Dictionary of channel names to channel IDs.
+    :param command: Command to execute ('spawn', 'bash', 'print').
+    :param unarchived: Flag to include unarchived videos.
+    :param frequency: Optional CRON frequency string.
+    :param config: The ConfigHandler object, defaults to a new instance if None.
+    :param logger: The logger instance to use, defaults to a new instance if None.
+    """
+    # 1. Ensure config and logger objects are available
+    if config is None:
+        config = ConfigHandler()
+    if logger is None:
+        logger = initialize_logging(config, logger_name="getVideos")
+
+    all_lives: List[str] = []
+    
     for channel in channel_ids_to_match:
         try:
-            logging.debug("Looking for: {0}".format(channel))
-            lives = common.get_upcoming_or_live_videos(channel_ids_to_match[channel], "streams")
-            all_lives += lives
+            logger.debug("Looking for: {0}".format(channel))
+            # Assuming common.get_upcoming_or_live_videos is updated to accept config
+            lives = common.get_upcoming_or_live_videos(channel_ids_to_match[channel], config, tab="streams")
+            all_lives.extend(lives)
         except Exception as e:
-            logging.exception(("Error fetching streams for {0}. Check cookies. \n{1}".format(channel,e)))
+            logger.exception("Error fetching streams for {0}. Check cookies.".format(channel))
+            
     if unarchived:
-        all_lives = common.combine_unarchived(all_lives)
+        # Assuming common.combine_unarchived is updated to accept config
+        all_lives = common.combine_unarchived(all_lives, config)
 
-    common.vid_executor(streams=all_lives, command=command, frequency=frequency, unarchived=unarchived)
-       
-def main(command=None, unarchived = False, frequency=None):
+    # Pass the config object and other arguments to the executor
+    common.vid_executor(streams=all_lives, command=command, config=config, frequency=frequency, unarchived=unarchived)
+        
+def main(command: Optional[str] = None, unarchived: bool = False, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging.Logger = None) -> None:
+    """
+    Main execution logic to determine which channel list to use and start fetching videos.
+    
+    :param command: The command to execute on the fetched video IDs.
+    :param unarchived: Flag to indicate if unarchived videos should be included.
+    :param frequency: The CRON frequency string.
+    :param config: The ConfigHandler object, defaults to a new instance if None.
+    :param logger: The logger instance to use, defaults to a new instance if None.
+    """
+    # 1. Ensure config and logger objects are available
+    if config is None:
+        config = ConfigHandler()
+    if logger is None:
+        logger = initialize_logging(config, logger_name="main_ytdlp")
+        
     if unarchived:
-        channel_ids_to_match = getConfig.unarchived_channel_ids_to_match
+        channel_ids_to_match = config.unarchived_channel_ids_to_match
     else:
-        channel_ids_to_match = getConfig.channel_ids_to_match
+        channel_ids_to_match = config.channel_ids_to_match
+        
     if channel_ids_to_match:
-        if getConfig.randomise_lists() is True:
+        if config.randomise_lists() is True:
             channel_ids_to_match = common.random_sample(channel_ids_to_match)
-        getVideos(channel_ids_to_match, command, unarchived, frequency=frequency)
+            
+        # Pass the config and logger objects down
+        getVideos(channel_ids_to_match, command, unarchived, frequency=frequency, config=config, logger=logger)
 
     
 if __name__ == "__main__":
     try:
+        # 1. Instantiate ConfigHandler once
+        app_config = ConfigHandler()
+
+        # 2. Initialize the logger for the main execution block
+        main_logger = initialize_logging(app_config, logger_name="getYTDLP")
+    
+    
         # Create the parser
         parser = argparse.ArgumentParser(description="Process command and an optional unarchived flag.")
 
-        # Add an optional named argument '--command' (default to None if not provided)
+        # Add arguments
         parser.add_argument('--command', type=str, choices=['spawn', 'bash', 'print'], default=None, help='The command (optional, default: None)')
-
-        # Add an optional flag '--unarchived' (set to True if provided, otherwise False)
         parser.add_argument('--unarchived', action='store_true', help='Flag to indicate unarchived (default: False)')
+        parser.add_argument('--frequency', type=str, default=None, help='The cron schedule (optional, default: None)')
 
         # Parse the arguments
         args = parser.parse_args()
-        # Access the arguments
-        command = args.command
-        unarchived = args.unarchived
         
-        main(command=command, unarchived=unarchived)
+        # Call main, passing the config object and the logger
+        main(command=args.command, unarchived=args.unarchived, frequency=args.frequency, config=app_config, logger=main_logger)
+        
     except Exception as e:
-        logging.exception("An unexpected error occurred when attempting to fetch videos via yt-dlp")
+        # Use the initialized logger for final error handling
+        main_logger.exception("An unexpected error occurred when attempting to fetch videos via yt-dlp")
         raise

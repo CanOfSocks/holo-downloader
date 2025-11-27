@@ -5,105 +5,89 @@ import json
 import argparse
 import os
 import logging
-
 import threading
 import signal
 from time import sleep
+from typing import Optional, Any
+from common import initialize_logging, kill_all
 
-kill_all = threading.Event()
 
-# Preserve original keyboard interrupt logic as true behaviour is known
-original_sigint = signal.getsignal(signal.SIGINT)
+def main(json_file: str, output_path: Optional[str] = None, config: ConfigHandler = None, logger: logging = None):
 
-def handle_shutdown(signum, frame):
-    kill_all.set()
-    sleep(0.5)
-    if callable(original_sigint):
-        original_sigint(signum, frame)
 
-getConfig = ConfigHandler()
+    # Instantiate ConfigHandler if it's not provided
+    if config is None:
+        config = ConfigHandler()
 
-common.setup_umask()
-from livestream_dl.download_Live import setup_logging
-logger = setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), file_options=getConfig.get_log_file_options())
-    
+    if logger is None:
+        logger = initialize_logging(config, logger_name="chat_downloader")
 
-def main(json_file, output_path=None):
-    global logger
-    logger = setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), file_options=getConfig.get_log_file_options(),logger_name=info_dict.get('id'))
+    common.setup_umask()
+
+    info_dict: dict
+
+    # Load info_dict and initialize logger specific to the video ID
     try:
         with open(json_file, 'r', encoding='utf-8') as file:
-            # Load the JSON data from the file
             info_dict = json.load(file)
     except Exception as e:
+        # Initialize a basic logger if file reading fails before ID is known
+        
         logger.exception(e)
         return
     
+    # Initialize logger using video ID
+    logger = initialize_logging(config, logger_name="{0}-chat".format(info_dict.get('id'))) 
+
     options = {
         "ID": info_dict.get('id'),
-        "output": output_path if output_path is not None else str(getConfig.get_unarchived_output_path(getConfig.get_ytdlp())),
-        "temp_folder": getConfig.get_unarchived_temp_folder(),
-        "cookies": getConfig.get_cookies_file(),
-        "log_level": getConfig.get_log_level(),
-        #"log_level": "DEBUG",
-        "log_file": getConfig.get_log_file(),
+        "output": output_path if output_path is not None else str(config.get_unarchived_output_path(config.get_ytdlp())),
+        "temp_folder": config.get_unarchived_temp_folder(),
+        "cookies": config.get_cookies_file(),
+        "log_level": config.get_log_level(),
+        "log_file": config.get_log_file(),
     }
+    
     if os.path.exists("/dev/shm"):
         lock_file_path = "/dev/shm/chat-{0}".format(options.get("ID"))
     else:
         lock_file_path = os.path.join(options.get("temp_folder"), "chat-{0}.lockfile".format(options.get("ID")))
-    '''
-    lock = common.FileLock(lock_file_path)
-
-    try:
-        lock.acquire()
-        result = download_live_chat(info_dict=info_dict, options=options)
-        return result
-    except (IOError, BlockingIOError):
-        logging.info("Unable to acquire lock for {0}, must be already downloading".format(lock_file_path))
-        return None
-    finally:
-        try:
-            lock.release()
-        except Exception:
-            pass
-    '''
+    
     try:
         with common.FileLock(lock_file_path) as lock_file:
-        
             lock_file.acquire()
+            
+            # The LiveStreamDownloader gets the unique logger instance
             downloader = LiveStreamDownloader(kill_all=kill_all, logger=logger)
-            result = downloader.download_live_chat(info_dict=info_dict, options=options)
-            """
-            if result is not None and isinstance(result, tuple):
-                out_folder = os.path.dirname(options.get("output"))
-                os.makedirs(out_folder)
-                shutil.move(result[0], out_folder)
-            """
+            
+            result: Any = downloader.download_live_chat(info_dict=info_dict, options=options)
             lock_file.release()
             return result
+            
     except (IOError, BlockingIOError) as e:
-        logger.info("Unable to aquire lock for {0}, must be already downloading: {1}".format(lock_file_path, e))
+        logger.info("Unable to acquire lock for {0}, must be already downloading: {1}".format(lock_file_path, e))
+        
     return None
     
 
 if __name__ == "__main__":
     try:
+        # Instantiate ConfigHandler once for the execution flow
+        app_config = ConfigHandler()
+
+        # Set up a generic logger for argparse error handling
+        logger = initialize_logging(app_config, logger_name="chat_downloader")
+    
+    
         # Create the parser
         parser = argparse.ArgumentParser(description="Download chat of a video using info.json")
-
-        # Add a required positional argument 'ID'
         parser.add_argument('json', type=str, help='info.json path (required)')
-
         parser.add_argument('--output-path', type=str, default=None, help='Optional output path')
-
-        # Parse the arguments
         args = parser.parse_args()
 
-        # Access the values
-        json_file = args.json
-        output_path = args.output_path
-
-        main(json_file=json_file, output_path=output_path)
+        # Call main, passing the config object
+        main(json_file=args.json, output_path=args.output_path, config=app_config, logger=logger)
+        
     except Exception as e:
-        logger.exception("An unhandled error occurred when trying to download chat")
+        # Use the logger initialized above for final error logging
+        logging.exception("An unhandled error occurred when trying to download chat")

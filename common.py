@@ -1,7 +1,5 @@
 from subprocess import Popen 
-#from config import title_filter,description_filter
 from yt_dlp import YoutubeDL
-#import getConfig
 from getConfig import ConfigHandler
 from datetime import datetime, timedelta, timezone    
 import os
@@ -10,13 +8,57 @@ import re
 import random
 import logging
 import json
+from typing import List, Dict, Any, Optional, Union
 
-getConfig = ConfigHandler()
+import signal
+
+import threading
+
+kill_all = threading.Event()
+
+original_sigint = signal.getsignal(signal.SIGINT)
+
+def handle_shutdown(signum, frame):
+    """Signal handler to set the kill_all event."""
+    kill_all.set()
+    sleep(0.5)
+    if callable(original_sigint):
+        original_sigint(signum, frame)
+
+# common
+signal.signal(signal.SIGINT, handle_shutdown)
+
+from platform import system
+if system() == "Windows":
+    # SIGTERM won’t fire — but SIGBREAK will on Ctrl-Break
+    signal.signal(signal.SIGBREAK, handle_shutdown)
+else:
+    # normal POSIX termination
+    signal.signal(signal.SIGTERM, handle_shutdown)
+
 from livestream_dl.download_Live import setup_logging
-setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), file_options=getConfig.get_log_file_options())
 
-def vid_executor(streams, command, unarchived = False, frequency = None):    
-    if getConfig.randomise_lists() is True:
+def initialize_logging(config: ConfigHandler = None, logger_name = None, force = False):
+    if config is None:
+        config = ConfigHandler()
+        
+    logger = setup_logging(
+        log_level=config.get_log_level(), 
+        console=True, 
+        file=config.get_log_file(), 
+        file_options=config.get_log_file_options(),
+        logger_name=logger_name,
+        force=force
+    )
+    return logger
+
+initialize_logging()
+
+def vid_executor(streams: List[str], command: str, config: ConfigHandler = None, unarchived: bool = False, frequency: str = None):    
+    if config is None:
+        config = ConfigHandler()
+
+    if config.randomise_lists() is True:
         streams = random_sample(streams)
     
     if(command == "spawn"):
@@ -27,19 +69,17 @@ def vid_executor(streams, command, unarchived = False, frequency = None):
         
         if frequency:
             frequency_sec = cron_frequency(frequency)
-            sleep_time = frequency_sec/(max(len(streams) + 1),2)
-            
+            sleep_time = frequency_sec / max(len(streams) + 1, 2)
         else:
             sleep_time = 60
         
         for i, live in enumerate(streams):
-            command = ["python", download_script, '--', live]
-            #Popen(command)
-            logging.debug("Executing: {0}".format(' '.join(command)))
-            Popen(command, start_new_session=True)
+            cmd_args = ["python", download_script, '--', live]
+            logging.debug("Executing: {0}".format(' '.join(cmd_args)))
+            Popen(cmd_args, start_new_session=True)
             if i < len(streams) - 1:
                 logging.debug("Sleeping for {0}".format(sleep_time))
-                sleep(random.uniform(max(sleep_time/2, 1.0),max(sleep_time * 1.25, 1.0)))
+                sleep(random.uniform(max(sleep_time/2, 1.0), max(sleep_time * 1.25, 1.0)))
         return    
         
     elif(command == "bash"):
@@ -50,14 +90,16 @@ def vid_executor(streams, command, unarchived = False, frequency = None):
         logging.info(streams)
         return streams
     
-def titleFilter(live,channel_id):
-    titFilter = getConfig.get_title_filter().get(channel_id, None)
+def titleFilter(live: Dict[str, Any], channel_id: str, config: ConfigHandler = None) -> Optional[bool]:
+    if config is None:
+        config = ConfigHandler()
+
+    titFilter = config.get_title_filter().get(channel_id, None)
     if titFilter is None:
         return None
     
-    #Return the result of the regex, if the search fails (such as a syntax error), disregard filter
     try:
-        search = re.search(titFilter,live.get('title'))
+        search = re.search(titFilter, live.get('title'))
         if(search):
             return True
         else:
@@ -66,11 +108,14 @@ def titleFilter(live,channel_id):
         logging.error("Filter failed")
         return None
     
-def descriptionFilter(live,channel_id):
-    descFilter = getConfig.get_desc_filter().get(channel_id, None)    
-    #If filter not present, return None
+def descriptionFilter(live: Dict[str, Any], channel_id: str, config: ConfigHandler = None) -> Optional[bool]:
+    if config is None:
+        config = ConfigHandler()
+
+    descFilter = config.get_desc_filter().get(channel_id, None)    
     if descFilter is None:
         return None
+    
     desc = live.get('description', None)
     if desc is None:
         ydl_opts = {
@@ -79,9 +124,7 @@ def descriptionFilter(live,channel_id):
             'sleep_interval': 1,
             'sleep_interval_requests': 1,
             'no_warnings': True,
-            'cookiefile': getConfig.get_cookies_file(),
-            #'verbose': True
-            #'match_filter': filters
+            'cookiefile': config.get_cookies_file(),
         }
         
         with YoutubeDL(ydl_opts) as ydl:
@@ -90,12 +133,8 @@ def descriptionFilter(live,channel_id):
             logging.debug(info)
             desc = info.get('description')
     
-    #if not desc:
-    #    return None
-
-    #Return the result of the regex, if the search fails (such as a syntax error), disregard filter
     try:
-        if re.search(descFilter,desc):
+        if re.search(descFilter, desc):
             return True
         else:
             return False
@@ -103,9 +142,13 @@ def descriptionFilter(live,channel_id):
         return None
     
 
-def filtering(live,channel_id):
-    title = titleFilter(live,channel_id)
-    description = descriptionFilter(live,channel_id)
+def filtering(live: Dict[str, Any], channel_id: str, config: ConfigHandler = None) -> bool:
+    if config is None:
+        config = ConfigHandler()
+
+    # We pass the valid 'config' instance down so sub-functions don't need to re-instantiate it
+    title = titleFilter(live, channel_id, config)
+    description = descriptionFilter(live, channel_id, config)
     
     if(title or description):
         return True
@@ -114,9 +157,11 @@ def filtering(live,channel_id):
     else:
         return False
        
-def withinFuture(releaseTime=None):
-    #Assume true if value missing
-    lookahead = getConfig.get_look_ahead()
+def withinFuture(config: ConfigHandler = None, releaseTime: Optional[int] = None) -> bool:
+    if config is None:
+        config = ConfigHandler()
+
+    lookahead = config.get_look_ahead()
     if(not releaseTime or not lookahead):
         return True
     release = datetime.fromtimestamp(releaseTime, timezone.utc)    
@@ -126,15 +171,16 @@ def withinFuture(releaseTime=None):
     else:
         return False
     
-def getAvailability(live):
+def getAvailability(live: Any, config: ConfigHandler = None):
+    if config is None:
+        config = ConfigHandler()
+
     if live.availability is None:        
-        from yt_dlp import YoutubeDL
         options = {
-            "cookiefile": getConfig.get_cookies_file(),
+            "cookiefile": config.get_cookies_file(),
             "quiet": True
         }
         with YoutubeDL(options) as ydl: 
-            #If unable to get availability (such as broken cookies or not a member), then keep as none
             try:
                 info_dict = ydl.extract_info("https://youtu.be/{0}".format(live.id), download=False)
                 live.description = info_dict.get('description', None)
@@ -143,19 +189,17 @@ def getAvailability(live):
                 pass
     return live.availability
 
-def get_upcoming_or_live_videos(channel_id, tab=None):
-    #channel_id = str(channel_id)
+def get_upcoming_or_live_videos(channel_id: str, config: ConfigHandler = None, tab: str = None) -> List[str]:
+    if config is None:
+        config = ConfigHandler()
+
     ydl_opts = {
         'quiet': True,
         'extract_flat': True,
-        #'force_generic_extractor': True,
         'sleep_interval': 1,
         'sleep_interval_requests': 1,
         'no_warnings': True,
-        'cookiefile': getConfig.get_cookies_file(),
-        #'playlist_items': '1:10',
-        #'verbose': True
-        #'match_filter': filters
+        'cookiefile': config.get_cookies_file(),
     }
     try:
         with YoutubeDL(ydl_opts) as ydl:
@@ -180,24 +224,32 @@ def get_upcoming_or_live_videos(channel_id, tab=None):
             else:
                 url = "https://www.youtube.com/channel/{0}/{1}".format(channel_id, tab)
                 ydl_opts.update({'playlist_items': '1:10'})
+            
             info = ydl.extract_info(url, download=False)
             logging.debug(json.dumps(info))
             upcoming_or_live_videos = []
+            
             for video in info['entries']:
-                if (video.get('live_status') == 'is_live' or video.get('live_status') == 'post_live' or (video.get('live_status') == 'is_upcoming' and withinFuture(video.get('release_timestamp', None)))) and filtering(video,video.get('channel_id')):
+                # Config is passed explicitly here
+                is_future = withinFuture(config, video.get('release_timestamp', None))
+                passes_filter = filtering(video, video.get('channel_id'), config)
+
+                if (video.get('live_status') == 'is_live' or video.get('live_status') == 'post_live' or (video.get('live_status') == 'is_upcoming' and is_future)) and passes_filter:
                     logging.debug("({1}) live_status = {0}".format(video.get('live_status'),video.get('id')))
                     logging.debug(json.dumps(video))
                     upcoming_or_live_videos.append(video.get('id'))
-
 
             return list(set(upcoming_or_live_videos))
     except Exception as e:
         logging.exception("An unexpected error occurred when trying to fetch videos")
         raise
     
-def combine_unarchived(ids):
+def combine_unarchived(ids: List[str], config: ConfigHandler = None) -> List[str]:
+    if config is None:
+        config = ConfigHandler()
+
     yta_pattern = r"^([0-9A-Za-z_-]{10}[048AEIMQUYcgkosw])\.info\.json$"
-    directory = getConfig.get_unarchived_temp_folder()
+    directory = config.get_unarchived_temp_folder()
     if not os.path.exists(directory):
         os.makedirs(directory, exist_ok=True)
     files = [
@@ -216,45 +268,33 @@ def combine_unarchived(ids):
     
     return list(id_set)
 
-def cron_frequency(cron_expr):
+def cron_frequency(cron_expr: str) -> float:
     from croniter import croniter
     now = datetime.now()
     cron = croniter(cron_expr, now)
-    
-    # Get the next two execution times
     next_time = cron.get_next(datetime)
     next_time_after = cron.get_next(datetime)
-    
-    # Calculate the interval in seconds
     interval_seconds = (next_time_after - next_time).total_seconds()
-    
     return interval_seconds
 
-def replace_ip_in_json(file_name):
+def replace_ip_in_json(file_name: str):
     pattern = re.compile(r'((?:[0-9]{1,3}\.){3}[0-9]{1,3})|((?:[a-f0-9]{1,4}:){7}[a-f0-9]{1,4})')
-
     with open(file_name, 'r', encoding="utf8") as file:
         content = file.read()
-
     modified_content = re.sub(pattern, '0.0.0.0', content)
-
     with open(file_name, 'w', encoding="utf8") as file:
         file.write(modified_content)
         
-def random_sample(data, k=None):
-    """Returns a random sample of size k from a list, tuple, or dictionary."""
+def random_sample(data: Union[List, tuple, Dict], k: int = None) -> Union[List, tuple, Dict]:
     if k is None:
         k = len(data)
     if isinstance(data, list):
-        return random.sample(data, k)  # Returns a list
-    
+        return random.sample(data, k)
     elif isinstance(data, tuple):
-        return tuple(random.sample(data, k))  # Returns a tuple
-    
+        return tuple(random.sample(data, k))
     elif isinstance(data, dict):
-        sampled_items = dict(random.sample(list(data.items()), k))  # Returns a dictionary
+        sampled_items = dict(random.sample(list(data.items()), k))
         return sampled_items
-    
     else:
         raise TypeError("Unsupported data type. Only lists, tuples, and dictionaries are allowed.")
     

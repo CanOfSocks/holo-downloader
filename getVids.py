@@ -1,47 +1,66 @@
 #!/usr/local/bin/python
 from getConfig import ConfigHandler
+from common import initialize_logging
 import argparse
 import logging
+from typing import Optional
 
-getConfig = ConfigHandler()
 
-from livestream_dl.download_Live import setup_logging
-setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), force=True, file_options=getConfig.get_log_file_options())
-
-def main(command=None, unarchived=False, frequency=None):
+def main(command: Optional[str] = None, unarchived: bool = False, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging = None):
+    """
+    Main entry point to determine which video fetching method to use.
     
-        method = getConfig.get_fetch_method()
-        if(method == "ytdlp"):
-            import getYTDLP
-            getYTDLP.main(command,unarchived=unarchived,frequency=frequency)
-        elif(method == "json"):
-            import getJson
-            getJson.main(command,unarchived=unarchived,frequency=frequency)
-        else:
-            logging.error("Invalid method: {0}".format(method))
+    :param command: The command to execute on the fetched video IDs.
+    :param unarchived: Flag to indicate if unarchived videos should be included.
+    :param frequency: The CRON frequency string.
+    :param config: The ConfigHandler object, defaults to a new instance if None.
+    """
+    # Instantiate ConfigHandler if it's not provided
+    if config is None:
+        config = ConfigHandler()
+
+    if logger is None:
+        logger = initialize_logging(config, "getVids")
+
+    method = config.get_fetch_method()
+    
+    if(method == "ytdlp"):
+        import getYTDLP
+        # Assuming getYTDLP.main is updated to accept config as its final argument
+        getYTDLP.main(command, unarchived=unarchived, frequency=frequency, config=config)
+    elif(method == "json"):
+        import getJson
+        # Assuming getJson.main is updated to accept config as its final argument
+        getJson.main(command, unarchived=unarchived, frequency=frequency, config=config)
+    else:
+        # Use a standard logger if main is called without prior initialization
+        logger.error("Invalid fetch method: {0}".format(method))
     
 
 if __name__ == "__main__":
     try:
+        # 1. Instantiate ConfigHandler once for the execution flow
+        app_config = ConfigHandler()
+
+        # 2. Initialize logging using the instance
+        logger = initialize_logging(app_config, "getVids") 
+    
+    
         # Create the parser
         parser = argparse.ArgumentParser(description="Process command and an optional unarchived flag.")
 
-        # Add an optional named argument '--command' (default to None if not provided)
+        # Add arguments
         parser.add_argument('--command', type=str, choices=['spawn', 'bash', 'print'], default=None, help='The command (optional, default: None)')
-
-        # Add an optional flag '--unarchived' (set to True if provided, otherwise False)
         parser.add_argument('--unarchived', action='store_true', help='Flag to indicate unarchived (default: False)')
-        
         parser.add_argument('--frequency', type=str, default=None, help='The cron schedule (optional, default: None)')
 
         # Parse the arguments
         args = parser.parse_args()
-        # Access the arguments
-        command = args.command
-        unarchived = args.unarchived
         
-        main(command=command, unarchived=unarchived)
+        # Call main, passing the config object
+        main(command=args.command, unarchived=args.unarchived, frequency=args.frequency, config=app_config)
 
     except Exception as e:
+        # The initialized logger is now used for the final error logging
         logging.exception("An unhandled error occurred while attempting to fetch videos")
         raise

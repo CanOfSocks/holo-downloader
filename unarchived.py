@@ -1,195 +1,103 @@
 #!/usr/local/bin/python
-#import yt_dlp
 import os
 import json
 from getConfig import ConfigHandler
-#import requests
-#import base64
 import subprocess
 import argparse
-#from yt_dlp.utils import DownloadError
-
-#import psutil
-#import sys
 from shutil import move
 import discord_web
 from json import load
-
-from common import FileLock, setup_umask
-
+from common import FileLock, setup_umask, initialize_logging, kill_all
 import traceback
-
 from livestream_dl import getUrls
 import logging
-
 import threading
 import signal
 from time import sleep
+from typing import Optional, Dict, Any, Tuple
+from pathlib import Path
 
-kill_all = threading.Event()
+# --- Utility Functions ---
 
-# Preserve original keyboard interrupt logic as true behaviour is known
-original_sigint = signal.getsignal(signal.SIGINT)
+def check_ytdlp_age(existing_file: str, config: ConfigHandler = None, logger: logging.Logger = None) -> bool:
+    """Checks if a JSON info file is older than 6 hours and removes it if so."""
+    if config is None:
+        config = ConfigHandler()
+    if logger is None:
+        logger = initialize_logging(config, logger_name="checker")
 
-def handle_shutdown(signum, frame):
-    kill_all.set()
-    sleep(0.5)
-    if callable(original_sigint):
-        original_sigint(signum, frame)
-
-getConfig = ConfigHandler()
-
-setup_umask()
-
-from livestream_dl.download_Live import setup_logging
-logger = setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), file_options=getConfig.get_log_file_options())
-
-def check_ytdlp_age(existing_file):    
     from time import time
     current_time = time()
-    # Open the file
-    data = None
+    data: Optional[Dict[str, Any]] = None
+    
     if os.path.exists(existing_file):
-        with open(existing_file, 'r', encoding='utf-8') as file:
-            # Load the JSON data from the file
-            data = json.load(file)
+        try:
+            with open(existing_file, 'r', encoding='utf-8') as file:
+                data = json.load(file)
+        except Exception:
+            # If JSON is corrupt, treat it as old
+            data = None 
+            
+    file_age_hours = (current_time - os.path.getmtime(existing_file)) / 3600.0
+    
+    # Check 1: Age using 'epoch' key (if present) or file modification time
     if data and 'epoch' in data:
-        current_time = time()
-        if ((current_time - data['epoch']) / 3600) > 6 or ((current_time - os.path.getmtime(existing_file)) / 3600.0) > 6:
+        data_age_hours = (current_time - data['epoch']) / 3600
+        if data_age_hours > 6 or file_age_hours > 6:
             logger.info("JSON {0} is older than 6 hours, removing...".format(os.path.basename(existing_file)))
             os.remove(existing_file)
-    # Return False if removed, otherwise True
             return False
-    elif ((current_time - os.path.getmtime(existing_file)) / 3600.0) > 6:
+    elif file_age_hours > 6:
+        # Check 2: Only using file modification time
+        logger.info("JSON {0} is older than 6 hours (mod time), removing...".format(os.path.basename(existing_file)))
         os.remove(existing_file)
         return False
-    return True
-"""
-def check_yta_raw_age(existing_file):   
-    from time import time
-    current_time = time()
-    data = None
-    if os.path.exists(existing_file):
-        with open(existing_file, 'r', encoding='utf-8') as file:
-            # Load the JSON data from the file
-            data = json.load(file)
-    if data and 'createTime' in data:
-        current_time = time()
-        from datetime import datetime
-        if ((current_time - datetime.fromisoformat(data['createTime']).timestamp()) / 3600) > 6 or (current_time - os.path.getmtime(existing_file) / 3600) > 6:
-            logging.info("JSON {0} ({1}) is older than 6 hours, removing...".format(os.path.basename(existing_file), existing_file))
-            os.remove(existing_file)
-    # Return False if removed, otherwise True
-            return False
-    elif (current_time - os.path.getmtime(existing_file) / 3600) > 6:
-        os.remove(existing_file)
-        return False
-    return True            
-"""
-def is_video_private(id):
-    json_out_path = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.info.json".format(id))
-    chat_out_path = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.live_chat.zip".format(id))
-    jpg_out_path = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.jpg".format(id))
-    #jpg_out_path= "{0}.jpg".format(id)
-    from livestream_dl.download_Live import LiveStreamDownloader
-    downloader = LiveStreamDownloader(kill_all=kill_all, logger=logger)
-    try:
-        additional_ytdlp_options = None
-        if getConfig.get_ytdlp_options():
-            additional_ytdlp_options = json.loads(getConfig.get_ytdlp_options())
-        info_dict, live_status = getUrls.get_Video_Info(id=id,  wait=(5, 1800), cookies=getConfig.get_cookies_file(), proxy=getConfig.get_proxy(), additional_options=additional_ytdlp_options)
-        if info_dict.get('live_status') == 'is_live' or info_dict.get('live_status') == 'post_live':
-            os.makedirs(os.path.dirname(json_out_path), exist_ok=True)
-            with open(json_out_path, 'w', encoding='utf-8') as json_file:
-                json.dump(info_dict, json_file, ensure_ascii=False, indent=4)   
-                logger.debug("Created {0}".format(os.path.abspath(json_out_path)))
-
-            if getConfig.get_unarchived_chat_dl() and info_dict.get('live_status') == 'is_live':
-                chat_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'getChatOnly.py')
-                command = ["python", chat_script, '--output-path', chat_out_path, '--', json_out_path]
-                #Popen(command)
-                subprocess.Popen(command, start_new_session=True)
-            
-            aux_options = {
-                'write_thumbnail': True,
-                'temp_folder': getConfig.get_unarchived_temp_folder(),                
-            }
-            
-            file = downloader.download_auxiliary_files(info_dict=info_dict, options=aux_options)[0].get('thumbnail',None)
-            if file is not None and not str(file.suffix).endswith("jpg"):
-                subprocess.run([
-                    "ffmpeg", "-y",
-                    '-hide_banner', '-nostdin', '-loglevel', 'error',
-                    "-i", file.absolute(),  # Input file
-                    "-q:v", "2",
-                    jpg_out_path        # Output file
-                ], check=True)
-                logger.debug("Deleting: ".format(file.absolute()))
-                file.unlink()
-            return
-    except getUrls.VideoInaccessibleError as e:        
-        logger.info("Experienced Video Inaccessible Error error while checking {0}: {1}".format(id, e))
-        if os.path.exists(json_out_path):
-            download_private(info_dict_file=json_out_path, thumbnail=jpg_out_path, chat=chat_out_path) 
-    except getUrls.VideoProcessedError as e:
-        logger.info("({0}) {1}".format(id, e))
-    except Exception as e:
-        logger.exception("Unexpected exception occurred: {0}\n{1}".format(e,traceback.format_exc()))
-        try:
-            discord_web.main(info_dict.get('id'), "error", message=str("{0}\n{1}".format(e, traceback.format_exc))[-1000:])
-        except Exception as e:
-            logger.exception("Unable to send discord error message")
-
-    #existing_file = os.path.join(getConfig.get_unarchived_temp_folder(),"{0}.info.json".format(id))
-    if os.path.exists(json_out_path):
-        # If removed (returns false), the also remove thumbnail if it exists
-        if not check_ytdlp_age(json_out_path):
-            if os.path.exists(jpg_out_path):
-                os.remove(jpg_out_path)
-            if os.path.exists(chat_out_path):
-                os.remove(chat_out_path)
-            
         
-def download_private(info_dict_file, thumbnail=None, chat=None):
+    return True
+
+def download_private(info_dict_file: str, thumbnail: Optional[str] = None, chat: Optional[str] = None, config: ConfigHandler = None, logger: logging.Logger = None) -> None:
+    """Downloads a private or post-live video using pre-fetched info."""
+    if config is None:
+        config = ConfigHandler()
+    if logger is None:
+        logger = initialize_logging(config, logger_name="downloader")
+        
     with open(info_dict_file, 'r', encoding='utf-8') as file:
-        # Load the JSON data from the file
         info_dict = json.load(file)
-    logger.info("Attempting to download video: {0}".format(info_dict.get('id', "")))
-    discord_web.main(info_dict.get('id'), "recording")
+        
+    video_id = info_dict.get('id', "")
+    logger.info("Attempting to download video: {0}".format(video_id))
+    
+    # Assuming discord_web.main is updated to accept config
+    discord_web.main(video_id, "recording", config=config)
+    
     from livestream_dl import download_Live
+    # Use the passed/created logger instance
     downloader = download_Live.LiveStreamDownloader(kill_all=kill_all, logger=logger)
-    # Add livechat to downloaded files dictionary so it is moved appropriately at the end
     
     options = {
-        "ID": info_dict.get('id'),
+        "ID": video_id,
         "resolution": 'best',
-        "video_format": None,
-        "audio_format": None,
-        "threads": 20,
-        "batch_size": 5,
-        "segment_retries": 10,
-        "merge": getConfig.get_mux(),
-        "output": str(getConfig.get_unarchived_output_path(getConfig.get_ytdlp())),
-        "temp_folder": getConfig.get_unarchived_temp_folder(),
-        "write_thumbnail": getConfig.get_thumbnail(),
-        "embed_thumbnail": getConfig.get_thumbnail(),
-        "write_info_json": getConfig.get_info_json(),
-        "write_description": getConfig.get_description(),
-        "keep_database_file": False,
-        "recovery": True,
-        "force_recover_merge": getConfig.get_unarchived_force_merge(),
-        "recovery_failure_tolerance": getConfig.get_unarchived_recovery_failure_tolerance(),
-        "database_in_memory": False,
-        "direct_to_ts": False,
-        "wait_for_video": None,
-        "json_file": None,
-        "remove_ip_from_json": getConfig.get_remove_ip(),
-        "log_level": getConfig.get_log_level(),
-        #"log_level": "DEBUG",
-        "log_file": getConfig.get_log_file(),
-        'write_ffmpeg_command': getConfig.get_ffmpeg_command(),
+        "video_format": None, "audio_format": None, "threads": 20, "batch_size": 5, "segment_retries": 10,
+        "merge": config.get_mux(),
+        "output": str(config.get_unarchived_output_path(config.get_ytdlp())),
+        "temp_folder": config.get_unarchived_temp_folder(),
+        "write_thumbnail": config.get_thumbnail(),
+        "embed_thumbnail": config.get_thumbnail(),
+        "write_info_json": config.get_info_json(),
+        "write_description": config.get_description(),
+        "keep_database_file": False, "recovery": True,
+        "force_recover_merge": config.get_unarchived_force_merge(),
+        "recovery_failure_tolerance": config.get_unarchived_recovery_failure_tolerance(),
+        "database_in_memory": False, "direct_to_ts": False, "wait_for_video": None, "json_file": None,
+        "remove_ip_from_json": config.get_remove_ip(),
+        "log_level": config.get_log_level(),
+        "log_file": config.get_log_file(),
+        'write_ffmpeg_command': config.get_ffmpeg_command(),
     }
+    
     logger.info("Output path: {0}".format(options.get('output')))
+    
     if thumbnail and os.path.exists(thumbnail):
         downloader.file_names['thumbnail'] = downloader.FileInfo(thumbnail, file_type='thumbnail')
     if chat is not None and os.path.exists(chat):
@@ -198,105 +106,177 @@ def download_private(info_dict_file, thumbnail=None, chat=None):
         })
 
     try:
-        downloader.download_segments(info_dict=info_dict, resolution='best', options=options)   
+        downloader.download_segments(info_dict=info_dict, resolution='best', options=options) 
     except Exception as e:
         logger.exception(e)
         import traceback
-        discord_web.main(info_dict.get('id'), "error", message=str("{0}\n{1}".format(e, traceback.format_exc))[-1000:])
+        # Assuming discord_web.main is updated to accept config
+        discord_web.main(video_id, "error", message=str("{0}\n{1}".format(e, traceback.format_exc))[-1000:], config=config)
         return
     
+    # Assuming discord_web.main is updated to accept config
+    discord_web.main(video_id, "done", config=config)
     
-
-    discord_web.main(info_dict.get('id'), "done")
-    
+    # Clean up temp files
     if os.path.exists(info_dict_file):
         os.remove(info_dict_file)
-        
-    if os.path.exists(thumbnail):
+    if thumbnail and os.path.exists(thumbnail):
         os.remove(thumbnail)
-"""        
-def is_script_running(script_name, id):
-    current = psutil.Process()
-    logging.debug("PID: {0}, command line: {1}, argument: {2}".format(current.pid, current.cmdline(), current.cmdline()[2:]))
-    current_pid = psutil.Process().pid
-    
-    for process in psutil.process_iter():
-        try:
-            process_cmdline = process.cmdline()
-            if (
-                process.pid != current_pid and
-                script_name in process_cmdline and
-                id in process_cmdline[2:]   # Needs testing between Windows and Postix to ensure compatibility
-            ):
-                return True
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            pass
-    return False
-"""
-def main(id=None):
-    # Get script name
-    ##script_name = sys.argv[0]
 
+def is_video_private(id: str, config: ConfigHandler = None, logger: logging.Logger = None) -> None:
+    """Checks video status, downloads info, thumbnail, and triggers download_private if required."""
+    if config is None:
+        config = ConfigHandler()
+    if logger is None:
+        # Use a logger specific to the video ID
+        logger = initialize_logging(config, logger_name=id) 
+
+    temp_folder = config.get_unarchived_temp_folder()
+    json_out_path = os.path.join(temp_folder,"{0}.info.json".format(id))
+    chat_out_path = os.path.join(temp_folder,"{0}.live_chat.zip".format(id))
+    jpg_out_path = os.path.join(temp_folder,"{0}.jpg".format(id))
+
+    from livestream_dl.download_Live import LiveStreamDownloader
+    # Use the passed/created logger instance
+    downloader = LiveStreamDownloader(kill_all=kill_all, logger=logger)
+    
+    try:
+        additional_ytdlp_options = None
+        if config.get_ytdlp_options():
+            additional_ytdlp_options = json.loads(config.get_ytdlp_options())
+            
+        # Call getUrls.get_Video_Info with config dependencies
+        info_dict, live_status = getUrls.get_Video_Info(
+            id=id, 
+            wait=(5, 1800), 
+            cookies=config.get_cookies_file(), 
+            proxy=config.get_proxy(), 
+            additional_options=additional_ytdlp_options
+        )
+        
+        # --- Processing Live/Post-Live Videos ---
+        if info_dict.get('live_status') in ['is_live', 'post_live']:
+            os.makedirs(os.path.dirname(json_out_path), exist_ok=True)
+            with open(json_out_path, 'w', encoding='utf-8') as json_file:
+                json.dump(info_dict, json_file, ensure_ascii=False, indent=4) 
+                logger.debug("Created {0}".format(os.path.abspath(json_out_path)))
+
+            if config.get_unarchived_chat_dl() and info_dict.get('live_status') == 'is_live':
+                # Assuming getChatOnly.py is updated to handle config dependencies
+                chat_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'getChatOnly.py')
+                command = ["python", chat_script, '--output-path', chat_out_path, '--', json_out_path]
+                subprocess.Popen(command, start_new_session=True)
+            
+            aux_options = {
+                'write_thumbnail': True,
+                'temp_folder': temp_folder,                  
+            }
+            
+            # Download auxiliary files (thumbnail)
+            downloaded_aux = downloader.download_auxiliary_files(info_dict=info_dict, options=aux_options)
+            file: Optional[Path] = downloaded_aux[0].get('thumbnail', None)
+            
+            if file is not None and file.exists() and not str(file.suffix).endswith(".jpg"):
+                # Convert thumbnail to JPG using ffmpeg
+                subprocess.run([
+                    "ffmpeg", "-y", '-hide_banner', '-nostdin', '-loglevel', 'error',
+                    "-i", file.absolute(), 
+                    "-q:v", "2",
+                    jpg_out_path 
+                ], check=True)
+                logger.debug("Deleting original thumbnail: {0}".format(file.absolute()))
+                file.unlink()
+            elif file is not None and file.exists():
+                 # Rename if already a jpg but in temp folder
+                 os.rename(file.absolute(), jpg_out_path)
+                 
+            return # Exit successfully if video is live/post-live
+            
+    except getUrls.VideoInaccessibleError as e:     
+        logger.info("Experienced Video Inaccessible Error error while checking {0}: {1}".format(id, e))
+        if os.path.exists(json_out_path):
+            # If info.json exists, attempt to download it as a private video
+            download_private(info_dict_file=json_out_path, thumbnail=jpg_out_path, chat=chat_out_path, config=config, logger=logger) 
+    except getUrls.VideoProcessedError as e:
+        logger.info("({0}) {1}".format(id, e))
+    except Exception as e:
+        logger.exception("Unexpected exception occurred: {0}".format(e))
+        try:
+            # Assuming discord_web.main is updated to accept config
+            discord_web.main(id, "error", message=str("{0}\n{1}".format(e, traceback.format_exc))[-1000:], config=config)
+        except Exception as e_discord:
+            logger.exception("Unable to send discord error message")
+
+    # --- Cleanup ---
+    if os.path.exists(json_out_path):
+        # Check if files are too old and should be deleted
+        if not check_ytdlp_age(json_out_path, config=config, logger=logger):
+            if os.path.exists(jpg_out_path):
+                os.remove(jpg_out_path)
+            if os.path.exists(chat_out_path):
+                os.remove(chat_out_path)
+        
+def main(id: Optional[str] = None, config: ConfigHandler = None, logger: logging.Logger = None) -> None:
+    """
+    Main function for the unarchived stream checker. Sets up lock and calls processing logic.
+    """
     if id is None:
         raise Exception("No video ID provided, unable to continue")
-    """
-    if is_script_running(script_name, id):
-        logging.debug("{0} already running, exiting...".format(id))
-        return 0
-    """
-    global logger
-    logger = setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), file_options=getConfig.get_log_file_options(), logger_name=id)
+        
+    # 1. Ensure config and logger objects are available
+    if config is None:
+        config = ConfigHandler()
+    
+    # 2. Setup the logger specific to this video ID
+    if logger is None:
+        logger = initialize_logging(config, logger_name=id)
+        
+    # 3. Determine lock file path
     if os.path.exists("/dev/shm"):
         lock_file_path = "/dev/shm/unarchived-{0}".format(id)
     else:
-        lock_file_path = os.path.join(getConfig.get_temp_folder(), "unarchived-{0}.lockfile".format(id))
+        # Use the configured temp folder
+        lock_file_path = os.path.join(config.get_temp_folder(), "unarchived-{0}.lockfile".format(id))
     
-    '''
-    lock = FileLock(lock_file_path)
-
-    try:
-        lock.acquire()
-        is_video_private(id)        
-    except (IOError, BlockingIOError):
-        logging.info("Unable to acquire lock for {0}, must be already downloading".format(lock_file_path))
-    finally:
-        try:
-            lock.release()
-        except Exception:
-            pass
-    
-    '''
+    # 4. Acquire file lock and run processing logic
     try:
         with FileLock(lock_file_path) as lock_file:
-        
             lock_file.acquire()
-            is_video_private(id)
-            """
-            if result is not None and isinstance(result, tuple):
-                out_folder = os.path.dirname(options.get("output"))
-                os.makedirs(out_folder)
-                shutil.move(result[0], out_folder)
-            """
+            # Pass the config and logger objects to the worker function
+            is_video_private(id, config=config, logger=logger)
             lock_file.release()
+            
     except (IOError, BlockingIOError) as e:
-        logger.warning("Unable to aquire lock for {0}, must be already downloading: {1}".format(lock_file_path, e))
-
-    
+        logger.warning("Unable to acquire lock for {0}, must be already downloading: {1}".format(lock_file_path, e))
 
 if __name__ == "__main__":
+
     try:
+    
+        # 2. Instantiate ConfigHandler once
+        app_config = ConfigHandler()
+        
+        
+        # 3. Setup umask globally (as in original script)
+        setup_umask() 
+        
+        # We delay the logger creation until the ID is known (inside main), 
+        # but need a basic logger for the argparse block's exception.
+        # We use the logging system's root logger here, which is set up by initialize_logging if called.
+    
+    
         # Create the parser
         parser = argparse.ArgumentParser(description="Process an video by ID")
-
-        # Add a required positional argument 'ID'
         parser.add_argument('ID', type=str, help='The video ID (required)')
 
         # Parse the arguments
         args = parser.parse_args()
-
-        # Access the 'ID' value
-        id = args.ID
-        main(id=id)
+        
+        logger = initialize_logging(app_config, f"{args.ID}-unarchived")
+        # Call main, passing the config object
+        # The main function will create the final logger instance specific to the ID
+        main(id=args.ID, config=app_config)
+        
     except Exception as e:
-        logger.exception("An unhandled error occurred when trying to run the unarchived stream checker")
+        logging.exception("An unhandled error occurred when trying to run the unarchived stream checker")
         raise

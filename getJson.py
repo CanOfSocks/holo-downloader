@@ -1,129 +1,144 @@
 #!/usr/local/bin/python
 import requests
-
 import argparse
 import common
 import json
 from datetime import datetime
 from getConfig import ConfigHandler
 import logging
+from typing import Optional, List, Dict, Any
 
-getConfig = ConfigHandler()
-
-from livestream_dl.download_Live import setup_logging
-setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), file_options=getConfig.get_log_file_options())
-
+# URL for the API endpoint (remains constant)
 url = "https://holo.dev/api/v1/lives/open"
 
+# 2. json_object Class
 class json_object:
-    def __init__(self,live):
-        self.holodev_id=live.get('id')
-        self.title=live.get('title')
+    """A wrapper class to unify the structure of Holo.dev API responses."""
+    def __init__(self, live: Dict[str, Any]):
         date_format = "%Y-%m-%dT%H:%M:%S.%fZ"
+        
+        self.holodev_id = live.get('id')
+        self.title = live.get('title')
         self.start_at = datetime.strptime(live.get('start_at'), date_format)
         self.created_at = datetime.strptime(live.get('created_at'), date_format)
-        self.json_channel_id = live.get('channel_id')
+        self.json_channel_id = live.get('channel_id') # Original channel ID from JSON
         self.thumbnail_url = live.get('cover')
         
-        self.id = live.get('room')
+        self.id = live.get('room')          # Video ID
         self.platform = live.get('platform')
-        self.channel_id = live.get('channel')
+        self.channel_id = live.get('channel') # YouTube Channel ID (UC...)
         
         self.duration = live.get('duration') if live.get('duration') is not None else -1
         self.description = None
-        
-        #For members only
         self.availability = None
     
-    def get(self, property, default=None):
+    def get(self, property: str, default: Any = None) -> Any:
         return getattr(self, property, default)
-    
-   
-#def membershipOnlyFilter(live):
-#    membersOnly = members_only.get(live.channel_id, None)
-#    # If config is set to only get member videos for channel, attempt to get availability. 
-#    # Failures to get availability will result in the video not being retrieved
-#    if membersOnly:
-#        return getAvailability(live).casefold() == "subscriber_only".casefold()
-#    else:
-#        return True 
 
-    
-def getStreams(unarchived=False):
-    # List to store the matching live streams
-    matching_streams = []
+# 3. getStreams function updated to accept config
+def getStreams(unarchived: bool = False, config: ConfigHandler = None, logger: logging = None) -> List[str]:
+    # Instantiate ConfigHandler if it's not provided
+    if config is None:
+        config = ConfigHandler()
 
-    # Send an HTTP GET request to the URL
-    response = requests.get(url)
+    if logger is None:
+        logger = common.initialize_logging(config, "GetJson")
+        
+    matching_streams: List[str] = []
 
-    # Check if the request was successful (status code 200)
-    if response.status_code == 200:
-        # Parse the JSON data from the response
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
+    except requests.exceptions.RequestException as e:
+        logging.exception(f"Error retrieving streams")
+        return []
+
+    # Parse the JSON data from the response
+    try:
         data = response.json()
-        logging.debug("Received videos:\n{0}".format(json.dumps(data)))
-        videos = []
-        # Check if the "lives" key exists in the JSON data
-        if 'lives' in data:
-            # Add all videos to class list
-            for live in data['lives']:
-                videos.append(json_object(live))
-                
-            # Get dictionary depending on which search (unarchived/normal)    
-            if unarchived:
-                channel_ids_to_match = getConfig.unarchived_channel_ids_to_match        
-            else:
-                channel_ids_to_match = getConfig.channel_ids_to_match
+        logger.debug(f"Received videos:\n{json.dumps(data)}")
+    except json.JSONDecodeError as e:
+        logger.exception(f"Error decoding JSON response")
+        return []
+
+    videos: List[json_object] = []
+    
+    if 'lives' in data:
+        for live in data['lives']:
+            videos.append(json_object(live))
             
-            if channel_ids_to_match is None:
-                return
-            #Run for each class object made
-            for live in videos:            
-                # Check if the "channel_id" is in the dictionary
-                #print(live.channel_id)
-                if live.channel_id in channel_ids_to_match.values():
-                    # Find the key (descriptive name) corresponding to the matched channel_id
-                    #channel_name = [key for key, value in channel_ids_to_match.items() if value == channel_id][0]
+        # Get dictionary depending on which search (unarchived/normal) 
+        # Access config properties via the passed/instantiated config object
+        if unarchived:
+            channel_ids_to_match = config.unarchived_channel_ids_to_match 
+        else:
+            channel_ids_to_match = config.channel_ids_to_match
+        
+        if channel_ids_to_match is None:
+            return []
+        
+        for live in videos:
+            # Check if the "channel_id" is in the dictionary values
+            if live.channel_id in channel_ids_to_match.values():
+                
+                if live.platform == "youtube":
                     
-                    if(live.platform == "youtube"):
-                        #print(time_difference)
-                        if unarchived:
-                            if common.withinFuture(live.start_at.timestamp()):
-                                matching_streams.append(live.get('id'))
-                        else:
-                            if(common.withinFuture(live.start_at.timestamp()) and common.filtering(live, live.get('channel_id'))):
-                                matching_streams.append(live.get('id'))
-    else:
-        logging.error("Error retrieving streams: {0}".format(response.status_code))
-    # Print the list of matching streams as a JSON representation
-    #matching_streams_json = json.dumps(matching_streams)
+                    # NOTE: common.withinFuture and common.filtering need the config object.
+                    # Assuming they are refactored to handle config=None or accept it, 
+                    # but since we have a valid config object here, we pass it.
+                    
+                    if unarchived:
+                        # Assuming common.withinFuture is updated to accept config
+                        if common.withinFuture(config, live.start_at.timestamp()):
+                            matching_streams.append(live.get('id'))
+                    else:
+                        # Assuming common.filtering is updated to accept config
+                        if (common.withinFuture(config, live.start_at.timestamp()) and 
+                            common.filtering(live, live.get('channel_id'), config)):
+                            matching_streams.append(live.get('id'))
+                            
     return matching_streams
 
+# 4. main function updated to accept config
+def main(command: Optional[str] = None, unarchived: bool = False, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging = None):
+    # Instantiate ConfigHandler if it's not provided
+    if config is None:
+        config = ConfigHandler()
 
-def main(command=None, unarchived=False, frequency=None):
-    streams = getStreams(unarchived)
+    if logger is None:
+        logger = common.initialize_logging(config, "GetJson")
+        
+    streams = getStreams(unarchived, config)
+    
     if unarchived:
-        streams = common.combine_unarchived(streams)
-    common.vid_executor(streams, command, unarchived, frequency=frequency)  
+        # Assuming common.combine_unarchived is updated to accept config
+        streams = common.combine_unarchived(streams, config)
+        
+    # Assuming common.vid_executor is updated to accept config
+    common.vid_executor(streams, command, config, unarchived, frequency=frequency) 
 
-
+# 5. Execution block updated
 if __name__ == "__main__":
     try:
+        # Instantiate ConfigHandler once for the execution flow
+        app_config = ConfigHandler()
+
+        # Initialize logging using the instance
+        logger = common.initialize_logging(app_config) 
+    
+    
         parser = argparse.ArgumentParser(description="Process a command and optionally an unarchive value.")
 
-        # Add the required positional argument 'command'
         parser.add_argument('--command', type=str, choices=['spawn', 'bash', 'print'], default=None, help='The command (optional, default: None)')
-
-        # Add an optional named argument '--unarchive' with default as None
         parser.add_argument('--unarchived', action='store_true', help='Flag to indicate unarchived (default: False)')
+        parser.add_argument('--frequency', type=str, default=None, help='Optional CRON frequency string for scheduling')
 
         # Parse the arguments
         args = parser.parse_args()
 
-        # Access the arguments
-        command = args.command
-        unarchived = args.unarchive  # Will be None if not provided
-
-        main(command=command, unarchived=unarchived)
+        # Call main, passing the config object
+        main(command=args.command, unarchived=args.unarchived, frequency=args.frequency, config=app_config, logger=logger)
+        
     except Exception as e:
         logging.exception("An unexpected error occurred when attempting to fetch videos from Holo.dev")
         raise

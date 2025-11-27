@@ -1,8 +1,6 @@
 #!/usr/local/bin/python
 import yt_dlp
-#import psutil
 import os
-#import sys
 import threading
 from getConfig import ConfigHandler
 from pathlib import Path
@@ -10,220 +8,184 @@ import subprocess
 import discord_web
 import traceback
 from time import sleep, asctime
-from common import FileLock, setup_umask
+# Import FileLock, setup_umask, AND the shared kill_all event from common
+from common import FileLock, setup_umask, kill_all 
 
 import argparse
-
-import signal
-from time import sleep
-import platform
-
-kill_all = threading.Event()
-
-# Preserve original keyboard interrupt logic as true behaviour is known
-original_sigint = signal.getsignal(signal.SIGINT)
-
-def handle_shutdown(signum, frame):
-    kill_all.set()
-    sleep(0.5)
-    if callable(original_sigint):
-        original_sigint(signum, frame)
-
-# common
-signal.signal(signal.SIGINT, handle_shutdown)
-
-if platform.system() == "Windows":
-    # SIGTERM won’t fire — but SIGBREAK will on Ctrl-Break
-    signal.signal(signal.SIGBREAK, handle_shutdown)
-else:
-    # normal POSIX termination
-    signal.signal(signal.SIGTERM, handle_shutdown)
-
-getConfig = ConfigHandler()
-
 import logging
+from typing import Optional, Tuple, Dict, Any
 
-setup_umask()
-from livestream_dl.download_Live import setup_logging
-logger = setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), file_options=getConfig.get_log_file_options())
+# --- Logging Initialization Helper (Define locally for modularity) ---
 
-#id = sys.argv[1]
-#id = "kJGsWORSg-4"
-#outputFile = None
+def initialize_logging(config: ConfigHandler, logger_name: Optional[str] = None) -> logging.Logger:
+    """Initializes logging based on the provided ConfigHandler instance."""
+    from livestream_dl.download_Live import setup_logging
+    name = logger_name if logger_name else __name__
+    return setup_logging(
+        log_level=config.get_log_level(), 
+        console=True, 
+        file=config.get_log_file(), 
+        file_options=config.get_log_file_options(),
+        logger_name=name
+    )
 
+# --- Core Functions Updated with Dependencies ---
 
-
-def createTorrent(output):
-    if not getConfig.getTorrent():
+def createTorrent(output: str, config: ConfigHandler) -> None:
+    """Creates a torrent file for the given output path using the provided config."""
+    if not config.getTorrent():
         return
-    fullPath = getConfig.getTempOutputPath(output)
+    fullPath = config.getTempOutputPath(output)
     folder = Path(fullPath).parent
     
-    torrentRunner = subprocess.run(getConfig.torrentBuilder(fullPath,folder), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    # Use config methods to build the command
+    subprocess.run(config.torrentBuilder(fullPath, folder), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
         
-def downloader(id,outputTemplate, info_dict):
+def downloader(id: str, outputTemplate: str, info_dict: Dict[str, Any], config: ConfigHandler, logger: logging.Logger) -> None:
+    """
+    Handles the main video segment download process.
+    
+    Uses the kill_all event imported from common.
+    """
     if id is None or outputTemplate is None:
         raise Exception(("Unable to retrieve information about video {0}".format(id)))
+        
     from livestream_dl import download_Live
-    #outputFile = "{0}{1}".format(getConfig.getTempFolder(),output)
     
-    options = getConfig.get_livestream_dl_options(info_dict=info_dict, output_template=outputTemplate)
-    #output = str(getConfig.get_temp_output_path(outputTemplate))
+    # Options retrieved using the passed config object
+    options = config.get_livestream_dl_options(info_dict=info_dict, output_template=outputTemplate)
     
-    # Start additional information downloaders
-    discord_notify = threading.Thread(target=discord_web.main, args=(id, "recording"), daemon=True)
-    discord_notify.start()    
+    # Start additional information downloaders (Discord notification)
+    # NOTE: Assuming discord_web.main is updated to accept the config object
+    discord_notify = threading.Thread(target=discord_web.main, args=(id, "recording", config), daemon=True)
+    discord_notify.start() 
+    
     try:
+        # Pass the imported kill_all event and the logger instance
         downloader = download_Live.LiveStreamDownloader(kill_all=kill_all, logger=logger)
-        downloader.download_segments(info_dict=info_dict, resolution=getConfig.get_quality(), options=options)
+        downloader.download_segments(info_dict=info_dict, resolution=config.get_quality(), options=options)
     except Exception as e:
         logger.exception("Error occured {0}".format(id))
-        #discord_web.main(id, "error", message=str(e)[-500:])
         sleep(1.0)
         raise Exception(("{2} - Error downloading video: {0}, Code: {1}".format(id, e, asctime())))
-        return
-    # Wait for remaining processes
-    discord_notify.join()
+    finally:
+        # Wait for remaining processes
+        discord_notify.join()
         
-    #if(getConfig.getTorrent()):
-    #    try:
-    #        createTorrent(outputTemplate)
-    #    except subprocess.CalledProcessError as e:
-    #        print(e.stderr)
-    #        discord_web.main(id, "error", message=str(e.stderr)[-1500:])
-    #        raise Exception(("Error creating torrent for video: {0}, Code: {1}".format(id, e.returncode)))
-        
-    discord_web.main(id, "done")
+    # Final notification using the config object
+    discord_web.main(id, "done", config=config)
     return
 
-def download_video_info(video_url):
+def download_video_info(video_url: str, config: ConfigHandler, logger: logging.Logger) -> Tuple[str, Dict[str, Any]]:
+    """
+    Fetches video metadata and prepares the output file template.
+    
+    Uses the passed config and logger objects.
+    """
     options = {
-    #    'wait_for_video': (1,300),
-    #   'retries': 25,
-    #    'skip_download': True,
-        'outtmpl': getConfig.get_ytdlp(),
-    #    'cookiefile': getConfig.get_cookies_file(),        
+        'outtmpl': config.get_ytdlp(),
         'quiet': True,
-        'no_warnings': True       
+        'no_warnings': True      
     }
+    
     import json
-    #if getConfig.get_ytdlp_options() is not None:
-    #    options.update({'ytdlp_options': json.loads(getConfig.get_ytdlp_options())})
-
+    from livestream_dl import getUrls
+    
     with yt_dlp.YoutubeDL(options) as ydl:
-        #info_dict = ydl.extract_info(video_url, download=False)
-        from livestream_dl import getUrls
         additional_ytdlp_options = None
-        if getConfig.get_ytdlp_options():
-            additional_ytdlp_options = json.loads(getConfig.get_ytdlp_options())
-        info_dict, live_status = getUrls.get_Video_Info(id=video_url,  wait=(1,300), cookies=getConfig.get_cookies_file(), proxy=getConfig.get_proxy(), additional_options=additional_ytdlp_options, include_dash=getConfig.get_include_dash(), include_m3u8=getConfig.get_include_m3u8())
-        #info_dict = ydl.sanitize_info(info_dict)
+        if config.get_ytdlp_options():
+            additional_ytdlp_options = json.loads(config.get_ytdlp_options())
+            
+        # Call get_Video_Info with config dependencies
+        info_dict, live_status = getUrls.get_Video_Info(
+            id=video_url, 
+            wait=(1,300), 
+            cookies=config.get_cookies_file(), 
+            proxy=config.get_proxy(), 
+            additional_options=additional_ytdlp_options, 
+            include_dash=config.get_include_dash(), 
+            include_m3u8=config.get_include_m3u8()
+        )
         outputFile = str(ydl.prepare_filename(info_dict))
             
     logger.debug("({0}) Info.json: {1}".format(video_url, json.dumps(info_dict)))
     logger.info("Output file: {0}".format(outputFile))
     return outputFile, info_dict
-"""
-def is_script_running(script_name, id):
-    current = psutil.Process()
-    logging.debug("PID: {0}, command line: {1}, argument: {2}".format(current.pid, current.cmdline(), current.cmdline()[2:]))
-    current_pid = psutil.Process().pid
     
-    for process in psutil.process_iter():
-        try:
-            process_cmdline = process.cmdline()
-            if (
-                process.pid != current_pid and
-                script_name in process_cmdline and
-                id in process_cmdline[2:]   # Needs testing between Windows and Postix to ensure compatibility
-            ):
-                return True
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            pass
-    return False
-"""    
-def main(id=None):
-    
-    #script_name = sys.argv[0]    
+def main(id: Optional[str] = None, config: ConfigHandler = None, logger: logging.Logger = None) -> None:
+    """
+    Main function for handling video download with file locking.
+    """
+    # 1. Ensure config and logger objects are available
+    if config is None:
+        config = ConfigHandler()
+    if logger is None:
+        logger = initialize_logging(config, logger_name=id or "main_download")
 
-    # If ID is none, raise exception
     if id is None:
         raise ValueError("No video ID provided, unable to continue")
-    global logger
-    logger = setup_logging(log_level=getConfig.get_log_level(), console=True, file=getConfig.get_log_file(), file_options=getConfig.get_log_file_options(), logger_name=id)
     
+    # 2. Determine lock file path using the config object
     if os.path.exists("/dev/shm/"):
         lock_file_path = "/dev/shm/videoDL-{0}".format(id)
     else:
-        lock_file_path = os.path.join(getConfig.get_temp_folder(), "videoDL-{0}.lockfile".format(id))
+        lock_file_path = os.path.join(config.get_temp_folder(), "videoDL-{0}.lockfile".format(id))
 
-    lock = FileLock(lock_file_path)
-    '''
-    try:
-        lock.acquire()
-        discord_web.main(id, "waiting")
-        outputFile, info_dict = download_video_info(id)
-        logging.debug("Output file: {0}".format(outputFile))
-        if outputFile is None:
-            discord_web.main(id, "error")
-            raise Exception(("Unable to retrieve information about video {0}".format(id)))
-        
-        downloader(id,outputFile, info_dict)        
-    except (IOError, BlockingIOError):
-        logging.info("Unable to acquire lock for {0}, must be already downloading".format(lock_file_path))
-    finally:
-        try:
-            lock.release()
-        except Exception:
-            pass
-    '''
+    # 3. Acquire file lock and run download logic
     try:
         with FileLock(lock_file_path) as lock_file:
-        
             lock_file.acquire()
-            discord_web.main(id, "waiting")
+            
+            # Use the config object for pre-download notification
+            discord_web.main(id, "waiting", config=config)
+            
             try:
-                outputFile, info_dict = download_video_info(id)
+                # Pass config and logger
+                outputFile, info_dict = download_video_info(id, config, logger)
                 logger.debug("Output file: {0}".format(outputFile))
+                
                 if outputFile is None:
                     raise LookupError(("Unable to retrieve information about video {0}".format(id)))
                 
-                downloader(id,outputFile, info_dict)
-                """
-                if result is not None and isinstance(result, tuple):
-                    out_folder = os.path.dirname(options.get("output"))
-                    os.makedirs(out_folder)
-                    shutil.move(result[0], out_folder)
-                """
+                # Pass config and logger
+                downloader(id, outputFile, info_dict, config, logger)
+                
             except Exception as e:
-                discord_web.main(id, "error", message=f"{type(e).__name__}: {str(e)}"[-500:])
                 logger.exception("Error downloading video")
+                # Pass config for error notification
+                discord_web.main(id, "error", message=f"{type(e).__name__}: {str(e)}"[-500:], config=config)
 
             lock_file.release()
     except (IOError, BlockingIOError) as e:
-        logger.info("Unable to aquire lock for {0}, must be already downloading: {1}".format(lock_file_path, e))
-    
-    """
-    if is_script_running(script_name, id):
-        logging.debug("{0} already running, exiting...".format(id))
-        return 0
-    """
+        logger.info("Unable to acquire lock for {0}, must be already downloading: {1}".format(lock_file_path, e))
     
 
 if __name__ == "__main__":
     try:
+        # 1. Setup umask globally
+        setup_umask() 
+
+        # 2. Instantiate ConfigHandler once
+        app_config = ConfigHandler()
+        
+        # We will initialize the logger inside main for the video ID, but need a general one for errors here
+        # Initialize a logger that will catch initial parsing/execution errors
+        
+    
+    
         # Create the parser
         parser = argparse.ArgumentParser(description="Process an video by ID")
-
-        # Add a required positional argument 'ID'
         parser.add_argument('ID', type=str, help='The video ID (required)')
 
         # Parse the arguments
         args = parser.parse_args()
 
-        # Access the 'ID' value
-        id = args.ID
-        main(id=id)
+        main_logger = initialize_logging(app_config, logger_name=f"{args.ID}")
+
+        # Call main, passing the config object and the logger
+        main(id=args.ID, config=app_config, logger=main_logger)
+        
     except Exception as e:
-        logger.exception("An unhandled error occurred when attempting to download a video")
+        # Use the initialized logger for final error handling
+        logging.exception("An unhandled error occurred when attempting to download a video")
         raise
