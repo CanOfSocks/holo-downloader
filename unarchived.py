@@ -99,10 +99,10 @@ def download_private(info_dict_file: str, thumbnail: Optional[str] = None, chat:
     logger.info("Output path: {0}".format(options.get('output')))
     
     if thumbnail and os.path.exists(thumbnail):
-        downloader.file_names['thumbnail'] = downloader.FileInfo(thumbnail, file_type='thumbnail')
+        downloader.file_names['thumbnail'] = download_Live.FileInfo(thumbnail, file_type='thumbnail')
     if chat is not None and os.path.exists(chat):
         downloader.file_names.update({
-            'live_chat': downloader.FileInfo(chat, file_type='live_chat')
+            'live_chat': download_Live.FileInfo(chat, file_type='live_chat')
         })
 
     try:
@@ -136,7 +136,7 @@ def is_video_private(id: str, config: ConfigHandler = None, logger: logging.Logg
     chat_out_path = os.path.join(temp_folder,"{0}.live_chat.zip".format(id))
     jpg_out_path = os.path.join(temp_folder,"{0}.jpg".format(id))
 
-    from livestream_dl.download_Live import LiveStreamDownloader
+    from livestream_dl.download_Live import LiveStreamDownloader, FileInfo
     # Use the passed/created logger instance
     downloader = LiveStreamDownloader(kill_all=kill_all, logger=logger)
     
@@ -174,7 +174,7 @@ def is_video_private(id: str, config: ConfigHandler = None, logger: logging.Logg
             
             # Download auxiliary files (thumbnail)
             downloaded_aux = downloader.download_auxiliary_files(info_dict=info_dict, options=aux_options)
-            file: Optional[Path] = downloaded_aux[0].get('thumbnail', None)
+            file: Optional[FileInfo] = downloaded_aux[0].get('thumbnail', None)
             
             if file is not None and file.exists() and not str(file.suffix).endswith(".jpg"):
                 # Convert thumbnail to JPG using ffmpeg
