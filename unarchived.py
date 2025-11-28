@@ -11,11 +11,8 @@ from common import FileLock, setup_umask, initialize_logging, kill_all
 import traceback
 from livestream_dl import getUrls
 import logging
-import threading
-import signal
 from time import sleep
 from typing import Optional, Dict, Any, Tuple
-from pathlib import Path
 
 # --- Utility Functions ---
 
@@ -78,7 +75,10 @@ def download_private(info_dict_file: str, thumbnail: Optional[str] = None, chat:
     options = {
         "ID": video_id,
         "resolution": 'best',
-        "video_format": None, "audio_format": None, "threads": 20, "batch_size": 5, "segment_retries": 10,
+        "video_format": None, "audio_format": None, 
+        "threads": 20, 
+        "batch_size": 5, 
+        "segment_retries": 10,
         "merge": config.get_mux(),
         "output": str(config.get_unarchived_output_path(config.get_ytdlp())),
         "temp_folder": config.get_unarchived_temp_folder(),
@@ -86,10 +86,14 @@ def download_private(info_dict_file: str, thumbnail: Optional[str] = None, chat:
         "embed_thumbnail": config.get_thumbnail(),
         "write_info_json": config.get_info_json(),
         "write_description": config.get_description(),
-        "keep_database_file": False, "recovery": True,
+        "keep_database_file": False, 
+        "recovery": True,
         "force_recover_merge": config.get_unarchived_force_merge(),
         "recovery_failure_tolerance": config.get_unarchived_recovery_failure_tolerance(),
-        "database_in_memory": False, "direct_to_ts": False, "wait_for_video": None, "json_file": None,
+        "database_in_memory": False, 
+        "direct_to_ts": False, 
+        "wait_for_video": None, 
+        "json_file": None,
         "remove_ip_from_json": config.get_remove_ip(),
         "log_level": config.get_log_level(),
         "log_file": config.get_log_file(),
