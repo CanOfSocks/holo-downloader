@@ -151,7 +151,9 @@ def is_video_private(id: str, config: ConfigHandler = None, logger: logging.Logg
             wait=(5, 1800), 
             cookies=config.get_cookies_file(), 
             proxy=config.get_proxy(), 
-            additional_options=additional_ytdlp_options
+            additional_options=additional_ytdlp_options,
+            include_dash=False,
+            include_m3u8=False,
         )
         
         # --- Processing Live/Post-Live Videos ---
