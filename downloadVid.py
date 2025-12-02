@@ -57,7 +57,7 @@ def downloader(id: str, outputTemplate: str, info_dict: Dict[str, Any], config: 
     
     # Start additional information downloaders (Discord notification)
     # NOTE: Assuming discord_web.main is updated to accept the config object
-    discord_notify = threading.Thread(target=discord_web.main, args=(id, "recording", config), daemon=True)
+    discord_notify = threading.Thread(target=discord_web.main, kwargs={"id": id, "status": "recording", "config": config, "logger": logger}, daemon=True)
     discord_notify.start() 
     
     try:
@@ -73,7 +73,7 @@ def downloader(id: str, outputTemplate: str, info_dict: Dict[str, Any], config: 
         discord_notify.join()
         
     # Final notification using the config object
-    discord_web.main(id, "done", config=config)
+    discord_web.main(id=id, status="done", config=config)
     return
 
 def download_video_info(video_url: str, config: ConfigHandler, logger: logging.Logger) -> Tuple[str, Dict[str, Any]]:
