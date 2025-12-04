@@ -162,14 +162,14 @@ def withinFuture(config: ConfigHandler = None, releaseTime: Optional[int] = None
         config = ConfigHandler()
 
     lookahead = config.get_look_ahead()
-    if(not releaseTime or not lookahead):
+    lookbehind = config.get_look_behind()
+    if(not releaseTime):
         return True
+
     release = datetime.fromtimestamp(releaseTime, timezone.utc)    
-    limit = datetime.now(timezone.utc) + timedelta(hours=lookahead)
-    if(release <= limit):
-        return True
-    else:
-        return False
+    ahead_limit = datetime.now(timezone.utc) + timedelta(hours=lookahead)
+    behind_limit = datetime.now(timezone.utc) - timedelta(hours=lookbehind)
+    return behind_limit <= release <= ahead_limit
     
 def getAvailability(live: Any, config: ConfigHandler = None):
     if config is None:

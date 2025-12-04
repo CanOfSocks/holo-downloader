@@ -152,7 +152,12 @@ class ConfigHandler:
         return options
 
     def get_look_ahead(self):
+        # Return option, defaulting to 48 hours/2 days in the future
         return self.download_options.get('look_ahead', 48)
+    
+    def get_look_behind(self):
+        # Return option, defaulting to 336 hours/2 weeks in the past
+        return self.download_options.get('look_behind', 336)
 
     def get_membership_directory(self):
         return self.download_options.get('members_dir', None) or self.get_done_folder()
