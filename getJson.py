@@ -100,7 +100,7 @@ def getStreams(unarchived: bool = False, config: ConfigHandler = None, logger: l
     return matching_streams
 
 # 4. main function updated to accept config
-def main(command: Optional[str] = None, unarchived: bool = False, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging = None):
+def main(command: Optional[str] = None, unarchived: bool = False, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging = None) -> list[str] | str:
     # Instantiate ConfigHandler if it's not provided
     if config is None:
         config = ConfigHandler()
@@ -115,7 +115,7 @@ def main(command: Optional[str] = None, unarchived: bool = False, frequency: Opt
         streams = common.combine_unarchived(streams, config)
         
     # Assuming common.vid_executor is updated to accept config
-    common.vid_executor(streams, command, config, unarchived, frequency=frequency) 
+    return common.vid_executor(streams, command, config, unarchived, frequency=frequency) 
 
 # 5. Execution block updated
 if __name__ == "__main__":

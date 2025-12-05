@@ -7,7 +7,7 @@ import logging
 from typing import Optional, Dict, List, Any
 from common import initialize_logging
 
-def getVideos(channel_ids_to_match: Dict[str, str], command: Optional[str] = None, unarchived: bool = False, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging.Logger = None) -> None:
+def getVideos(channel_ids_to_match: Dict[str, str], command: Optional[str] = None, unarchived: bool = False, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging.Logger = None) -> list[str] | str:
     """
     Fetches streams for the given channels and executes a command on them.
     
@@ -40,9 +40,9 @@ def getVideos(channel_ids_to_match: Dict[str, str], command: Optional[str] = Non
         all_lives = common.combine_unarchived(all_lives, config)
 
     # Pass the config object and other arguments to the executor
-    common.vid_executor(streams=all_lives, command=command, config=config, frequency=frequency, unarchived=unarchived)
+    return common.vid_executor(streams=all_lives, command=command, config=config, frequency=frequency, unarchived=unarchived)
         
-def main(command: Optional[str] = None, unarchived: bool = False, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging.Logger = None) -> None:
+def main(command: Optional[str] = None, unarchived: bool = False, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging.Logger = None) -> list[str] | str:
     """
     Main execution logic to determine which channel list to use and start fetching videos.
     
@@ -68,7 +68,7 @@ def main(command: Optional[str] = None, unarchived: bool = False, frequency: Opt
             channel_ids_to_match = common.random_sample(channel_ids_to_match)
             
         # Pass the config and logger objects down
-        getVideos(channel_ids_to_match, command, unarchived, frequency=frequency, config=config, logger=logger)
+        return getVideos(channel_ids_to_match, command, unarchived, frequency=frequency, config=config, logger=logger)
 
     
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ from getConfig import ConfigHandler
 import logging
 from typing import Optional, Dict, List, Any
 
-def getVideos(members_only: Dict[str, str], command: Optional[str] = None, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging = None) -> None:
+def getVideos(members_only: Dict[str, str], command: Optional[str] = None, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging = None) -> list[str] | str:
     """
     Fetches member-only videos for the given channels and executes a command on them.
     
@@ -52,9 +52,9 @@ def getVideos(members_only: Dict[str, str], command: Optional[str] = None, frequ
             discord_web.main(channel_id, "membership-error", message=str(e))
             
     # Assuming common.vid_executor is updated to accept config
-    common.vid_executor(all_lives, command, config, frequency=frequency)
+    return common.vid_executor(all_lives, command, config, frequency=frequency)
 
-def main(command: Optional[str] = None, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging = None) -> None:
+def main(command: Optional[str] = None, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging = None) -> list[str] | str:
     # Instantiate ConfigHandler if it's not provided
     if config is None:
         config = ConfigHandler()
@@ -63,7 +63,7 @@ def main(command: Optional[str] = None, frequency: Optional[str] = None, config:
         logger = common.initialize_logging(config, "getMembers")
         
     # Pass the members_only dict from the config instance to getVideos
-    getVideos(config.members_only, command, frequency, config)
+    return getVideos(config.members_only, command, frequency, config)
 
 if __name__ == "__main__":
     try:

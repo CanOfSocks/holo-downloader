@@ -54,7 +54,7 @@ def initialize_logging(config: ConfigHandler = None, logger_name = None, force =
 
 initialize_logging()
 
-def vid_executor(streams: List[str], command: str, config: ConfigHandler = None, unarchived: bool = False, frequency: str = None):    
+def vid_executor(streams: List[str], command: str, config: ConfigHandler = None, unarchived: bool = False, frequency: str = None) -> list[str] | str:    
     if config is None:
         config = ConfigHandler()
 
@@ -79,8 +79,7 @@ def vid_executor(streams: List[str], command: str, config: ConfigHandler = None,
             Popen(cmd_args, start_new_session=True)
             if i < len(streams) - 1:
                 logging.debug("Sleeping for {0}".format(sleep_time))
-                sleep(random.uniform(max(sleep_time/2, 1.0), max(sleep_time * 1.25, 1.0)))
-        return    
+                sleep(random.uniform(max(sleep_time/2, 1.0), max(sleep_time * 1.25, 1.0)))   
         
     elif(command == "bash"):
         bash_array = ' '.join(streams)
@@ -88,7 +87,7 @@ def vid_executor(streams: List[str], command: str, config: ConfigHandler = None,
         return bash_array            
     else:
         logging.info(streams)
-        return streams
+    return streams
     
 def titleFilter(live: Dict[str, Any], channel_id: str, config: ConfigHandler = None) -> Optional[bool]:
     if config is None:

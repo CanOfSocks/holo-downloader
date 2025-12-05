@@ -6,7 +6,7 @@ import logging
 from typing import Optional
 
 
-def main(command: Optional[str] = None, unarchived: bool = False, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging = None):
+def main(command: Optional[str] = None, unarchived: bool = False, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging = None) -> list[str] | str:
     """
     Main entry point to determine which video fetching method to use.
     
@@ -27,11 +27,11 @@ def main(command: Optional[str] = None, unarchived: bool = False, frequency: Opt
     if(method == "ytdlp"):
         import getYTDLP
         # Assuming getYTDLP.main is updated to accept config as its final argument
-        getYTDLP.main(command, unarchived=unarchived, frequency=frequency, config=config)
+        return getYTDLP.main(command, unarchived=unarchived, frequency=frequency, config=config)
     elif(method == "json"):
         import getJson
         # Assuming getJson.main is updated to accept config as its final argument
-        getJson.main(command, unarchived=unarchived, frequency=frequency, config=config)
+        return getJson.main(command, unarchived=unarchived, frequency=frequency, config=config)
     else:
         # Use a standard logger if main is called without prior initialization
         logger.error("Invalid fetch method: {0}".format(method))
