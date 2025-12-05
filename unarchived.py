@@ -258,7 +258,7 @@ if __name__ == "__main__":
         # Parse the arguments
         args = parser.parse_args()
         
-        logger = initialize_logging(app_config, f"{args.ID}-unarchived")
+        logger = initialize_logging(config=app_config, logger_name=f"{args.ID}-unarchived")
         # Call main, passing the config object
         # The main function will create the final logger instance specific to the ID
 

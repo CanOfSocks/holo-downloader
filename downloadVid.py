@@ -9,7 +9,7 @@ import discord_web
 import traceback
 from time import sleep, asctime
 # Import FileLock, setup_umask, AND the shared kill_all event from common
-from common import FileLock, setup_umask, kill_all, setup_logging
+from common import FileLock, setup_umask, kill_all, initialize_logging
 
 import argparse
 import logging
@@ -201,7 +201,7 @@ if __name__ == "__main__":
         # Parse the arguments
         args = parser.parse_args()
 
-        main_logger = setup_logging(app_config, logger_name=f"{args.ID}")
+        main_logger = initialize_logging(config=app_config, logger_name=f"{args.ID}")
 
         downloader = VideoDownloader(id=args.ID, config=app_config, logger=main_logger)
         # Call main, passing the config object and the logger
