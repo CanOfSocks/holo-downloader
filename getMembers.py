@@ -47,7 +47,7 @@ def main(command: Optional[str] = None, frequency: Optional[str] = None, config:
             # We are passing the channel ID as the target of the error.
             discord_web.main(channel_id, "membership-error", message=str(e))
         
-    return common.vid_executor(all_lives=all_lives, command=command, config=config, frequency=frequency)
+    return common.vid_executor(streams=all_lives, command=command, config=config, frequency=frequency)
 
 if __name__ == "__main__":
     try:
