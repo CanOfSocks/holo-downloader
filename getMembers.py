@@ -4,8 +4,12 @@ import common
 from getConfig import ConfigHandler
 import logging
 from typing import Optional, Dict, List, Any
+import discord_web 
 
-def getVideos(members_only: Dict[str, str], command: Optional[str] = None, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging = None) -> list[str] | str:
+from random import uniform
+from time import sleep
+
+def main(command: Optional[str] = None, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging = None) -> list[str] | str:
     """
     Fetches member-only videos for the given channels and executes a command on them.
     
@@ -15,25 +19,17 @@ def getVideos(members_only: Dict[str, str], command: Optional[str] = None, frequ
     :param config: The ConfigHandler object, defaults to a new instance if None.
     """
     # Instantiate ConfigHandler if it's not provided
-    if config is None:
-        config = ConfigHandler()
+    config = config or ConfigHandler()
 
-    if logger is None:
-        logger = common.initialize_logging(config, "getMembers")
+    logger = logger or common.initialize_logging(config, "getMembers")
 
-    from random import uniform
-    from time import sleep
-    
-    # We must import discord_web.main here because it's called inside the loop's exception handler
-    import discord_web 
-    
     all_lives: List[str] = []
     
-    for channel_name in members_only:
+    members_only = config.members_only
+
+    for channel_name, channel_id in members_only.items():
         # Rate limit the API calls
         sleep(uniform(5.0, 10.0))
-        
-        channel_id = members_only[channel_name]
         
         try:
             logger.debug(f"Looking for membership streams for: {channel_name} ({channel_id})")
@@ -50,20 +46,8 @@ def getVideos(members_only: Dict[str, str], command: Optional[str] = None, frequ
             # its internal default config creation here if not explicitly passed.
             # We are passing the channel ID as the target of the error.
             discord_web.main(channel_id, "membership-error", message=str(e))
-            
-    # Assuming common.vid_executor is updated to accept config
-    return common.vid_executor(all_lives, command, config, frequency=frequency)
-
-def main(command: Optional[str] = None, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging = None) -> list[str] | str:
-    # Instantiate ConfigHandler if it's not provided
-    if config is None:
-        config = ConfigHandler()
-
-    if logger is None:
-        logger = common.initialize_logging(config, "getMembers")
         
-    # Pass the members_only dict from the config instance to getVideos
-    return getVideos(config.members_only, command, frequency, config)
+    return common.vid_executor(all_lives=all_lives, command=command, config=config, frequency=frequency)
 
 if __name__ == "__main__":
     try:

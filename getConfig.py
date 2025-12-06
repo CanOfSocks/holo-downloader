@@ -10,23 +10,23 @@ class ConfigHandler:
             config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), config_file)
             with open(config_file, "rb") as toml_file:
                 config = toml.load(toml_file)
-        self.channel_ids_to_match = config.get("channel_ids_to_match", {})
-        self.unarchived_channel_ids_to_match = config.get("unarchived_channel_ids_to_match", {})
-        self.community_tab_channels = config.get("community_tab", {})
+        self.channel_ids_to_match: dict = config.get("channel_ids_to_match", {})
+        self.unarchived_channel_ids_to_match: dict = config.get("unarchived_channel_ids_to_match", {})
+        self.community_tab_channels: dict = config.get("community_tab", {})
         
-        self.title_filter = config.get("title_filter", {})   
-        self.description_filter = config.get("description_filter", {})
-        self.members_only = config.get("members_only", {})
-        self.community_tab = config.get("community_tab", {})
-        self.webhook = config.get("webhook", {})
+        self.title_filter: dict = config.get("title_filter", {})   
+        self.description_filter: dict = config.get("description_filter", {})
+        self.members_only: dict = config.get("members_only", {})
+        self.community_tab: dict = config.get("community_tab", {})
+        self.webhook: dict = config.get("webhook", {})
         
-        self.download_options = config.get("download_options", {})
+        self.download_options: dict = config.get("download_options", {})
         
         #print(self.download_options)
         
-        self.torrent_options = config.get("torrent_options", {})
+        self.torrent_options: dict = config.get("torrent_options", {})
         
-        self.community_tab_options = config.get("community_tab_options", {})
+        self.community_tab_options: dict = config.get("community_tab_options", {})
         
         
 
