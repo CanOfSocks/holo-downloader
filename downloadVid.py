@@ -205,10 +205,11 @@ if __name__ == "__main__":
 
         downloader = VideoDownloader(id=args.ID, config=app_config, logger=main_logger)
         # Call main, passing the config object and the logger
-        downloader.main(use_file_lock=True)
+        downloader.main(use_lock_file=True)
         
     except Exception as e:
         # Use the initialized logger for final error handling
         logging.exception("An unhandled error occurred when attempting to download a video")
 
         raise
+
