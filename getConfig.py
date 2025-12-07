@@ -1,15 +1,17 @@
 from sys import argv
 from pathlib import Path, PurePath
 import os
-import tomllib as toml
-#import json
+import tomlkit
 
 class ConfigHandler:
     def __init__(self, config=None, config_file="config.toml"):
+        # If no dict provided, load via tomlkit
         if config is None and config_file:
-            config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), config_file)
-            with open(config_file, "rb") as toml_file:
-                config = toml.load(toml_file)
+            #config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), config_file)
+            with open(config_file, "rt", encoding="utf-8") as toml_file:
+                config_doc = tomlkit.load(toml_file)
+            # Convert tomlkit document to plain dict for easier usage
+            config = config_doc.unwrap()  # or access config_doc[...] directly if you prefer
         self.channel_ids_to_match: dict = config.get("channel_ids_to_match", {})
         self.unarchived_channel_ids_to_match: dict = config.get("unarchived_channel_ids_to_match", {})
         self.community_tab_channels: dict = config.get("community_tab", {})
@@ -19,14 +21,28 @@ class ConfigHandler:
         self.members_only: dict = config.get("members_only", {})
         self.community_tab: dict = config.get("community_tab", {})
         self.webhook: dict = config.get("webhook", {})
+
+        self.cron_schedule = config.get("cron_schedule", {})
         
         self.download_options: dict = config.get("download_options", {})
-        
-        #print(self.download_options)
-        
         self.torrent_options: dict = config.get("torrent_options", {})
-        
         self.community_tab_options: dict = config.get("community_tab_options", {})
+        
+        # If you want to keep the TOML document for writes:
+        self._config_doc = config_doc if 'config_doc' in locals() else None
+
+    def save(self, config_file="config.toml"):
+        """
+        If the config was loaded via tomlkit and you modified it,
+        you can write it back (preserving comments/format) using tomlkit.
+        Requires that self._config_doc is not None.
+        """
+        if self._config_doc is None:
+                raise RuntimeError("No TOML document loaded — cannot save")
+
+        # Write file with preserved formatting + comments
+        with open(config_file, "wt", encoding="utf-8") as f:
+            tomlkit.dump(self._config_doc, f)
         
         
 
@@ -256,6 +272,12 @@ class ConfigHandler:
     
     def get_remux_container(self):
         return self.download_options.get('remux_extension', None)
+    
+    def get_cron_schedule(self, timer=None):
+        if not timer:
+            return self.cron_schedule
+        else:
+            return self.cron_schedule.get(timer, None)
     
     def get_livestream_dl_options(self, info_dict, output_template):
         options = {

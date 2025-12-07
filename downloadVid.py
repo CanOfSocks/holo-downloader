@@ -47,14 +47,14 @@ class VideoDownloader():
         self.config = config
 
         if logger is None:
-            logger = setup_logging(config, logger_name=id)
+            logger = initialize_logging(config, logger_name=id)
         self.logger = logger
         
         self.kill_current = threading.Event()
         self.livestream_downloader = download_Live.LiveStreamDownloader(kill_all=kill_all, logger=logger, kill_this=self.kill_this)
         self.config = config
 
-        self.info_dict = None
+        self.info_dict = {}
         self.outputFile = None
         
 
@@ -83,10 +83,8 @@ class VideoDownloader():
         discord_notify = threading.Thread(target=discord_web.main, kwargs={"id": self.id, "status": "recording", "config": self.config, "logger": self.logger}, daemon=True)
         discord_notify.start() 
         
-        try:
-            # Pass the imported kill_all event and the logger instance
-            downloader = download_Live.LiveStreamDownloader(kill_all=kill_all, logger=self.logger)
-            downloader.download_segments(info_dict=self.info_dict, resolution=self.config.get_quality(), options=options)
+        try:            
+            self.livestream_downloader.download_segments(info_dict=self.info_dict, resolution=self.config.get_quality(), options=options)
         except Exception as e:
             self.logger.exception("Error occured {0}".format(self.id))
             sleep(1.0)

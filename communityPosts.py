@@ -4,13 +4,13 @@ from getConfig import ConfigHandler
 from os import path
 import logging
 from typing import Optional, Dict, Any
-from common import initialize_logging
+from common import initialize_logging, kill_all
 
 # The global instantiation and immediate logging setup are removed:
 # getConfig = ConfigHandler()
 # setup_logging(...)
 
-def main(command: Optional[str] = None, config: ConfigHandler = None, logger: logging = None):
+def main(config: ConfigHandler = None, logger: logging = None):
     """
     Main function to process the community tab download.
     ConfigHandler is instantiated if not passed.
@@ -38,6 +38,8 @@ def main(command: Optional[str] = None, config: ConfigHandler = None, logger: lo
     if com_tab_folder:
         com_tab_archive = config.get_community_tab_archive()
         for channel in community_tab:
+            if kill_all.is_set():
+                break
             id = community_tab[channel]
             
             # Construct the base command
@@ -69,7 +71,7 @@ if __name__ == "__main__":
         app_config = ConfigHandler()
         
         # 2. Initialize logging using the instance
-        logger = initialize_logging(app_config)
+        logger = initialize_logging(config=app_config, logger_name="community-posts")
         
         # 3. Pass the instance to main()
         main(config=app_config, logger=logger)

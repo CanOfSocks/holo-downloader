@@ -27,7 +27,7 @@ class ChatOnlyDownloader:
         self.logger = logger or initialize_logging(self.config, logger_name="chat_downloader")
         self.downloader = LiveStreamDownloader(kill_all=kill_all, logger=self.logger, kill_this=self.kill_this)
 
-    def run(self, use_lock_file=False) -> None:
+    def main(self, use_lock_file=False) -> None:
         # Setup environment
         common.setup_umask()
 
@@ -96,7 +96,7 @@ if __name__ == "__main__":
         logger = initialize_logging(config=app_config, logger_name="chat_downloader")
         chat_downloader = ChatOnlyDownloader(json_file=args.json, output_path=args.output_path, config=app_config)
         # Call main, passing the config object
-        chat_downloader.run(use_lock_file=True)
+        chat_downloader.main(use_lock_file=True)
         
     except Exception as e:
         # Use the logger initialized above for final error logging

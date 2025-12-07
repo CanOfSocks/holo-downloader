@@ -21,7 +21,7 @@ original_sigint = signal.getsignal(signal.SIGINT)
 def handle_shutdown(signum, frame):
     """Signal handler to set the kill_all event."""
     kill_all.set()
-    sleep(0.5)
+    sleep(5)
     if callable(original_sigint):
         original_sigint(signum, frame)
 
@@ -52,7 +52,7 @@ def initialize_logging(config: ConfigHandler = None, logger_name = None, force =
     )
     return logger
 
-initialize_logging()
+logger = initialize_logging()
 
 def vid_executor(streams: List[str], command: str, config: ConfigHandler = None, unarchived: bool = False, frequency: str = None) -> list[str] | str:    
     if config is None:
@@ -93,6 +93,8 @@ def titleFilter(live: Dict[str, Any], channel_id: str, config: ConfigHandler = N
     if config is None:
         config = ConfigHandler()
 
+    #print(channel_id, type(channel_id))
+
     titFilter = config.get_title_filter().get(channel_id, None)
     if titFilter is None:
         return None
@@ -104,7 +106,7 @@ def titleFilter(live: Dict[str, Any], channel_id: str, config: ConfigHandler = N
         else:
             return False
     except:
-        logging.error("Filter failed")
+        logging.exception("Filter failed")
         return None
     
 def descriptionFilter(live: Dict[str, Any], channel_id: str, config: ConfigHandler = None) -> Optional[bool]:

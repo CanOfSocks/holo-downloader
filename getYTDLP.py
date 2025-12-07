@@ -5,7 +5,7 @@ import time
 from getConfig import ConfigHandler
 import logging
 from typing import Optional, Dict, List, Any
-from common import initialize_logging
+from common import initialize_logging, kill_all
 
 def getVideos(channel_ids_to_match: Dict[str, str], command: Optional[str] = None, unarchived: bool = False, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging.Logger = None) -> list[str] | str:
     """
@@ -27,6 +27,8 @@ def getVideos(channel_ids_to_match: Dict[str, str], command: Optional[str] = Non
     all_lives: List[str] = []
     
     for channel in channel_ids_to_match:
+        if kill_all.is_set():
+            break
         try:
             logger.debug("Looking for: {0}".format(channel))
             # Assuming common.get_upcoming_or_live_videos is updated to accept config

@@ -25,6 +25,7 @@ class UnarchivedDownloader:
         self.config = config or ConfigHandler()
         self.logger = logger or initialize_logging(self.config, logger_name="unarchived_downloader")
         self.downloader = LiveStreamDownloader(kill_all=kill_all, logger=self.logger, kill_this=self.kill_this)
+        self.info_dict = {}
 
     def check_ytdlp_age(self, existing_file: str) -> bool:
         """Checks if a JSON info file is older than 6 hours and removes it if so."""
