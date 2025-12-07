@@ -9,7 +9,6 @@ RUN apk update && apk add --no-cache \
     unzip \
     xz \
     procps \
-    crond \
     git \
     curl \
     tar \
