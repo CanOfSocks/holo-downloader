@@ -49,21 +49,6 @@ RUN wget -q -O "/app/ytct.py" https://raw.githubusercontent.com/HoloArchivists/y
 # ==========================================
 FROM python:3.13-alpine
 
-# ------------------------------------------
-# Install GLIBC (Replaces libc6-compat)
-# ------------------------------------------
-# We use a specific version known to work well with Deno and FFmpeg
-ENV GLIBC_KEY=https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub
-ENV GLIBC_RELEASE=https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.35-r1/glibc-2.35-r1.apk
-ENV GLIBC_BIN_RELEASE=https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.35-r1/glibc-bin-2.35-r1.apk
-
-RUN apk update && \
-    apk add --no-cache ca-certificates wget && \
-    wget -q -O /etc/apk/keys/sgerrand.rsa.pub "$GLIBC_KEY" && \
-    wget "$GLIBC_RELEASE" && \
-    wget "$GLIBC_BIN_RELEASE" && \
-    apk add --no-cache --force-overwrite glibc-2.35-r1.apk glibc-bin-2.35-r1.apk && \
-    rm glibc-2.35-r1.apk glibc-bin-2.35-r1.apk
 
 # ------------------------------------------
 # Install System Dependencies
@@ -71,23 +56,23 @@ RUN apk update && \
 # Note: Removed libc6-compat and gcompat as we now have real glibc
 # Kept libstdc++ as many binaries still link to it
 RUN apk add --no-cache \
-    libstdc++ \
     git \
     curl \
-    bash
+    ffmpeg \
+    deno
 
 WORKDIR /app
 
 # ------------------------------------------
 # Copy Binaries & Set Permissions
 # ------------------------------------------
-COPY --from=builder /build-bin/ffmpeg /usr/local/bin/ffmpeg
-COPY --from=builder /build-bin/ffprobe /usr/local/bin/ffprobe
-COPY --from=builder /build-deno/bin/deno /usr/local/bin/deno
+#COPY --from=builder /build-bin/ffmpeg /usr/local/bin/ffmpeg
+#COPY --from=builder /build-bin/ffprobe /usr/local/bin/ffprobe
+#COPY --from=builder /build-deno/bin/deno /usr/local/bin/deno
 
-RUN chmod 755 /usr/local/bin/ffmpeg \
-    /usr/local/bin/ffprobe \
-    /usr/local/bin/deno
+#RUN chmod 755 /usr/local/bin/ffmpeg \
+#    /usr/local/bin/ffprobe \
+#    /usr/local/bin/deno
 
 # ------------------------------------------
 # Copy Application Files
