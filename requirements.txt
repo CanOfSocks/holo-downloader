@@ -1,7 +1,6 @@
 yt-dlp>=2023.10.13
 discord-webhook>=1.3.0
 git+https://github.com/mikelei8291/chat-downloader.git
-psutil>=5.9.4
 py3createtorrent>=1.2.0
 croniter>=3.0.3
 bgutil-ytdlp-pot-provider>=1.2.2
