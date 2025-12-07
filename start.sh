@@ -34,14 +34,14 @@ fi
 # Run the pre-start script as root (or the initial user)
 python /app/discord_web.py '0' 'starting'
 
-cd /app
+
 # Start the main application
 if [ -n "$PUID" ] && [ -n "$PGID" ]; then
     # 4. Use 'su-exec' or 'gosu' for safe privilege drop in Alpine,
     # or a simpler busybox 'su' without a login shell.
     # The 'su -' logic is safer if the user has a shell configured.
     # /bin/sh is the default minimal shell on Alpine.
-    exec su - "$USERNAME" -c "python /app/web.py --config /app/config.toml"
+    exec su - "$USERNAME" -c "cd /app; python /app/web.py"
 else
-    exec python /app/web.py --config /app/config.toml
+    exec python /app/web.py
 fi
