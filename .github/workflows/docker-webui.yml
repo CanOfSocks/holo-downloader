@@ -1,0 +1,54 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ "webui" ]
+  pull_request:
+    branches: [ "webui" ]
+  schedule:
+    - cron: "5 0 6 * *"
+  repository_dispatch:
+    types: [yt-dlp_release_update]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: canofsocks
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Log into GHCR
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker create tag meta
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            canofsocks/holo-downloader
+            ghcr.io/canofsocks/holo-downloader
+          tags: |
+            type=edge,branch=webui
+            type=ref,event=branch
+            type=sha
+            # (you can omit other tags like latest/raw if you don't want them)
+
+      - name: Build and publish
+        uses: docker/build-push-action@v4
+        if: github.ref == 'refs/heads/webui'
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
