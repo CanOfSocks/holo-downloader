@@ -44,7 +44,6 @@ WORKDIR /app
 COPY . .
 
 RUN apk add --no-cache \
-        bash \
         git \
         curl
 
