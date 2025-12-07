@@ -48,7 +48,7 @@ RUN apk add --no-cache \
         curl
 
 # Set permissions for Python scripts and Cron file
-RUN chmod +x *.py /app/startCron.sh
+RUN chmod +x *.py /app/start.sh
 
 # Install remaining dependencies
 RUN pip install --no-cache-dir -r /app/livestream_dl/requirements.txt
