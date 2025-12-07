@@ -34,6 +34,7 @@ fi
 # Run the pre-start script as root (or the initial user)
 python /app/discord_web.py '0' 'starting'
 
+cd /app
 # Start the main application
 if [ -n "$PUID" ] && [ -n "$PGID" ]; then
     # 4. Use 'su-exec' or 'gosu' for safe privilege drop in Alpine,
