@@ -356,7 +356,7 @@ ACTIVE_TABLE_TEMPLATE = """
         <tr>
             <td>{{ job.id }}</td>
             <td>{{ job.info.get("fulltitle", "") }}</td>
-            <td><span class="badge bg-info">{{ job.stats.get('video', {}).get('status', "") or job.stats.get('audio', {}).get('status', "Unknown") }}</span></td>
+            <td><span class="badge bg-info">{{ job.stats.get('video', {}).get('status', "") or job.stats.get('audio', {}).get('status', "") or job.stats.get('status', "Unknown") }}</span></td>
             <td>{{ job.stats.get('video', {}).get('downloaded_segments', None) }}</td>
             <td>{{ job.stats.get('audio', {}).get('downloaded_segments', None) }}</td>
             <td>{{ job.stats.get('video', {}).get('latest_sequence', 0) or job.stats.get('audio', {}).get('latest_sequence', 0) }}</td>

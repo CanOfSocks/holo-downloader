@@ -2,6 +2,7 @@
 import argparse
 import common
 import time
+import discord_web
 from getConfig import ConfigHandler
 import logging
 from typing import Optional, Dict, List, Any
@@ -35,6 +36,7 @@ def getVideos(channel_ids_to_match: Dict[str, str], command: Optional[str] = Non
             lives = common.get_upcoming_or_live_videos(channel_ids_to_match[channel], config, tab="streams")
             all_lives.extend(lives)
         except Exception as e:
+            discord_web.main(channel_ids_to_match[channel], "error", message=f"Error getting streams:\n{type(e).__name__}: {str(e)}"[-500:], config=config)
             logger.exception("Error fetching streams for {0}. Check cookies.".format(channel))
             
     if unarchived:

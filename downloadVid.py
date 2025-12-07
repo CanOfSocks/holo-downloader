@@ -84,9 +84,13 @@ class VideoDownloader():
         discord_notify.start() 
         
         try:            
+            self.livestream_downloader.stats["status"] = "Recording"
             self.livestream_downloader.download_segments(info_dict=self.info_dict, resolution=self.config.get_quality(), options=options)
+            
+            self.livestream_downloader.stats["status"] = "Finished"
         except Exception as e:
             self.logger.exception("Error occured {0}".format(self.id))
+            self.livestream_downloader.stats["status"] = "Error"
             sleep(1.0)
             raise Exception(("{2} - Error downloading video: {0}, Code: {1}".format(self.id, e, asctime())))
         finally:
@@ -142,7 +146,7 @@ class VideoDownloader():
         def run_download():
             # Use the config object for pre-download notification
             discord_web.main(self.id, "waiting", config=self.config)
-            
+            self.livestream_downloader.stats["status"] = "Waiting"
             try:
                 # Pass config and logger
                 self.outputFile, self.info_dict = self.download_video_info(self.id)
