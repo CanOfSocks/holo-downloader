@@ -301,7 +301,7 @@ def index():
 
 @app.route('/actions/check', methods=['POST'])
 def manual_check():
-    threading.Thread(target=start_download).start()
+    threading.Thread(target=get_streams).start()
     flash("Manual check triggered! Tables will update shortly.", "success")
     return redirect(url_for('index'))
 
