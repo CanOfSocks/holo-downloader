@@ -1,3 +1,6 @@
+# ==========================================
+# Stage 1: Builder
+# ==========================================
 FROM python:3.13-alpine AS builder
 
 # Install build dependencies
@@ -10,7 +13,7 @@ RUN apk add --no-cache \
     findutils
 
 # ------------------------------------------
-# 1. Install Jellyfin FFmpeg (ROBUST METHOD)
+# 1. Install Jellyfin FFmpeg (Robust Method)
 # ------------------------------------------
 RUN set -e; \
     latest_tag=$(curl -Ls -o /dev/null -w %{url_effective} https://github.com/jellyfin/jellyfin-ffmpeg/releases/latest | awk -F'/' '{print $NF}'); \
@@ -18,19 +21,12 @@ RUN set -e; \
     asset_url="https://github.com/jellyfin/jellyfin-ffmpeg/releases/download/$latest_tag/jellyfin-ffmpeg_${latest_tag#v}_portable_linux64-gpl.tar.xz"; \
     echo "Downloading: $asset_url"; \
     wget -O ffmpeg.tar.xz "$asset_url"; \
-    # Create temp directory
     mkdir -p /tmp/ffmpeg-extract; \
-    # Extract WITHOUT stripping components (safer)
     tar -xvf ffmpeg.tar.xz -C /tmp/ffmpeg-extract; \
-    # Prepare target directory
     mkdir -p /build-bin; \
-    # USE FIND to locate the binary regardless of folder structure
+    # Find binaries regardless of folder structure
     find /tmp/ffmpeg-extract -name "ffmpeg" -type f -exec cp {} /build-bin/ \;; \
     find /tmp/ffmpeg-extract -name "ffprobe" -type f -exec cp {} /build-bin/ \;; \
-    # Verify they exist (will fail build if not found)
-    ls -lh /build-bin/ffmpeg; \
-    ls -lh /build-bin/ffprobe; \
-    # Cleanup
     rm -rf ffmpeg.tar.xz /tmp/ffmpeg-extract
 
 # ------------------------------------------
@@ -49,45 +45,69 @@ RUN wget -q -O "/app/ytct.py" https://raw.githubusercontent.com/HoloArchivists/y
 
 
 # ==========================================
-# Stage 2: Final Image
+# Stage 2: Final Image with GLIBC
 # ==========================================
 FROM python:3.13-alpine
 
-# Install compatibility libraries for glibc binaries (FFmpeg/Deno) on Alpine
+# ------------------------------------------
+# Install GLIBC (Replaces libc6-compat)
+# ------------------------------------------
+# We use a specific version known to work well with Deno and FFmpeg
+ENV GLIBC_KEY=https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub
+ENV GLIBC_RELEASE=https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.35-r1/glibc-2.35-r1.apk
+ENV GLIBC_BIN_RELEASE=https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.35-r1/glibc-bin-2.35-r1.apk
+
+RUN apk update && \
+    apk add --no-cache ca-certificates wget && \
+    wget -q -O /etc/apk/keys/sgerrand.rsa.pub "$GLIBC_KEY" && \
+    wget "$GLIBC_RELEASE" && \
+    wget "$GLIBC_BIN_RELEASE" && \
+    apk add --no-cache --force-overwrite glibc-2.35-r1.apk glibc-bin-2.35-r1.apk && \
+    rm glibc-2.35-r1.apk glibc-bin-2.35-r1.apk
+
+# ------------------------------------------
+# Install System Dependencies
+# ------------------------------------------
+# Note: Removed libc6-compat and gcompat as we now have real glibc
+# Kept libstdc++ as many binaries still link to it
 RUN apk add --no-cache \
-    libc6-compat \
     libstdc++ \
-    gcompat \
     git \
     curl \
-    ca-certificates
+    bash
 
 WORKDIR /app
 
-# Copy Binaries
+# ------------------------------------------
+# Copy Binaries & Set Permissions
+# ------------------------------------------
 COPY --from=builder /build-bin/ffmpeg /usr/local/bin/ffmpeg
 COPY --from=builder /build-bin/ffprobe /usr/local/bin/ffprobe
 COPY --from=builder /build-deno/bin/deno /usr/local/bin/deno
 
-# Set execution permissions
 RUN chmod 755 /usr/local/bin/ffmpeg \
     /usr/local/bin/ffprobe \
     /usr/local/bin/deno
 
+# ------------------------------------------
 # Copy Application Files
+# ------------------------------------------
 COPY --from=builder /app/livestream_dl /app/livestream_dl
 COPY --from=builder /app/ytct.py /app/ytct.py
 COPY . .
 
-# Set permissions for scripts
 RUN chmod +x *.py /app/start.sh
 
+# ------------------------------------------
 # Install Python Dependencies
+# ------------------------------------------
 RUN pip install --no-cache-dir -r /app/livestream_dl/requirements.txt && \
     pip install --no-cache-dir -r /app/requirements.txt && \
     pip install --no-cache-dir -e "git+https://github.com/HoloArchivists/youtube-community-tab.git#egg=youtube-community-tab&subdirectory=youtube-community-tab"
 
+# ------------------------------------------
 # Patches
+# ------------------------------------------
 RUN (sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" /usr/local/lib/python*/site-packages/chat_downloader/sites/youtube.py) ; \
     (sed -i "/if[[:space:]]\+fmt_stream\.get('targetDurationSec'):/,/^[[:space:]]*continue/s/^[[:space:]]*/&#/" "$(pip show yt-dlp | awk '/Location/ {print $2}')/yt_dlp/extractor/youtube/_video.py")
 
