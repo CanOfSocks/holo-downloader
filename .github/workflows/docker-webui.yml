@@ -45,7 +45,7 @@ jobs:
 
       - name: Build and publish
         uses: docker/build-push-action@v4
-        if: github.ref == 'refs/heads/webui'
+        if: github.ref == 'refs/heads/web-ui'
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
