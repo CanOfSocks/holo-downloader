@@ -1,14 +1,23 @@
-FROM python:3.13-slim AS builder
+FROM python:3.13-alpine AS builder
 
-# Install dependencies and download tools in one step
-RUN apt-get update && apt-get install --no-install-recommends -y \
-    wget unzip xz-utils procps cron git && \
-    apt-get clean -y
+# Install core dependencies using apk
+# Alpine uses 'apk add' instead of 'apt-get install'
+# We install the Alpine equivalent packages:
+#   - wget, unzip, xz, procps, crond (for cron), git
+RUN apk update && apk add --no-cache \
+    wget \
+    unzip \
+    xz \
+    procps \
+    crond \
+    git \
+    curl \
+    tar \
+    ca-certificates
 
 # Install latest Jellyfin FFmpeg binary release from GitHub
-RUN apt-get update && apt-get install --no-install-recommends -y \
-    curl wget tar xz-utils ca-certificates && \
-    set -e; \
+# All necessary packages (curl, wget, tar, xz, ca-certificates) are already installed above.
+RUN set -e; \
     latest_tag=$(curl -Ls -o /dev/null -w %{url_effective} https://github.com/jellyfin/jellyfin-ffmpeg/releases/latest | awk -F'/' '{print $NF}'); \
     echo "Latest tag: $latest_tag"; \
     asset_url="https://github.com/jellyfin/jellyfin-ffmpeg/releases/download/$latest_tag/jellyfin-ffmpeg_${latest_tag#v}_portable_linux64-gpl.tar.xz"; \
