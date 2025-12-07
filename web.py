@@ -565,6 +565,12 @@ CONFIG_TEMPLATE = """
 # --- Main Entry Point ---
 
 if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description="Web App runner")
+    parser.add_argument('--config', type=str, default="config.toml", help='Config file (defaults to "config.toml")')
+    args = parser.parse_args()
+
+    CONFIG_FILE = args.config
     # Initialize DB
     init_db()
     
