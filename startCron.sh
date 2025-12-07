@@ -20,7 +20,7 @@ if [[ -n "$PUID" && -n "$PGID" ]]; then
   fi
 
   # Fix ownership of /app
-  chown -R "$PUID:$PGID" /app
+  chown "$PUID:$PGID" /app /app/*
 fi
 
 # (Optional) any pre-start hooks, e.g. notifications
