@@ -29,7 +29,7 @@ ARG DENO_INSTALL=/usr
 RUN curl -fsSL https://deno.land/install.sh | sh
 
 # Final minimal image setup
-FROM python:3.13-slim
+FROM python:3.13-alpine
 
 # Copy only the necessary files from the builder stage
 COPY --from=builder /usr/bin/ffmpeg /usr/bin/
@@ -43,9 +43,10 @@ WORKDIR /app
 # Copy application files
 COPY . .
 
-RUN apt-get update && apt-get install --no-install-recommends -y \
-         procps cron git curl && \
-         apt-get clean -y
+RUN apk add --no-cache \
+        bash \
+        git \
+        curl
 
 # Set permissions for Python scripts and Cron file
 RUN chmod +x *.py /app/startCron.sh
