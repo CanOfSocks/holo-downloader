@@ -18,7 +18,7 @@ trap terminate SIGTERM SIGINT
 start_app() {
     local user="${1:-$(whoami)}"
     local cron_content
-    su -c \"${UMASK:+umask $UMASK;} python /app/getVids.py --command 'spawn' --frequency '${VIDEOSCHEDULE}'\" $user
+    su -c \"${UMASK:+umask $UMASK;} python /app/web.py \" $user
 }
 
 
