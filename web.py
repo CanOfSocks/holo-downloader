@@ -572,4 +572,4 @@ if __name__ == '__main__':
     update_scheduler()
     scheduler.start()
     
-    app.run(debug=True, use_reloader=False, port=5000)
+    app.run(debug=True, host='0.0.0.0', use_reloader=False, port=5000)
