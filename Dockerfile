@@ -32,11 +32,11 @@ RUN curl -fsSL https://deno.land/install.sh | sh
 FROM python:3.13-alpine
 
 # Copy only the necessary files from the builder stage
-COPY --from=builder /usr/bin/ffmpeg /usr/bin/
-COPY --from=builder /usr/bin/ffprobe /usr/bin/
+#COPY --from=builder /usr/bin/ffmpeg /usr/bin/
+#COPY --from=builder /usr/bin/ffprobe /usr/bin/
 COPY --from=builder /app/livestream_dl /app/livestream_dl
 COPY --from=builder /app/ytct.py /app/ytct.py
-COPY --from=builder /usr/bin/deno /usr/bin/
+#COPY --from=builder /usr/bin/deno /usr/bin/
 
 WORKDIR /app
 
@@ -45,7 +45,8 @@ COPY . .
 
 RUN apk add --no-cache \
         git \
-        curl
+        curl \
+        ffmpeg
 
 # Set permissions for Python scripts and Cron file
 RUN chmod +x *.py /app/start.sh
@@ -54,6 +55,7 @@ RUN chmod +x *.py /app/start.sh
 RUN pip install --no-cache-dir -r /app/livestream_dl/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 RUN pip install --no-cache-dir -e "git+https://github.com/HoloArchivists/youtube-community-tab.git#egg=youtube-community-tab&subdirectory=youtube-community-tab"
+RUN pip install --no-cache-dir -U deno
 
 # Modify yt-dlp
 RUN (sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" /usr/local/lib/python*/site-packages/chat_downloader/sites/youtube.py) ; (sed -i "/if[[:space:]]\+fmt_stream\.get('targetDurationSec'):/,/^[[:space:]]*continue/s/^[[:space:]]*/&#/" "$(pip show yt-dlp | awk '/Location/ {print $2}')/yt_dlp/extractor/youtube/_video.py")
