@@ -70,7 +70,7 @@ WORKDIR /app
 
 # 2. Copy the Deno Binary
 # This corresponds to Line 12 in your image (copy /deno/deno)
-COPY --from=deno_source /usr/local/deno /usr/local/bin/deno
+COPY --from=deno_source /bin/deno /usr/local/bin/deno
 
 # 3. Copy the glibc Compatibility Libraries (CRITICAL STEP)
 # This corresponds to Lines 3 and 4 in your image which install the necessary lib files.
