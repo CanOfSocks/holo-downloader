@@ -47,6 +47,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             video_id VARCHAR(11),
             type VARCHAR(20),
+            status VARCHAR(20),
             total_size INTEGER,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
@@ -61,8 +62,8 @@ def save_to_history(video_id, stats, download_type="unknown"):
     
     download_size = stats.get('video', {}).get("current_filesize", 0) + stats.get('audio', {}).get("current_filesize", 0)
 
-    c.execute('INSERT INTO history (video_id, type, total_size) VALUES (?, ?, ?)',
-              (video_id, download_type, convert_bytes(download_size)))
+    c.execute('INSERT INTO history (video_id, type, total_size, status) VALUES (?, ?, ?, ?)',
+              (video_id, download_type, convert_bytes(download_size), stats.get("status", None)))
     
     c.execute('''
         DELETE FROM history WHERE id NOT IN (
