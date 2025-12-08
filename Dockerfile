@@ -58,7 +58,7 @@ FROM python:3.13-alpine
 RUN apk add --no-cache \
     git \
     curl \
-    jellyfin-ffmpeg \
+    ffmpeg \
     deno
 
 WORKDIR /app
