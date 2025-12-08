@@ -42,6 +42,17 @@ def send_webhook(url: str, id: str = "Unknown", status: str = "error", message: 
         webhook.add_embed(embed)
         webhook.execute()
         return
+    elif(status=="playlist-error"):
+        title = "Playlist error"
+        color="ff0000"
+        embed = DiscordEmbed(title, description=("Error checking streams playlist for [{0}](https://www.youtube.com/channel/{0}). \nCheck cookies!".format(id)), color=color)
+        if message:
+            embed.add_embed_field(name="Error Message: {0}".format(id), value=message)
+            embed.set_footer(text='Error Logger')
+        embed.set_timestamp()
+        webhook.add_embed(embed)
+        webhook.execute()
+        return
     
     embed_error: Optional[str] = None
     try:
