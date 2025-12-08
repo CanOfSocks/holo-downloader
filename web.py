@@ -10,6 +10,7 @@ from flask import Flask, render_template_string, request, redirect, url_for, fla
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 import tomlkit
+import uuid
 
 from getConfig import ConfigHandler
 import downloadVid
@@ -231,6 +232,7 @@ def update_scheduler():
             common.logger.debug("Error creating schedule for {0}: {1}".format(schedule_type, message))
     return True, "All valid schedules loaded"
 
+
 # --- Helper for HTMX Data Routes ---
 
 def get_active_jobs_data():
@@ -389,7 +391,7 @@ HISTORY_TABLE_TEMPLATE = """
             <td>{{ row.id }}</td>
             <td>{{ row.video_id }}</td>
             <td>{{ row.title }}</td>
-            <td>{{ (row.total_size) | convert_bytes }}</td>
+            <td>{{ (int(row.total_size)) | convert_bytes }}</td>
             <td>{{ row.timestamp }}</td>
         </tr>
         {% endfor %}
