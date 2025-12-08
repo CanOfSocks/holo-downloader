@@ -43,7 +43,7 @@ RUN apk add --no-cache git
 RUN git clone "https://github.com/CanOfSocks/livestream_dl" /app/livestream_dl
 RUN wget -q -O "/app/ytct.py" https://raw.githubusercontent.com/HoloArchivists/youtube-community-tab/master/ytct.py
 
-FROM denoland/deno:bin AS deno_source
+FROM denoland/deno:alpine AS deno_source
 
 FROM python:3.13-alpine
 
@@ -57,7 +57,7 @@ RUN apk add --no-cache \
     git \
     curl \
     ffmpeg \
-    deno
+    libc6-compat
 
 WORKDIR /app
 
@@ -68,6 +68,16 @@ WORKDIR /app
 #COPY --from=builder /build-bin/ffprobe /usr/local/bin/ffprobe
 #COPY --from=builder /build-deno/bin/deno /usr/local/bin/deno
 
+# 2. Copy the Deno Binary
+# This corresponds to Line 12 in your image (copy /deno/deno)
+COPY --from=deno_source /usr/local/bin/deno /usr/local/bin/deno
+
+# 3. Copy the glibc Compatibility Libraries (CRITICAL STEP)
+# This corresponds to Lines 3 and 4 in your image which install the necessary lib files.
+# The official image installs them to /usr/local/lib/
+COPY --from=deno_source /usr/local/lib/lib*linux-gnu* /usr/local/lib/
+COPY --from=deno_source /usr/local/lib/ld-linux-* /usr/local/lib/
+ENV LD_LIBRARY_PATH=/usr/local/lib
 #RUN chmod 755 /usr/local/bin/ffmpeg \
 #    /usr/local/bin/ffprobe \
 #    /usr/local/bin/deno
