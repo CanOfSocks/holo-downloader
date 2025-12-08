@@ -75,7 +75,7 @@ WORKDIR /app
 # ------------------------------------------
 # Copy Application Files
 # ------------------------------------------
-COPY --from=deno_source /deno /usr/local/bin/deno
+COPY --from=deno_source /deno /usr/bin/deno
 COPY --from=builder /app/livestream_dl /app/livestream_dl
 COPY --from=builder /app/ytct.py /app/ytct.py
 COPY . .
