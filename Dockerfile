@@ -57,7 +57,7 @@ RUN apk add --no-cache \
     git \
     curl \
     ffmpeg \
-    gcompat
+    deno
 
 WORKDIR /app
 
