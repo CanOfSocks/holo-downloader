@@ -253,6 +253,7 @@ def convert_bytes(bytes):
         try:
             int(float(bytes))
         except Exception as e:
+            common.logger.exception("Error converting {0} to number".format(bytes))
             return "Invalid Value"
         # List of units in order
         units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB']
