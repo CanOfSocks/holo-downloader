@@ -362,11 +362,31 @@ def config_page():
         content = f.read()
     return render_template_string(CONFIG_TEMPLATE, config_content=content)
 
+@app.route('/actions/cancel/<video_id>', methods=['POST'])
+def cancel_download(video_id):
+    """Sets the kill flag to True for a specific downloader."""
+    with LOCK:
+        if video_id in active_downloads:
+            job_entry = active_downloads[video_id]
+            downloader_instance: downloadVid.VideoDownloader = job_entry.get('downloader')
+            
+            # Navigate to the inner downloader object that holds the flag
+            # Based on your existing code: downloader -> livestream_downloader
+            try:
+                downloader_instance.kill_current.set()
+            except Exception as e:
+                common.logger.error(f"Failed to cancel {video_id}: {e}")
+                flash(f"Error cancelling {video_id}", "danger")
+        else:
+            flash(f"Stream {video_id} is not currently active.", "secondary")
+            
+    return redirect(url_for('index'))
+
 # --- HTMX Table Templates (Unchanged) ---
 
 ACTIVE_TABLE_TEMPLATE = """
 {% if active_downloads %}
-<table class="table table-striped">
+<table class="table table-striped align-middle">
     <thead>
         <tr>
             <th>Video ID</th>
@@ -375,27 +395,39 @@ ACTIVE_TABLE_TEMPLATE = """
             <th>Video Segments</th>
             <th>Audio Segments</th>
             <th>Latest Segment</th>
-            <th>Downloaded</th>
+            <th>Size</th>
             <th>Started At</th>
+            <th>Action</th>
         </tr>
     </thead>
     <tbody>
         {% for job in active_downloads %}
         <tr>
             <td>{{ job.id }}</td>
-            <td>{{ job.info.get("fulltitle", "") }}</td>
+            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ job.info.get("fulltitle", "") }}">
+                {{ job.info.get("fulltitle", "") }}
+            </td>
             <td><span class="badge bg-info">{{ job.stats.get('video', {}).get('status', "") or job.stats.get('audio', {}).get('status', "") or job.stats.get('status', "Unknown") }}</span></td>
-            <td>{{ job.stats.get('video', {}).get('downloaded_segments', None) }}</td>
-            <td>{{ job.stats.get('audio', {}).get('downloaded_segments', None) }}</td>
+            <td>{{ job.stats.get('video', {}).get('downloaded_segments', 0) }}</td>
+            <td>{{ job.stats.get('audio', {}).get('downloaded_segments', 0) }}</td>
             <td>{{ job.stats.get('video', {}).get('latest_sequence', 0) or job.stats.get('audio', {}).get('latest_sequence', 0) }}</td>
             <td>{{ (job.stats.get('video', {}).get('current_filesize', 0) + job.stats.get('audio', {}).get('current_filesize', 0)) | convert_bytes }}</td>
             <td>{{ job.start_time }}</td>
+            <td>
+                <form action="/actions/cancel/{{ job.id }}" method="POST" style="margin:0;">
+                    <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Stop recording {{ job.id }}?');" title="Stop Download">
+                        🗑️
+                    </button>
+                </form>
+            </td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
 {% else %}
-<p class="text-muted">No active downloads.</p>
+<div class="text-center p-3">
+    <p class="text-muted mb-0">No active downloads.</p>
+</div>
 {% endif %}
 """
 
