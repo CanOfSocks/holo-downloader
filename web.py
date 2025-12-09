@@ -407,7 +407,7 @@ ACTIVE_TABLE_TEMPLATE = """
             <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ job.info.get("fulltitle", "") }}">
                 {{ job.info.get("fulltitle", "") }}
             </td>
-            <td><span class="badge bg-info">{{ job.stats.get('video', {}).get('status', "") or job.stats.get('audio', {}).get('status', "") or job.stats.get('status', "Unknown") }}</span></td>
+            <td><span class="badge bg-info">{{ job.stats.get('status', "Unknown") }}</span></td>
             <td>{{ job.stats.get('video', {}).get('downloaded_segments', 0) }}</td>
             <td>{{ job.stats.get('audio', {}).get('downloaded_segments', 0) }}</td>
             <td>{{ job.stats.get('video', {}).get('latest_sequence', 0) or job.stats.get('audio', {}).get('latest_sequence', 0) }}</td>
