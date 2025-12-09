@@ -130,7 +130,7 @@ class VideoDownloader():
             # Call get_Video_Info with config dependencies
             info_dict, live_status = getUrls.get_Video_Info(
                 id=video_url, 
-                wait=(10,900), 
+                wait=(60,900), 
                 cookies=self.config.get_cookies_file(), 
                 proxy=self.config.get_proxy(), 
                 additional_options=additional_ytdlp_options, 

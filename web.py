@@ -398,7 +398,7 @@ ACTIVE_TABLE_TEMPLATE = """
             <th>Latest Segment</th>
             <th>Size</th>
             <th>Started At</th>
-            <th>Action</th>
+            <th>Cancel</th>
         </tr>
     </thead>
     <tbody>
