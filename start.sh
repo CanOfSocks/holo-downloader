@@ -33,7 +33,7 @@ if [ -n "$PUID" ] && [ -n "$PGID" ]; then
     # or a simpler busybox 'su' without a login shell.
     # The 'su -' logic is safer if the user has a shell configured.
     # /bin/sh is the default minimal shell on Alpine.
-    exec su "$USERNAME" -c "python /app/web.py"
+    exec gosu "$PUID:$PGID" python /app/web.py
 else
     exec python /app/web.py
 fi

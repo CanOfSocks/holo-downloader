@@ -42,7 +42,7 @@ WORKDIR /app
 COPY . .
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-         git curl && \
+         git curl gosu && \
          apt-get clean -y
 
 # Set permissions for Python scripts and start file
