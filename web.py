@@ -438,6 +438,7 @@ HISTORY_TABLE_TEMPLATE = """
         <tr>
             <th>ID</th>
             <th>Video ID</th>
+            <th>Download Type</th>
             <th>Status</th>
             <th>Size</th>
             <th>Date</th>
@@ -448,6 +449,7 @@ HISTORY_TABLE_TEMPLATE = """
         <tr>
             <td>{{ row.id }}</td>
             <td>{{ row.video_id }}</td>
+            <td>{{ row.type }}</td>
             <td>{{ row.status }}</td>
             <td>{{ (row.total_size) | convert_bytes }}</td>
             <td>{{ row.timestamp }}</td>
