@@ -50,7 +50,6 @@ class VideoDownloader():
             logger = initialize_logging(config, logger_name=id)
         self.logger = logger
         
-        self.kill_current = threading.Event()
         self.livestream_downloader = download_Live.LiveStreamDownloader(kill_all=kill_all, logger=logger, kill_this=self.kill_this)
         self.config = config
 

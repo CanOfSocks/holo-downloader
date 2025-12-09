@@ -373,7 +373,7 @@ def cancel_download(video_id):
             # Navigate to the inner downloader object that holds the flag
             # Based on your existing code: downloader -> livestream_downloader
             try:
-                downloader_instance.kill_current.set()
+                downloader_instance.kill_this.set()
             except Exception as e:
                 common.logger.error(f"Failed to cancel {video_id}: {e}")
                 flash(f"Error cancelling {video_id}", "danger")
