@@ -250,6 +250,10 @@ def get_active_jobs_data():
 
 # --- Helper to format byte strings ---
 def convert_bytes(bytes):
+        try:
+            int(float(bytes))
+        except Exception as e:
+            return "Invalid Value"
         # List of units in order
         units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB']
         
@@ -304,7 +308,28 @@ def index():
 
 @app.route('/actions/check', methods=['POST'])
 def manual_check():
-    threading.Thread(target=get_streams).start()
+    """Triggers an existing job's function to run immediately."""
+
+    manual_check_id = "manual-stream-check"
+
+    # 1. Get the existing job object
+    job = scheduler.get_job(manual_check_id)
+
+    if job:
+        common.logger.warning("Manual stream check already running")
+        flash("Manual stream check already triggered, please wait for existing check to finish", "warning")
+        return redirect(url_for('index'))
+
+    # 2. Schedule a new one-off job with the same function/parameters
+    scheduler.add_job(
+        get_streams, 
+        trigger='date',
+        run_date=datetime.now(),
+        id=manual_check_id
+        # Copying job stores, executor, etc. is often unnecessary
+        # but you might want to specify executor if you need a different one.
+    )
+    common.logger.debug(f"Successfully triggered immediate run for job ID: {manual_check_id}")
     flash("Manual check triggered! Tables will update shortly.", "success")
     return redirect(url_for('index'))
 
@@ -380,7 +405,7 @@ HISTORY_TABLE_TEMPLATE = """
         <tr>
             <th>ID</th>
             <th>Video ID</th>
-            <th>Title</th>
+            <th>Status</th>
             <th>Size</th>
             <th>Date</th>
         </tr>
@@ -390,8 +415,8 @@ HISTORY_TABLE_TEMPLATE = """
         <tr>
             <td>{{ row.id }}</td>
             <td>{{ row.video_id }}</td>
-            <td>{{ row.title }}</td>
-            <td>{{ (int(row.total_size)) | convert_bytes }}</td>
+            <td>{{ row.status }}</td>
+            <td>{{ (row.total_size) | convert_bytes }}</td>
             <td>{{ row.timestamp }}</td>
         </tr>
         {% endfor %}
