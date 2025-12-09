@@ -21,7 +21,7 @@ if [ -n "$PUID" ] && [ -n "$PGID" ]; then
     fi
 
     # Fix ownership of /app (and its contents) — adjust as needed for nested dirs
-    chown -R "$PUID:$PGID" /app
+    chown "$PUID:$PGID" /app /app/*
 fi
 
 # Run pre-start script as root (or the initial user)
