@@ -40,18 +40,18 @@ class VideoDownloader():
         
         self.id = id        
         
-        self.kill_this = kill_this or threading.Event()
+        self.kill_this: threading.Event = kill_this or threading.Event()
 
         if config is None:
             config = ConfigHandler()
-        self.config = config
+        self.config: ConfigHandler = config
 
         if logger is None:
             logger = initialize_logging(config, logger_name=id)
-        self.logger = logger
+        self.logger: logging = logger
         
         self.livestream_downloader = download_Live.LiveStreamDownloader(kill_all=kill_all, logger=logger, kill_this=self.kill_this)
-        self.config = config
+        
 
         self.info_dict = {}
         self.outputFile = None
@@ -86,7 +86,13 @@ class VideoDownloader():
             self.livestream_downloader.stats["status"] = "Recording"
             self.livestream_downloader.download_segments(info_dict=self.info_dict, resolution=self.config.get_quality(), options=options)
             
-            self.livestream_downloader.stats["status"] = "Finished"
+            if self.kill_this.is_set():
+                self.livestream_downloader.stats["status"] = "Cancelled"
+            else:
+                self.livestream_downloader.stats["status"] = "Finished"
+        except KeyboardInterrupt as e:
+            self.livestream_downloader.stats["status"] = "Cancelled"
+            self.logger.warning("Download of {0} was cancelled".format(self.id))
         except Exception as e:
             self.logger.exception("Error occured {0}".format(self.id))
             self.livestream_downloader.stats["status"] = "Error"
