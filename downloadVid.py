@@ -93,6 +93,7 @@ class VideoDownloader():
         except KeyboardInterrupt as e:
             self.livestream_downloader.stats["status"] = "Cancelled"
             self.logger.warning("Download of {0} was cancelled".format(self.id))
+            return
         except Exception as e:
             self.logger.exception("Error occured {0}".format(self.id))
             self.livestream_downloader.stats["status"] = "Error"
