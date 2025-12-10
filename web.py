@@ -25,7 +25,7 @@ config_file_path = 'config.toml'
 DB_FILE = 'stream_history.db'
 LOCK = threading.Lock()
 
-scheduler = BackgroundScheduler()
+scheduler = BackgroundScheduler(daemon=True)
 
 # Global State for Active Downloads
 active_downloads = {}
