@@ -246,6 +246,7 @@ def get_active_jobs_data():
                 'id': vid,
                 'stats': job['downloader'].livestream_downloader.stats,
                 'info': job['downloader'].info_dict.copy(),
+                'embed': job['downloader'].embed_info.copy(),
                 'start_time': job['start_time'].strftime('%H:%M:%S')
             })
     return current_jobs
@@ -258,7 +259,7 @@ def convert_bytes(bytes):
             common.logger.exception("Error converting {0} to number".format(bytes))
             return "Invalid Value"
         # List of units in order
-        units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB']
+        units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB']
         
         # Start with bytes and convert to larger units
         unit_index = 0
@@ -414,9 +415,11 @@ ACTIVE_TABLE_TEMPLATE = """
 {%- endmacro %}
 
 {% if active_downloads %}
+
 <table class="table table-striped align-middle">
     <thead>
         <tr>
+            <th scope="col">Preview</th>
             <th>Video ID</th>
             <th>Title</th>
             <th>Status</th>
@@ -431,16 +434,31 @@ ACTIVE_TABLE_TEMPLATE = """
     <tbody>
         {% for job in active_downloads %}
         <tr>
-            <td>{{ job.id }}</td>
-            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ job.info.get("fulltitle", "") }}">
-                {{ job.info.get("fulltitle", "") }}
+            <td>
+                <img src="https://img.youtube.com/vi/{{ job.id }}/maxresdefault.jpg" 
+                        alt="ID {{ job.id }}" 
+                        class="img-thumbnail"
+                        style="max-height: 60px; width: auto;">
             </td>
-            {# MODIFIED LINE: Use the macro to set the class based on status #}
+            
+            <td>
+                <a href="https://www.youtube.com/watch?v={{ job.id }}" target="_blank" rel="noopener noreferrer">
+                    {{ job.id }}
+                </a>
+            </td>
+            
+            <td>
+                <div style="max-height: 60px; overflow: hidden;" title="{{ job.info.get("fulltitle", "") }}">
+                    {{ job.info.get("fulltitle", "") or job.embed.get("title", "") }}
+                </div>
+            </td>
+            
             <td><span class="badge {{ get_status_color(job.stats.get('status', "Unknown")) }}">{{ job.stats.get('status', "Unknown") }}</span></td>
-            {# END MODIFIED LINE #}
+            
             <td>{{ job.stats.get('video', {}).get('downloaded_segments', 0) }}</td>
             <td>{{ job.stats.get('audio', {}).get('downloaded_segments', 0) }}</td>
             <td>{{ job.stats.get('video', {}).get('latest_sequence', 0) or job.stats.get('audio', {}).get('latest_sequence', 0) }}</td>
+            
             <td>{{ (job.stats.get('video', {}).get('current_filesize', 0) + job.stats.get('audio', {}).get('current_filesize', 0)) | convert_bytes }}</td>
             <td>{{ job.start_time }}</td>
             <td>
@@ -454,6 +472,7 @@ ACTIVE_TABLE_TEMPLATE = """
         {% endfor %}
     </tbody>
 </table>
+
 {% else %}
 <div class="text-center p-3">
     <p class="text-muted mb-0">No active downloads.</p>
@@ -493,14 +512,15 @@ HISTORY_TABLE_TEMPLATE = """
     </thead>
     <tbody>
         {% for row in history %}
-        {# MODIFIED LINE: Add conditional class for the entire row based on 'Cancelled' #}
         <tr class="{{ 'table-secondary text-muted' if row.status | lower == 'cancelled' }}">
             <td>{{ row.id }}</td>
-            <td>{{ row.video_id }}</td>
+            <td>
+                <a href="https://www.youtube.com/watch?v={{ row.video_id }}" target="_blank" rel="noopener noreferrer">
+                    {{ row.video_id }}
+                </a>
+            </td>
             <td>{{ row.type }}</td>
-            {# MODIFIED LINE: Use the macro to set the badge class #}
             <td><span class="badge {{ get_history_status_color(row.status) }}">{{ row.status }}</span></td>
-            {# END MODIFIED LINE #}
             <td>{{ (row.total_size) | convert_bytes }}</td>
             <td>{{ row.timestamp }}</td>
         </tr>
@@ -539,7 +559,7 @@ HTML_TEMPLATE = """
         </div>
     </nav>
 
-    <div class="container mt-4">
+    <div class="container mt-4" >
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
             {% for category, message in messages %}
@@ -693,6 +713,7 @@ CONFIG_TEMPLATE = """
 # --- Main Entry Point ---
 
 if __name__ == '__main__':
+    common.setup_umask()
     import argparse
     parser = argparse.ArgumentParser(description="Web App runner")
     parser.add_argument('--config', type=str, default="config.toml", help='Config file (defaults to "config.toml")')

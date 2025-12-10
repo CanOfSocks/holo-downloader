@@ -16,6 +16,7 @@ import logging
 from typing import Optional, Tuple, Dict, Any
 
 from livestream_dl import download_Live
+import requests
 
 '''
 # --- Logging Initialization Helper (Define locally for modularity) ---
@@ -55,6 +56,9 @@ class VideoDownloader():
 
         self.info_dict = {}
         self.outputFile = None
+
+        response = requests.get("https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v={0}".format(id), timeout=30)
+        self.embed_info: Optional[Dict[str, Any]] = response.json() if response.status_code == 200 else {}
         
 
     def createTorrent(self, output: str) -> None:
