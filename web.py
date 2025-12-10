@@ -12,7 +12,7 @@ from apscheduler.triggers.cron import CronTrigger
 import tomlkit
 import uuid
 
-from getConfig import ConfigHandler
+from getConfig import ConfigHandler, config_file_path
 import downloadVid
 import getMembers
 import communityPosts
@@ -21,7 +21,7 @@ import unarchived
 import getVids
 
 # --- Configuration & Constants ---
-CONFIG_FILE = 'config.toml'
+config_file_path = 'config.toml'
 DB_FILE = 'stream_history.db'
 LOCK = threading.Lock()
 
@@ -37,6 +37,8 @@ recently_finished = []
 
 app = Flask(__name__)
 app.secret_key = 'dev-secret-key'
+
+GLOBAL_THEME = "dark"
 
 # --- Database Management ---
 
@@ -87,22 +89,22 @@ def get_history():
 # --- Config Management (Unchanged from previous update) ---
 
 def load_config():
-    if not os.path.exists(CONFIG_FILE):
+    if not os.path.exists(config_file_path):
         doc = tomlkit.document()
         doc.add("app_name", "StreamArchiver")
         
         doc.add(tomlkit.comment("Format: Minute Hour Day_of_Month Month Day_of_Week (standard 5 fields)"))
         doc.add("cron_schedule", "*/30 * * * *") 
         
-        with open(CONFIG_FILE, "w") as f:
+        with open(config_file_path, "w") as f:
             f.write(tomlkit.dumps(doc))
             
-    return ConfigHandler(config_file=CONFIG_FILE)
+    return ConfigHandler(config_file=config_file_path)
 
 def save_config(content):
     try:
         tomlkit.parse(content)
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        with open(config_file_path, "w", encoding="utf-8") as f:
             f.write(content)
         return True, "Config saved"
     except Exception as e:
@@ -305,7 +307,9 @@ def index():
     
     return render_template_string(HTML_TEMPLATE, 
                                   history=history,
-                                  active_downloads=active_jobs) 
+                                  active_downloads=active_jobs,
+                                  theme=GLOBAL_THEME,
+                                  ) 
 
 @app.route('/actions/check', methods=['POST'])
 def manual_check():
@@ -359,9 +363,9 @@ def config_page():
             flash("Invalid TOML format. Configuration not saved.", "danger")
         return redirect(url_for('config_page'))
 
-    with open(CONFIG_FILE, 'r', encoding="utf-8") as f:
+    with open(config_file_path, 'r', encoding="utf-8") as f:
         content = f.read()
-    return render_template_string(CONFIG_TEMPLATE, config_content=content)
+    return render_template_string(CONFIG_TEMPLATE, config_content=content, theme=GLOBAL_THEME)
 
 @app.route('/actions/cancel/<video_id>', methods=['POST'])
 def cancel_download(video_id):
@@ -383,9 +387,32 @@ def cancel_download(video_id):
             
     return redirect(url_for('index'))
 
+@app.route('/actions/toggle_theme', methods=['POST'])
+def toggle_theme():
+    global GLOBAL_THEME
+    with LOCK:
+        GLOBAL_THEME = "dark" if GLOBAL_THEME == "light" else "light"
+    # Redirect to the page that made the request (config or index)
+    return redirect(request.referrer or url_for('index'))
+
 # --- HTMX Table Templates (Unchanged) ---
 
 ACTIVE_TABLE_TEMPLATE = """
+{% macro get_status_color(status) -%}
+    {% set status_lower = status | lower %}
+    {% if 'recording' in status_lower and 'warning' in status_lower or 'error' in status_lower %}
+        bg-warning text-dark
+    {% elif 'error' in status_lower or 'kill_flag' in status_lower %}
+        bg-danger
+    {% elif 'recording' in status_lower %}
+        bg-primary
+    {% elif 'waiting' in status_lower or status == 'Unknown' %}
+        bg-secondary
+    {% else %}
+        bg-info
+    {% endif %}
+{%- endmacro %}
+
 {% if active_downloads %}
 <table class="table table-striped align-middle">
     <thead>
@@ -408,7 +435,9 @@ ACTIVE_TABLE_TEMPLATE = """
             <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ job.info.get("fulltitle", "") }}">
                 {{ job.info.get("fulltitle", "") }}
             </td>
-            <td><span class="badge bg-info">{{ job.stats.get('status', "Unknown") }}</span></td>
+            {# MODIFIED LINE: Use the macro to set the class based on status #}
+            <td><span class="badge {{ get_status_color(job.stats.get('status', "Unknown")) }}">{{ job.stats.get('status', "Unknown") }}</span></td>
+            {# END MODIFIED LINE #}
             <td>{{ job.stats.get('video', {}).get('downloaded_segments', 0) }}</td>
             <td>{{ job.stats.get('audio', {}).get('downloaded_segments', 0) }}</td>
             <td>{{ job.stats.get('video', {}).get('latest_sequence', 0) or job.stats.get('audio', {}).get('latest_sequence', 0) }}</td>
@@ -433,6 +462,24 @@ ACTIVE_TABLE_TEMPLATE = """
 """
 
 HISTORY_TABLE_TEMPLATE = """
+{# NEW MACRO for status badge color in History Table #}
+{% macro get_history_status_color(status) -%}
+    {% set status_lower = status | lower %}
+    {% if status_lower == 'waiting' %}
+        bg-secondary
+    {% elif status_lower == 'finished' %}
+        bg-success
+    {% elif 'error' in status_lower %}
+        bg-danger
+    {% elif 'warning' in status_lower %}
+        bg-warning text-dark
+    {% elif status_lower == 'cancelled' %}
+        bg-secondary
+    {% else %}
+        bg-info
+    {% endif %}
+{%- endmacro %}
+
 <table class="table table-sm">
     <thead>
         <tr>
@@ -446,11 +493,14 @@ HISTORY_TABLE_TEMPLATE = """
     </thead>
     <tbody>
         {% for row in history %}
-        <tr>
+        {# MODIFIED LINE: Add conditional class for the entire row based on 'Cancelled' #}
+        <tr class="{{ 'table-secondary text-muted' if row.status | lower == 'cancelled' }}">
             <td>{{ row.id }}</td>
             <td>{{ row.video_id }}</td>
             <td>{{ row.type }}</td>
-            <td>{{ row.status }}</td>
+            {# MODIFIED LINE: Use the macro to set the badge class #}
+            <td><span class="badge {{ get_history_status_color(row.status) }}">{{ row.status }}</span></td>
+            {# END MODIFIED LINE #}
             <td>{{ (row.total_size) | convert_bytes }}</td>
             <td>{{ row.timestamp }}</td>
         </tr>
@@ -464,7 +514,7 @@ HISTORY_TABLE_TEMPLATE = """
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="{{ theme }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -472,13 +522,19 @@ HTML_TEMPLATE = """
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script> 
 </head>
-<body class="bg-light">
+<body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
             <a class="navbar-brand" href="/">StreamArchiver</a>
-            <div class="navbar-nav ms-auto">
+            <div class="navbar-nav ms-auto d-flex flex-row gap-3">
                 <a class="nav-link" href="/">Dashboard</a>
                 <a class="nav-link" href="/config">Configuration</a>
+                
+                <form action="/actions/toggle_theme" method="POST" class="d-flex align-items-center m-0">
+                     <button type="submit" class="btn btn-sm btn-outline-light" title="Toggle Dark/Light Mode">
+                        {% if theme == 'light' %} 🌙 {% else %} ☀️ {% endif %}
+                     </button>
+                </form>
             </div>
         </div>
     </nav>
@@ -539,17 +595,18 @@ HTML_TEMPLATE = """
 </html>
 """
 
+# --- Config Template (Added data-bs-theme and Toggle) ---
 CONFIG_TEMPLATE = """
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="{{ theme }}">
 <head>
     <meta charset="UTF-8">
     <title>Configuration</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
-    <!-- CodeMirror CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/eclipse.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/monokai.min.css">
 
     <style>
         html, body {
@@ -560,7 +617,7 @@ CONFIG_TEMPLATE = """
             flex-direction: column;
         }
         .content-wrapper {
-            flex: 1 0 auto; /* Take remaining height */
+            flex: 1 0 auto;
             display: flex;
             flex-direction: column;
         }
@@ -570,17 +627,23 @@ CONFIG_TEMPLATE = """
             flex-direction: column;
         }
         .CodeMirror {
-            flex: 1 1 auto; /* Make CodeMirror fill the card body */
+            flex: 1 1 auto;
         }
     </style>
 </head>
-<body class="bg-light">
+<body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
             <a class="navbar-brand" href="/">StreamArchiver</a>
-            <div class="navbar-nav ms-auto">
+            <div class="navbar-nav ms-auto d-flex flex-row gap-3">
                 <a class="nav-link" href="/">Dashboard</a>
                 <a class="nav-link active" href="/config">Configuration</a>
+
+                <form action="/actions/toggle_theme" method="POST" class="d-flex align-items-center m-0">
+                     <button type="submit" class="btn btn-sm btn-outline-light" title="Toggle Dark/Light Mode">
+                        {% if theme == 'light' %} 🌙 {% else %} ☀️ {% endif %}
+                     </button>
+                </form>
             </div>
         </div>
     </nav>
@@ -605,14 +668,16 @@ CONFIG_TEMPLATE = """
         </div>
     </div>
 
-    <!-- CodeMirror JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/toml/toml.min.js"></script>
     <script>
+        var currentTheme = "{{ theme }}";
+        var cmTheme = currentTheme === 'dark' ? 'monokai' : 'eclipse';
+
         var editor = CodeMirror.fromTextArea(document.getElementById("toml_editor"), {
             lineNumbers: true,
             mode: "toml",
-            theme: "eclipse",
+            theme: cmTheme,
             lineWrapping: true
         });
 
@@ -633,7 +698,11 @@ if __name__ == '__main__':
     parser.add_argument('--config', type=str, default="config.toml", help='Config file (defaults to "config.toml")')
     args = parser.parse_args()
 
-    CONFIG_FILE = args.config
+    config_file_path = args.config
+
+    config = load_config()
+    GLOBAL_THEME = config.get_webui_theme()
+
     # Initialize DB
     init_db()
     

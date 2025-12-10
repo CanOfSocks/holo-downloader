@@ -3,8 +3,10 @@ from pathlib import Path, PurePath
 import os
 import tomlkit
 
+config_file_path = "config.toml"
+
 class ConfigHandler:
-    def __init__(self, config=None, config_file="config.toml"):
+    def __init__(self, config=None, config_file=config_file_path):
         # If no dict provided, load via tomlkit
         if config is None and config_file:
             #config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), config_file)
@@ -27,11 +29,13 @@ class ConfigHandler:
         self.download_options: dict = config.get("download_options", {})
         self.torrent_options: dict = config.get("torrent_options", {})
         self.community_tab_options: dict = config.get("community_tab_options", {})
+
+        self.webui_options = config.get("webui", {})
         
         # If you want to keep the TOML document for writes:
         self._config_doc = config_doc if 'config_doc' in locals() else None
 
-    def save(self, config_file="config.toml"):
+    def save(self, config_file=config_file_path):
         """
         If the config was loaded via tomlkit and you modified it,
         you can write it back (preserving comments/format) using tomlkit.
@@ -278,6 +282,9 @@ class ConfigHandler:
             return self.cron_schedule
         else:
             return self.cron_schedule.get(timer, None)
+        
+    def get_webui_theme(self):
+        return self.webui_options.get("theme", "dark")
     
     def get_livestream_dl_options(self, info_dict, output_template):
         options = {
