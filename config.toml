@@ -98,6 +98,43 @@
 "Shigure Ui" = "UCt30jJgChL8qeT9VPadidSw"
 "Roa" = "UCLIpj4TmXviSTNE_U5WG_Ug"
 #"cisne" = "UCzk-vfKu1M0T-iXaWB6Q8yQ"
+hydrangea = "UCDpX_q4mlkbuPJbY6h62eHQ"
+"Shisui Michiru" = "UC1cExET9xoWSO9iSnRsW_1Q"
+"Maemi Tenma" = "UC3K7pmiHsNSx1y0tdx2bbCw"
+"Utatane Nasa" = "UCB7sSUNwh_dXE7ZL3DsGDpw"
+"Rinkou Ashelia" = "UCg7sW-h1PUowdiR5K4HlBew"
+"Pipkin Pippa" = "UCJ46YTYBQVXsfsp8-HryoUA"
+"Fujikura Uruka" = "UCjXJYPsKxoJyc-1RPB6dSyw"
+"Hakushika Iori" = "UCN5bD1YYapThOeadG7YkBOA"
+"Ember Amane" = "UC0w_dvkIwnXzMak6gfeioRQ"
+"Dizzy Dokuro" = "UC98iRMvRqUxRD6GP4NtRskw"
+"Jelly Hoshiumi" = "UCkb-r702uhx4-6Lrmetp-Ow"
+"Kaneko Lumi" = "UCx_zwZuGIS4jxO07kFk8G6Q"
+"Eepy Sleepy" = "UC3aEtHpGzCFvoSn_wRWzgZQ"
+"Mari Mari" = "UCG5vZgELi3on_pksaLrIoxw"
+"Clio Aite" = "UCrGTSXWMiAWoPlowSuMVZ4Q"
+"Chisaka Airi" = "UC5qlAhrec6-0J-K3zmhNPPQ"
+"Remilia Nephys" = "UC-hMwvRuMsQrfgu0DPKLV2A"
+"Himemiya Rie" = "UCJ4O6PWA47f6XbCgrLQNqEQ"
+"Amanogawa Shiina" = "UCnJNNk45O1QYS2oMRYFKSyw"
+"Erina Makina" = "UCupmjRr7kPgzXKh-cPxxGbg"
+"Komachi Panko" = "UCVo_KgPNsDKxHwzib7uarCw"
+"Muu Muyu" = "UCejbicoRnQjCOdAPAv5JPwg"
+"Saya Sairroxs" = "UCFzQd4pZ43ZNEdWBFe7QOKA"
+"Runie Ruse" = "UCoAQsc-DQ0MjfTp059otQAw"
+"Eimi Isami" = "UC-tBLCGTheczDn5mYNoNWTQ"
+"Hikanari Hina" = "UCXDytlJU6RL8D68VrPZGyIA"
+"Malice Evermore" = "UC0mEc9OzI-B9HRi1v-GCVBw"
+#"Anya Nyabyss" = "UC9ig_HmTzk-8yuW708TQk3w"
+"Nitya Nil" = "UCBXLH5mn0nxgFH3udMtw4ig"
+"Sinon Sinfonia" = "UCjqlgGE9PA7xEbE6XW5Tl9g"
+"Bibi Biscuit" = "UCmbokzv5VTe9LeuzAFcDu9A"
+"Wilhelmina Frost" = "UCzA7j_ixOvBz39saDYlbRiA"
+"Kokoromo Memory" = "UCGXwv2zYOxeWiNNyPiLCBCQ"
+"Ayase Yuu" = "UCnNLZWjl4GvVF4s8zBT9_kA"
+"Kaminari Clara" = "UCRlZaszk84YXjRtdPCxqjvw"
+"Gram Pico" = "UCtWH0tVAcUcSm4v96H5cAqQ"
+"Kannagi Loki" = "UCucJYLJSEFRRfV2CA_JGHIQ"
 
 [title_filter]
 # You can uncomment and add the appropriate filters here if needed
@@ -199,6 +236,42 @@
 "UCIfAvpeIWGHb0duCkMkmm2Q" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
 "UCt30jJgChL8qeT9VPadidSw" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
 "UCLIpj4TmXviSTNE_U5WG_Ug" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UC1cExET9xoWSO9iSnRsW_1Q" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UC3K7pmiHsNSx1y0tdx2bbCw" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCB7sSUNwh_dXE7ZL3DsGDpw" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCg7sW-h1PUowdiR5K4HlBew" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCJ46YTYBQVXsfsp8-HryoUA" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCjXJYPsKxoJyc-1RPB6dSyw" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCN5bD1YYapThOeadG7YkBOA" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UC0w_dvkIwnXzMak6gfeioRQ" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UC98iRMvRqUxRD6GP4NtRskw" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCkb-r702uhx4-6Lrmetp-Ow" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCx_zwZuGIS4jxO07kFk8G6Q" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UC3aEtHpGzCFvoSn_wRWzgZQ" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCG5vZgELi3on_pksaLrIoxw" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCrGTSXWMiAWoPlowSuMVZ4Q" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UC5qlAhrec6-0J-K3zmhNPPQ" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UC-hMwvRuMsQrfgu0DPKLV2A" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCJ4O6PWA47f6XbCgrLQNqEQ" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCnJNNk45O1QYS2oMRYFKSyw" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCupmjRr7kPgzXKh-cPxxGbg" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCVo_KgPNsDKxHwzib7uarCw" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCejbicoRnQjCOdAPAv5JPwg" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCFzQd4pZ43ZNEdWBFe7QOKA" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCoAQsc-DQ0MjfTp059otQAw" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UC-tBLCGTheczDn5mYNoNWTQ" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCXDytlJU6RL8D68VrPZGyIA" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UC0mEc9OzI-B9HRi1v-GCVBw" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UC9ig_HmTzk-8yuW708TQk3w" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCBXLH5mn0nxgFH3udMtw4ig" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCjqlgGE9PA7xEbE6XW5Tl9g" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCmbokzv5VTe9LeuzAFcDu9A" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCzA7j_ixOvBz39saDYlbRiA" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCGXwv2zYOxeWiNNyPiLCBCQ" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCnNLZWjl4GvVF4s8zBT9_kA" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCRlZaszk84YXjRtdPCxqjvw" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCtWH0tVAcUcSm4v96H5cAqQ" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
+"UCucJYLJSEFRRfV2CA_JGHIQ" = "(?i)(asmr|unarc(hive)?|karaoke|no\\s?arch(ive)?|watch-?a-?long|birthday|off[- ]?collab|sing(ing)?|(?<!silk)song|ゲリラ|歌枠|アーカイブなし|はメン.)|\\b\\@?saba\\b"
 
 [description_filter]
 # You can uncomment and add the appropriate filters here if needed
@@ -331,6 +404,42 @@
 "Shigure Ui" = "UCt30jJgChL8qeT9VPadidSw"
 "Saba" = "UCxsZ6NCzjU_t4YSxQLBcM5A"
 "Roa" = "UCLIpj4TmXviSTNE_U5WG_Ug"
+"Shisui Michiru" = "UC1cExET9xoWSO9iSnRsW_1Q"
+"Maemi Tenma" = "UC3K7pmiHsNSx1y0tdx2bbCw"
+"Utatane Nasa" = "UCB7sSUNwh_dXE7ZL3DsGDpw"
+"Rinkou Ashelia" = "UCg7sW-h1PUowdiR5K4HlBew"
+"Pipkin Pippa" = "UCJ46YTYBQVXsfsp8-HryoUA"
+"Fujikura Uruka" = "UCjXJYPsKxoJyc-1RPB6dSyw"
+"Hakushika Iori" = "UCN5bD1YYapThOeadG7YkBOA"
+"Ember Amane" = "UC0w_dvkIwnXzMak6gfeioRQ"
+"Dizzy Dokuro" = "UC98iRMvRqUxRD6GP4NtRskw"
+"Jelly Hoshiumi" = "UCkb-r702uhx4-6Lrmetp-Ow"
+"Kaneko Lumi" = "UCx_zwZuGIS4jxO07kFk8G6Q"
+"Eepy Sleepy" = "UC3aEtHpGzCFvoSn_wRWzgZQ"
+"Mari Mari" = "UCG5vZgELi3on_pksaLrIoxw"
+"Clio Aite" = "UCrGTSXWMiAWoPlowSuMVZ4Q"
+"Chisaka Airi" = "UC5qlAhrec6-0J-K3zmhNPPQ"
+"Remilia Nephys" = "UC-hMwvRuMsQrfgu0DPKLV2A"
+"Himemiya Rie" = "UCJ4O6PWA47f6XbCgrLQNqEQ"
+"Amanogawa Shiina" = "UCnJNNk45O1QYS2oMRYFKSyw"
+"Erina Makina" = "UCupmjRr7kPgzXKh-cPxxGbg"
+"Komachi Panko" = "UCVo_KgPNsDKxHwzib7uarCw"
+"Muu Muyu" = "UCejbicoRnQjCOdAPAv5JPwg"
+"Saya Sairroxs" = "UCFzQd4pZ43ZNEdWBFe7QOKA"
+"Runie Ruse" = "UCoAQsc-DQ0MjfTp059otQAw"
+"Eimi Isami" = "UC-tBLCGTheczDn5mYNoNWTQ"
+"Hikanari Hina" = "UCXDytlJU6RL8D68VrPZGyIA"
+"Malice Evermore" = "UC0mEc9OzI-B9HRi1v-GCVBw"
+#"Anya Nyabyss" = "UC9ig_HmTzk-8yuW708TQk3w"
+"Nitya Nil" = "UCBXLH5mn0nxgFH3udMtw4ig"
+"Sinon Sinfonia" = "UCjqlgGE9PA7xEbE6XW5Tl9g"
+"Bibi Biscuit" = "UCmbokzv5VTe9LeuzAFcDu9A"
+"Wilhelmina Frost" = "UCzA7j_ixOvBz39saDYlbRiA"
+"Kokoromo Memory" = "UCGXwv2zYOxeWiNNyPiLCBCQ"
+"Ayase Yuu" = "UCnNLZWjl4GvVF4s8zBT9_kA"
+"Kaminari Clara" = "UCRlZaszk84YXjRtdPCxqjvw"
+"Gram Pico" = "UCtWH0tVAcUcSm4v96H5cAqQ"
+"Kannagi Loki" = "UCucJYLJSEFRRfV2CA_JGHIQ"
 
 [community_tab]
 "Saba" = "UCxsZ6NCzjU_t4YSxQLBcM5A"
@@ -339,13 +448,12 @@
 "Saba" = "UCxsZ6NCzjU_t4YSxQLBcM5A"
 
 [webhook]
-url = "https://discord.com/api/webhooks/1177091614204764210/IH7MdsVwE3oo73H1wyPHjgRDGd5Jf3Nq0-kXhdungGOg0fXDhkfmOsl6kxCpOACSDPVi"
+url = "https://discord.com/api/webhooks/xxxxxx/yyyyyyy"
 
 [download_options]
 output_path = "%(channel)s/[%(release_date,upload_date)s] %(fulltitle).120B (%(id)s)/[%(release_date,upload_date)s] %(fulltitle).120B [%(channel)s] (%(id)s)"
 mux_file = true
 download_threads = 4
-#ytarchive_options = "--vp9 --add-metadata --no-frag-files --save-state --metadata date=%(start_date)s --ipv4"
 video_quality = "best"
 video_only = false
 download_chat = true
@@ -354,29 +462,24 @@ info_json = true
 description = true
 video_fetch_method = "ytdlp"
 look_ahead = 48
-#cookies_file = "/app/cookies.txt"
-temp_dir = "./app/temp/%(channel)s/[%(release_date,upload_date)s] %(fulltitle).180B (%(id)s)/"
-done_dir = "./app/Done/"
-members_dir = "./app/Members/"
-unarchived_dir = "./app/Done/"
-unarchived_tempdir = "./app/temp/unarchived/"
+cookies_file = "/app/cookies.txt"
+temp_dir = "/app/temp/%(channel)s/[%(release_date,upload_date)s] %(fulltitle).180B (%(id)s)/"
+done_dir = "/app/Done/"
+members_dir = "/app/Members/"
+unarchived_dir = "/app/Done/"
+unarchived_tempdir = "/app/temp/unarchived/"
 remove_ip = true
 log_level = "INFO"
 randomise_lists = true
 clean_urls = true
 unarchived_download_chat = true
-#web_ytdlp_options = '{"extractor_args": {"youtube": {"player_client": ["web_creator"]}, "youtubepot-bgutilhttp":{ "base_url": ["http://10.1.1.40:4416"]}}}'
-ytdlp_options = '{"extractor_args": {"youtubepot-bgutilhttp": {"base_url": ["http://10.1.1.40:4416"]}}}'
-log_file = "./log.log"
+ytdlp_options = '{"extractor_args": {"youtubepot-bgutilhttp": {"base_url": ["http://bgutilhttp:4416"]}}}'
+log_file = "/app/temp/log.log"
 log_file_rotate_when = "midnight"
 log_file_keep_backup = 14
 recovery_failure_tolerance = 1
 include_dash = true
 include_m3u8 = true
-
-[torrent]
-enabled = false
-options = ["-t", "udp://tracker.holopirates.moe:1337/announce", "-c", "CanOfSocks"]
 
 [community_tab_options]
 archive_file = "/app/com-tab-archive.txt"
@@ -385,4 +488,5 @@ community_dir = "/app/CommunityPosts"
 [cron_schedule]
 streams = "*/30 * * * *"
 members_only = "15,45 * * * *"
-unarchived = "15,45 * * * *"
+unarchived = "45 * * * *"
+community_posts = "0 0 * * *"
