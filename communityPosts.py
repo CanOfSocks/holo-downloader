@@ -51,7 +51,7 @@ def main(config: ConfigHandler = None, logger: logging = None):
             if com_tab_archive:
                 command_list += ["--post-archive", com_tab_archive]
                 
-            command_list.append('"https://www.youtube.com/channel/{0}/community"'.format(id))
+            command_list.append('"https://www.youtube.com/channel/{0}/posts"'.format(id))
             
             logger.debug(f"Executing command: {' '.join(command_list)}")
 
