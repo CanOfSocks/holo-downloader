@@ -24,7 +24,7 @@ class UnarchivedDownloader:
         self.kill_this = kill_this or threading.Event()
         self.config = config or ConfigHandler()
         self.logger = logger or initialize_logging(self.config, logger_name="unarchived_downloader")
-        self.downloader = LiveStreamDownloader(kill_all=kill_all, logger=self.logger, kill_this=self.kill_this)
+        self.livestream_downloader = LiveStreamDownloader(kill_all=kill_all, logger=self.logger, kill_this=self.kill_this)
         self.info_dict = {}
 
     def check_ytdlp_age(self, existing_file: str) -> bool:
@@ -101,14 +101,14 @@ class UnarchivedDownloader:
         self.logger.info(f"Output path: {options.get('output')}")
 
         if thumbnail and os.path.exists(thumbnail):
-            self.downloader.file_names['thumbnail'] = FileInfo(thumbnail, file_type='thumbnail')
+            self.livestream_downloader.file_names['thumbnail'] = FileInfo(thumbnail, file_type='thumbnail')
         if chat and os.path.exists(chat):
-            self.downloader.file_names.update({
+            self.livestream_downloader.file_names.update({
                 'live_chat': FileInfo(chat, file_type='live_chat')
             })
 
         try:
-            self.downloader.download_segments(info_dict=info_dict, resolution='best', options=options)
+            self.livestream_downloader.download_segments(info_dict=info_dict, resolution='best', options=options)
         except Exception as e:
             self.logger.exception(e)
             discord_web.main(
@@ -141,7 +141,7 @@ class UnarchivedDownloader:
 
             info_dict, live_status = getUrls.get_Video_Info(
                 id=video_id,
-                wait=(5, 1800),
+                wait=(60, 1800),
                 cookies=self.config.get_cookies_file(),
                 proxy=self.config.get_proxy(),
                 additional_options=additional_options,
@@ -169,7 +169,7 @@ class UnarchivedDownloader:
                     'write_thumbnail': True,
                     'temp_folder': temp_folder
                 }
-                downloaded_aux = self.downloader.download_auxiliary_files(info_dict=info_dict, options=aux_options)
+                downloaded_aux = self.livestream_downloader.download_auxiliary_files(info_dict=info_dict, options=aux_options)
                 file_obj = downloaded_aux[0].get('thumbnail', None)
 
                 if file_obj is not None and file_obj.exists() and not str(file_obj.suffix).endswith(".jpg"):
