@@ -1,0 +1,46 @@
+{# NEW MACRO for status badge color in History Table #}
+{% macro get_history_status_color(status) -%}
+    {% set status_lower = status | lower %}
+    {% if status_lower == 'waiting' %}
+        bg-secondary
+    {% elif status_lower == 'finished' %}
+        bg-success
+    {% elif 'error' in status_lower %}
+        bg-danger
+    {% elif 'warning' in status_lower %}
+        bg-warning text-dark
+    {% elif status_lower == 'cancelled' %}
+        bg-secondary
+    {% else %}
+        bg-info
+    {% endif %}
+{%- endmacro %}
+
+<table class="table table-sm">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Video ID</th>
+            <th>Download Type</th>
+            <th>Status</th>
+            <th>Size</th>
+            <th>Date</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in history %}
+        <tr class="{{ 'table-secondary text-muted' if row.status | lower == 'cancelled' }}">
+            <td>{{ row.id }}</td>
+            <td>
+                <a href="https://www.youtube.com/watch?v={{ row.video_id }}" target="_blank" rel="noopener noreferrer">
+                    {{ row.video_id }}
+                </a>
+            </td>
+            <td>{{ row.type }}</td>
+            <td><span class="badge {{ get_history_status_color(row.status) }}">{{ row.status }}</span></td>
+            <td>{{ (row.total_size) | convert_bytes }}</td>
+            <td>{{ row.timestamp }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

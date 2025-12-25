@@ -1,6 +1,6 @@
 import os
 import json
-import subprocess
+
 import traceback
 import logging
 from shutil import move
@@ -150,6 +150,7 @@ class UnarchivedDownloader:
             )
 
             if info_dict.get('live_status') in ['is_live', 'post_live']:
+                import subprocess
                 os.makedirs(os.path.dirname(json_out_path), exist_ok=True)
                 with open(json_out_path, 'w', encoding='utf-8') as json_file:
                     json.dump(info_dict, json_file, ensure_ascii=False, indent=4)

@@ -1,6 +1,5 @@
 from sys import argv
 from pathlib import Path, PurePath
-import os
 import tomlkit
 
 config_file_path = "config.toml"

@@ -6,9 +6,6 @@ import argparse
 import os
 import logging
 import threading
-import signal
-from time import sleep
-from typing import Optional, Any
 from common import initialize_logging, kill_all
 
 class ChatOnlyDownloader:

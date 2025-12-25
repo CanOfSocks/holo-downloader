@@ -6,19 +6,20 @@ import sqlite3
 import random
 import sys
 from datetime import datetime
-from flask import Flask, render_template_string, request, redirect, url_for, flash, make_response # <-- ADD make_response
+from flask import Flask, render_template, request, redirect, url_for, flash, make_response # <-- ADD make_response
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 import tomlkit
-import uuid
 
 from getConfig import ConfigHandler, config_file_path
 import downloadVid
 import getMembers
 import communityPosts
-import getChatOnly
 import unarchived
 import getVids
+
+from flask_caching import Cache
+
 
 # --- Configuration & Constants ---
 config_file_path = 'config.toml'
@@ -36,9 +37,17 @@ other_threads = {}
 recently_finished = [] 
 
 app = Flask(__name__)
-app.secret_key = 'dev-secret-key'
+#app.secret_key = 'dev-secret-key'
+
+# Configure SimpleCache (stores in RAM)
+app.config['CACHE_TYPE'] = 'SimpleCache' 
+app.config['CACHE_DEFAULT_TIMEOUT'] = 300 # Default 5 minutes
+
+cache = Cache(app)
 
 GLOBAL_THEME = "dark"
+
+history_update_event = threading.Event()
 
 # --- Database Management ---
 
@@ -117,10 +126,12 @@ def thread_worker(video_id, downloader, thread_tracker: dict = active_downloads)
     try:
         downloader.main()
         save_to_history(video_id, downloader.livestream_downloader.stats, download_type=thread_tracker.get(video_id, {}).get("type", "Unknown"))
+
+        # Clear cache of history table
+        with app.app_context():
+            cache.delete_memoized(data_history)
         
-        # Signal that history needs update
-        with LOCK:
-            recently_finished.append(True) 
+        history_update_event.set()
             
     except Exception as e:
         common.logger.error(f"Error downloading {video_id}: {e}", file=sys.stderr)
@@ -242,11 +253,16 @@ def get_active_jobs_data():
     with LOCK:
         current_jobs = []
         for vid, job in active_downloads.copy().items():
+            downloader: downloadVid.VideoDownloader = job['downloader']
+            display_info = {
+                'fulltitle': downloader.info_dict.get('fulltitle'),
+                'title': downloader.embed_info.get('title')
+            }
+
             current_jobs.append({
                 'id': vid,
-                'stats': job['downloader'].livestream_downloader.stats,
-                'info': job['downloader'].info_dict.copy(),
-                'embed': job['downloader'].embed_info.copy(),
+                'stats': downloader.livestream_downloader.stats,
+                'info': display_info, # Pass the small dict, not the huge one
                 'start_time': job['start_time'].strftime('%H:%M:%S')
             })
     return current_jobs
@@ -277,26 +293,26 @@ app.jinja_env.filters['convert_bytes'] = convert_bytes
 @app.route('/data/active')
 def data_active():
     """Endpoint for HTMX to poll active downloads table AND signal history update."""
-    global recently_finished
     current_jobs = get_active_jobs_data()
     # 1. Render the active table
-    rendered_table = render_template_string(ACTIVE_TABLE_TEMPLATE, active_downloads=current_jobs)
+    rendered_table = render_template('active_table.html', active_downloads=current_jobs)
     response = make_response(rendered_table)
     
     # 2. Check the signal list set by the background thread
     with LOCK:
-        if recently_finished:
+        if history_update_event.is_set():
             # Send HTMX trigger header, instructing the client to fire 'historyUpdated' event
             response.headers['HX-Trigger'] = 'historyUpdated' 
-            recently_finished.clear() # Reset the flag
+            history_update_event.clear() # Reset the flag
             
     return response
 
 @app.route('/data/history')
+@cache.cached(timeout=600) # Cache this result for 10 minutes (or until cleared)
 def data_history():
     """Endpoint for HTMX to poll history table."""
     history = get_history()
-    return render_template_string(HISTORY_TABLE_TEMPLATE, history=history)
+    return render_template('history_table.html', history=history)
 
 
 # --- Web Routes (Unchanged) ---
@@ -306,7 +322,7 @@ def index():
     history = get_history()
     active_jobs = get_active_jobs_data()
     
-    return render_template_string(HTML_TEMPLATE, 
+    return render_template('index.html', 
                                   history=history,
                                   active_downloads=active_jobs,
                                   theme=GLOBAL_THEME,
@@ -366,7 +382,7 @@ def config_page():
 
     with open(config_file_path, 'r', encoding="utf-8") as f:
         content = f.read()
-    return render_template_string(CONFIG_TEMPLATE, config_content=content, theme=GLOBAL_THEME)
+    return render_template('config.html', config_content=content, theme=GLOBAL_THEME)
 
 @app.route('/actions/cancel/<video_id>', methods=['POST'])
 def cancel_download(video_id):
@@ -396,320 +412,6 @@ def toggle_theme():
     # Redirect to the page that made the request (config or index)
     return redirect(request.referrer or url_for('index'))
 
-# --- HTMX Table Templates (Unchanged) ---
-
-ACTIVE_TABLE_TEMPLATE = """
-{% macro get_status_color(status) -%}
-    {% set status_lower = status | lower %}
-    {% if 'recording' in status_lower and 'warning' in status_lower or 'error' in status_lower %}
-        bg-warning text-dark
-    {% elif 'error' in status_lower or 'kill_flag' in status_lower %}
-        bg-danger
-    {% elif 'recording' in status_lower %}
-        bg-primary
-    {% elif 'waiting' in status_lower or status == 'Unknown' %}
-        bg-secondary
-    {% else %}
-        bg-info
-    {% endif %}
-{%- endmacro %}
-
-{% if active_downloads %}
-
-<table class="table table-striped align-middle">
-    <thead>
-        <tr>
-            <th scope="col">Preview</th>
-            <th>Video ID</th>
-            <th>Title</th>
-            <th>Status</th>
-            <th>Video Segments</th>
-            <th>Audio Segments</th>
-            <th>Latest Segment</th>
-            <th>Size</th>
-            <th>Started At</th>
-            <th>Cancel</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for job in active_downloads %}
-        <tr>
-            <td>
-                <img src="https://img.youtube.com/vi/{{ job.id }}/maxresdefault.jpg" 
-                        alt="ID {{ job.id }}" 
-                        class="img-thumbnail"
-                        style="max-height: 60px; width: auto;">
-            </td>
-            
-            <td>
-                <a href="https://www.youtube.com/watch?v={{ job.id }}" target="_blank" rel="noopener noreferrer">
-                    {{ job.id }}
-                </a>
-            </td>
-            
-            <td>
-                <div style="max-height: 60px; overflow: hidden;" title="{{ job.info.get("fulltitle", "") }}">
-                    {{ job.info.get("fulltitle", "") or job.embed.get("title", "") }}
-                </div>
-            </td>
-            
-            <td><span class="badge {{ get_status_color(job.stats.get('status', "Unknown")) }}">{{ job.stats.get('status', "Unknown") }}</span></td>
-            
-            <td>{{ job.stats.get('video', {}).get('downloaded_segments', 0) }}</td>
-            <td>{{ job.stats.get('audio', {}).get('downloaded_segments', 0) }}</td>
-            <td>{{ job.stats.get('video', {}).get('latest_sequence', 0) or job.stats.get('audio', {}).get('latest_sequence', 0) }}</td>
-            
-            <td>{{ (job.stats.get('video', {}).get('current_filesize', 0) + job.stats.get('audio', {}).get('current_filesize', 0)) | convert_bytes }}</td>
-            <td>{{ job.start_time }}</td>
-            <td>
-                <form action="/actions/cancel/{{ job.id }}" method="POST" style="margin:0;">
-                    <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Stop recording {{ job.id }}?');" title="Stop Download">
-                        🗑️
-                    </button>
-                </form>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-
-{% else %}
-<div class="text-center p-3">
-    <p class="text-muted mb-0">No active downloads.</p>
-</div>
-{% endif %}
-"""
-
-HISTORY_TABLE_TEMPLATE = """
-{# NEW MACRO for status badge color in History Table #}
-{% macro get_history_status_color(status) -%}
-    {% set status_lower = status | lower %}
-    {% if status_lower == 'waiting' %}
-        bg-secondary
-    {% elif status_lower == 'finished' %}
-        bg-success
-    {% elif 'error' in status_lower %}
-        bg-danger
-    {% elif 'warning' in status_lower %}
-        bg-warning text-dark
-    {% elif status_lower == 'cancelled' %}
-        bg-secondary
-    {% else %}
-        bg-info
-    {% endif %}
-{%- endmacro %}
-
-<table class="table table-sm">
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>Video ID</th>
-            <th>Download Type</th>
-            <th>Status</th>
-            <th>Size</th>
-            <th>Date</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for row in history %}
-        <tr class="{{ 'table-secondary text-muted' if row.status | lower == 'cancelled' }}">
-            <td>{{ row.id }}</td>
-            <td>
-                <a href="https://www.youtube.com/watch?v={{ row.video_id }}" target="_blank" rel="noopener noreferrer">
-                    {{ row.video_id }}
-                </a>
-            </td>
-            <td>{{ row.type }}</td>
-            <td><span class="badge {{ get_history_status_color(row.status) }}">{{ row.status }}</span></td>
-            <td>{{ (row.total_size) | convert_bytes }}</td>
-            <td>{{ row.timestamp }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-"""
-
-
-# --- Main HTML Template (Updated History Trigger) ---
-
-HTML_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="en" data-bs-theme="{{ theme }}">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stream Downloader</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script> 
-</head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container">
-            <a class="navbar-brand" href="/">StreamArchiver</a>
-            <div class="navbar-nav ms-auto d-flex flex-row gap-3">
-                <a class="nav-link" href="/">Dashboard</a>
-                <a class="nav-link" href="/config">Configuration</a>
-                
-                <form action="/actions/toggle_theme" method="POST" class="d-flex align-items-center m-0">
-                     <button type="submit" class="btn btn-sm btn-outline-light" title="Toggle Dark/Light Mode">
-                        {% if theme == 'light' %} 🌙 {% else %} ☀️ {% endif %}
-                     </button>
-                </form>
-            </div>
-        </div>
-    </nav>
-
-    <div class="container mt-4" >
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            {% for category, message in messages %}
-              <div class="alert alert-{{ category }}">{{ message }}</div>
-            {% endfor %}
-          {% endif %}
-        {% endwith %}
-
-        <div class="card mb-4 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Manual Actions</h5>
-                <div class="d-flex gap-2">
-                    <form action="/actions/check" method="POST">
-                        <button type="submit" class="btn btn-primary">Run Stream Check Now</button>
-                    </form>
-                    <form action="/actions/add" method="POST" class="d-flex gap-2">
-                        <input type="text" name="video_id" class="form-control" placeholder="Video ID" required>
-                        <button type="submit" class="btn btn-success">Download ID</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <div class="card mb-4 shadow-sm">
-            <div class="card-header bg-primary text-white">
-                Active Downloads
-            </div>
-            <div class="card-body" 
-                 id="active-downloads-container"
-                 hx-get="/data/active"
-                 hx-trigger="load, every 3s" 
-                 hx-swap="innerHTML">
-                 
-                 <p class="text-center text-muted">Loading active downloads...</p>
-            </div>
-        </div>
-
-        <div class="card shadow-sm">
-            <div class="card-header bg-secondary text-white">
-                History (Last 50)
-            </div>
-            <div class="card-body" 
-                 id="history-container"
-                 hx-get="/data/history"
-                 hx-trigger="load, every 30s, historyUpdated from:body" 
-                 hx-swap="innerHTML">
-                 
-                 <p class="text-center text-muted">Loading history...</p>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
-"""
-
-# --- Config Template (Added data-bs-theme and Toggle) ---
-CONFIG_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="en" data-bs-theme="{{ theme }}">
-<head>
-    <meta charset="UTF-8">
-    <title>Configuration</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/eclipse.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/monokai.min.css">
-
-    <style>
-        html, body {
-            height: 100%;
-        }
-        body {
-            display: flex;
-            flex-direction: column;
-        }
-        .content-wrapper {
-            flex: 1 0 auto;
-            display: flex;
-            flex-direction: column;
-        }
-        .card-body {
-            flex: 1 1 auto;
-            display: flex;
-            flex-direction: column;
-        }
-        .CodeMirror {
-            flex: 1 1 auto;
-        }
-    </style>
-</head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container">
-            <a class="navbar-brand" href="/">StreamArchiver</a>
-            <div class="navbar-nav ms-auto d-flex flex-row gap-3">
-                <a class="nav-link" href="/">Dashboard</a>
-                <a class="nav-link active" href="/config">Configuration</a>
-
-                <form action="/actions/toggle_theme" method="POST" class="d-flex align-items-center m-0">
-                     <button type="submit" class="btn btn-sm btn-outline-light" title="Toggle Dark/Light Mode">
-                        {% if theme == 'light' %} 🌙 {% else %} ☀️ {% endif %}
-                     </button>
-                </form>
-            </div>
-        </div>
-    </nav>
-
-    <div class="container-fluid content-wrapper mt-3">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            {% for category, message in messages %}
-              <div class="alert alert-{{ category }}">{{ message }}</div>
-            {% endfor %}
-          {% endif %}
-        {% endwith %}
-
-        <div class="card shadow-sm flex-grow-1">
-            <div class="card-header">Edit Config (TOML)</div>
-            <div class="card-body d-flex flex-column">
-                <form method="POST" class="d-flex flex-column flex-grow-1">
-                    <textarea id="toml_editor" name="toml_content" class="form-control" style="font-family: monospace;">{{ config_content }}</textarea>
-                    <button type="submit" class="btn btn-primary mt-2">Save & Reload Scheduler</button>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/toml/toml.min.js"></script>
-    <script>
-        var currentTheme = "{{ theme }}";
-        var cmTheme = currentTheme === 'dark' ? 'monokai' : 'eclipse';
-
-        var editor = CodeMirror.fromTextArea(document.getElementById("toml_editor"), {
-            lineNumbers: true,
-            mode: "toml",
-            theme: cmTheme,
-            lineWrapping: true
-        });
-
-        document.querySelector('form').addEventListener('submit', function() {
-            editor.save();
-        });
-    </script>
-</body>
-</html>
-"""
-
-
 # --- Main Entry Point ---
 
 if __name__ == '__main__':
@@ -731,4 +433,4 @@ if __name__ == '__main__':
     update_scheduler()
     scheduler.start()
     
-    app.run(debug=True, host='0.0.0.0', use_reloader=False, port=5000)
+    app.run(host='0.0.0.0', port=5000)

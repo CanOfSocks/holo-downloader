@@ -4,7 +4,7 @@ import os
 import threading
 from getConfig import ConfigHandler
 from pathlib import Path
-import subprocess
+
 import discord_web
 import traceback
 from time import sleep, asctime
@@ -62,6 +62,7 @@ class VideoDownloader():
         
 
     def createTorrent(self, output: str) -> None:
+        import subprocess
         """Creates a torrent file for the given output path using the provided config."""
         if not self.config.getTorrent():
             return
