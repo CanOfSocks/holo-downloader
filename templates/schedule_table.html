@@ -1,0 +1,35 @@
+{% if jobs %}
+<table class="table table-sm align-middle">
+    <thead>
+        <tr>
+            <th>Task Name</th>
+            <th>Next Run</th>
+            <th>Trigger</th>
+            <th class="text-end">Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for job in jobs %}
+        <tr>
+            <td>
+                <div class="fw-bold">{{ job.name }}</div>
+                {% if job.status == 'Inactive' %}
+                    <span class="badge bg-dark" style="font-size: 0.7em;">Disabled</span>
+                {% else %}
+                    <span class="badge bg-success" style="font-size: 0.7em;">Active</span>
+                {% endif %}
+            </td>
+            <td><small>{{ job.next_run }}</small></td>
+            <td><code style="font-size: 0.75em;">{{ job.trigger }}</code></td>
+            <td class="text-end">
+                <form action="/actions/force_run/{{ job.id }}" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-outline-primary btn-sm" title="Run Now">
+                        ▶️ Run Now
+                    </button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}

@@ -37,9 +37,6 @@
             <div class="card-body">
                 <h5 class="card-title">Manual Actions</h5>
                 <div class="d-flex gap-2">
-                    <form action="/actions/check" method="POST">
-                        <button type="submit" class="btn btn-primary">Run Stream Check Now</button>
-                    </form>
                     <form action="/actions/add" method="POST" class="d-flex gap-2">
                         <input type="text" name="video_id" class="form-control" placeholder="Video ID" required>
                         <button type="submit" class="btn btn-success">Download ID</button>
@@ -59,6 +56,18 @@
                  hx-swap="innerHTML">
                  
                  <p class="text-center text-muted">Loading active downloads...</p>
+            </div>
+        </div>
+
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-secondary text-white">
+                Background Task Scheduler
+            </div>
+            <div class="card-body" 
+                hx-get="/data/scheduler" 
+                hx-trigger="load, every 60s" 
+                hx-swap="innerHTML">
+                <p class="text-center text-muted">Querying scheduler...</p>
             </div>
         </div>
 

@@ -8,6 +8,7 @@ import sys
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, make_response # <-- ADD make_response
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.job import Job
 from apscheduler.triggers.cron import CronTrigger
 import tomlkit
 
@@ -37,7 +38,7 @@ other_threads = {}
 recently_finished = [] 
 
 app = Flask(__name__)
-#app.secret_key = 'dev-secret-key'
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-key-placeholder')
 
 # Configure SimpleCache (stores in RAM)
 app.config['CACHE_TYPE'] = 'SimpleCache' 
@@ -411,6 +412,78 @@ def toggle_theme():
         GLOBAL_THEME = "dark" if GLOBAL_THEME == "light" else "light"
     # Redirect to the page that made the request (config or index)
     return redirect(request.referrer or url_for('index'))
+
+# --- Helper for Scheduler Data ---
+
+def get_scheduler_jobs():
+    """Extracts all possible jobs and their current status."""
+    # Define the 'Master List' of jobs your app supports
+    possible_jobs = [
+        {"id": "streams-checker", "display": "Stream Checker"},
+        {"id": "unarchived-checker", "display": "Unarchived Checker"},
+        {"id": "members_only-checker", "display": "Members Only Checker"},
+        {"id": "community_posts-checker", "display": "Community Tab Checker"},
+    ]
+    active_jobs = {job.id: job for job in scheduler.get_jobs()}
+    final_data = []
+
+    for item in possible_jobs:
+        job_id = item["id"]
+        job_obj: Job = active_jobs.get(job_id)
+        
+        if job_obj:
+            next_run = job_obj.next_run_time.strftime('%H:%M:%S (%d-%b)') if job_obj.next_run_time else "Paused"
+            trigger = str(job_obj.trigger)
+            status = "Scheduled"
+        else:
+            next_run = "N/A"
+            trigger = "No Schedule Set"
+            status = "Inactive"
+            
+        final_data.append({
+            'id': job_id,
+            'name': item["display"],
+            'trigger': trigger,
+            'next_run': next_run,
+            'status': status
+        })
+    return final_data
+
+@app.route('/actions/force_run/<job_name>', methods=['POST'])
+def force_run_job(job_name):
+    """Executes a job function immediately in the background."""
+    # Mapping job IDs back to their functions
+    mapping = {
+        "streams-checker": get_streams,
+        "unarchived-checker": get_unarchived,
+        "members_only-checker": get_members,
+        "community_posts-checker": get_community_tab,
+    }
+    manual_check_id = f"manual-{job_name}"
+    func = mapping.get(job_name)
+    if func:
+        job = scheduler.get_job(manual_check_id)
+        if job:
+            common.logger.warning("Manual stream check already running")
+            flash("Manual stream check already triggered, please wait for existing check to finish", "warning")
+        else:    
+            # Run it immediately as a one-off job
+            scheduler.add_job(func, trigger='date', run_date=datetime.now(), id=manual_check_id, name=manual_check_id)
+            common.logger.debug(f"Successfully triggered immediate run for job ID: {manual_check_id}")
+            flash(f"Force-run triggered for {job_name}", "info")
+    else:
+        flash(f"Unknown job: {job_name}", "danger")
+        
+    return redirect(url_for('index'))
+
+# --- HTMX Route for Scheduler ---
+
+@app.route('/data/scheduler')
+def data_scheduler():
+    """Endpoint for HTMX to poll scheduler status."""
+    jobs = get_scheduler_jobs()
+    # Note: If you moved templates to files, use render_template('scheduler_table.html', ...)
+    return render_template('schedule_table.html', jobs=jobs)
 
 # --- Main Entry Point ---
 
