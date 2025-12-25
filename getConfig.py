@@ -31,24 +31,6 @@ class ConfigHandler:
         self.community_tab_options: dict = config.get("community_tab_options", {})
 
         self.webui_options = config.get("webui", {})
-        
-        # If you want to keep the TOML document for writes:
-        self._config_doc = config_doc if 'config_doc' in locals() else None
-
-    def save(self, config_file=config_file_path):
-        """
-        If the config was loaded via tomlkit and you modified it,
-        you can write it back (preserving comments/format) using tomlkit.
-        Requires that self._config_doc is not None.
-        """
-        if self._config_doc is None:
-                raise RuntimeError("No TOML document loaded — cannot save")
-
-        # Write file with preserved formatting + comments
-        with open(config_file, "wt", encoding="utf-8") as f:
-            tomlkit.dump(self._config_doc, f)
-        
-        
 
     def get_cookies_file(self):
         if self.download_options.get("cookies_file", None) is not None:
