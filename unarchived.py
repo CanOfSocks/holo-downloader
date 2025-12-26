@@ -4,13 +4,12 @@ import traceback
 import logging
 import threading
 import argparse
-from datetime import datetime
 from time import time
 from typing import Optional, Dict, Any
 
-# APScheduler imports
-from apscheduler.schedulers.blocking import BlockingScheduler
-from apscheduler.triggers.interval import IntervalTrigger
+# REMOVED: APScheduler imports
+# from apscheduler.schedulers.blocking import BlockingScheduler
+# from apscheduler.triggers.interval import IntervalTrigger
 
 # Local imports
 from getConfig import ConfigHandler
@@ -19,10 +18,10 @@ from livestream_dl import getUrls
 import discord_web
 from livestream_dl.download_Live import LiveStreamDownloader, FileInfo
 
-# Import the Chat class (assuming it's in a file named chat_downloader.py or similar)
-# If in the same file, just ensure the class definition is above this one.
+# Import the Chat class
 from getChatOnly import ChatOnlyDownloader
 import requests
+import random
 
 class UnarchivedDownloader:
     def __init__(self, id, config: ConfigHandler = None, logger: logging.Logger = None, kill_this: threading.Event = None):
@@ -37,16 +36,20 @@ class UnarchivedDownloader:
         self.livestream_downloader = LiveStreamDownloader(kill_all=kill_all, logger=self.logger, kill_this=self.kill_this)
         self.info_dict = {}
 
-        # Scheduling and Threading State
-        self.scheduler = BlockingScheduler()
+        # Threading State
+        # REMOVED: self.scheduler = BlockingScheduler()
         self.chat_thread: Optional[threading.Thread] = None
-        response = requests.get("https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v={0}".format(id), timeout=30)
-        self.embed_info: Optional[Dict[str, Any]] = response.json() if response.status_code == 200 else {}
+        
+        try:
+            response = requests.get("https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v={0}".format(id), timeout=30)
+            self.embed_info: Optional[Dict[str, Any]] = response.json() if response.status_code == 200 else {}
+        except Exception as e:
+            self.logger.warning(f"Could not fetch oembed info: {e}")
+            self.embed_info = {}
 
     def _run_chat_thread(self, json_path, chat_out_path):
         """Worker function to run ChatOnlyDownloader in a separate thread."""
         try:
-            # We pass self.logger to share the logging context
             chat_dl = ChatOnlyDownloader(
                 json_file=json_path, 
                 output_path=chat_out_path, 
@@ -59,6 +62,10 @@ class UnarchivedDownloader:
 
     def is_video_private(self, video_id: str) -> None:
         """Checks video status, downloads info, thumbnail, and triggers download_private if needed."""
+        # Check kill flag at start of operation
+        if self.kill_this.is_set() or kill_all.is_set():
+            return
+
         temp_folder = self.config.get_unarchived_temp_folder()
         json_out_path = os.path.join(temp_folder, f"{video_id}.info.json")
         chat_out_path = os.path.join(temp_folder, f"{video_id}.live_chat.zip")
@@ -89,7 +96,6 @@ class UnarchivedDownloader:
 
                 # --- Optimized Chat Trigger ---
                 if self.config.get_unarchived_chat_dl() and info_dict.get('live_status') == 'is_live':
-                    # Check if thread is already alive to prevent duplicate downloads
                     if self.chat_thread and self.chat_thread.is_alive():
                         self.logger.debug("Chat download thread is already running.")
                     else:
@@ -98,7 +104,7 @@ class UnarchivedDownloader:
                             target=self._run_chat_thread,
                             args=(json_out_path, chat_out_path),
                             name=f"ChatThread-{video_id}",
-                            daemon=True # Daemon ensures thread dies if main process is killed
+                            daemon=True
                         )
                         self.chat_thread.start()
                     self.livestream_downloader.stats["status"] = "Get Chat"
@@ -110,19 +116,22 @@ class UnarchivedDownloader:
                     'temp_folder': temp_folder
                 }
                 downloaded_aux = self.livestream_downloader.download_auxiliary_files(info_dict=info_dict, options=aux_options)
-                file_obj = downloaded_aux[0].get('thumbnail', None)
+                
+                # Check if we got results back
+                if downloaded_aux and len(downloaded_aux) > 0:
+                    file_obj = downloaded_aux[0].get('thumbnail', None)
 
-                # Thumbnail conversion logic (same as original)
-                if file_obj is not None and file_obj.exists() and not str(file_obj.suffix).endswith(".jpg"):
-                    subprocess.run([
-                        "ffmpeg", "-y", "-hide_banner", "-nostdin", "-loglevel", "error",
-                        "-i", str(file_obj.absolute()).replace('%', '%%'),
-                        "-q:v", "2",
-                        str(jpg_out_path).replace('%', '%%')
-                    ], check=True)
-                    file_obj.unlink()
-                elif file_obj is not None and file_obj.exists():
-                    os.rename(file_obj.absolute(), jpg_out_path)
+                    # Thumbnail conversion logic
+                    if file_obj is not None and file_obj.exists() and not str(file_obj.suffix).endswith(".jpg"):
+                        subprocess.run([
+                            "ffmpeg", "-y", "-hide_banner", "-nostdin", "-loglevel", "error",
+                            "-i", str(file_obj.absolute()).replace('%', '%%'),
+                            "-q:v", "2",
+                            str(jpg_out_path).replace('%', '%%')
+                        ], check=True)
+                        file_obj.unlink()
+                    elif file_obj is not None and file_obj.exists():
+                        os.rename(file_obj.absolute(), jpg_out_path)
 
                 return  # Exit successfully if live/post-live
 
@@ -150,10 +159,15 @@ class UnarchivedDownloader:
                     os.remove(jpg_out_path)
                 if os.path.exists(chat_out_path):
                     os.remove(chat_out_path)
-                if self.scheduler.running:
-                    self.kill_scheduler()
+                
+                # REPLACED: scheduler kill with event set
+                # If we removed the files because age was > 6 hours or similar logic, 
+                # we assume the process is "done" for this video instance? 
+                # Or if the download_private finished successfully?
+                # Based on original logic, this kills the process.
+                self.logger.info("Processing complete or timed out. Stopping monitor.")
+                self.kill_this.set()
 
-    # --- Existing Methods (check_ytdlp_age, download_private) remain unchanged ---
     def check_ytdlp_age(self, existing_file: str) -> bool:
         """Checks if a JSON info file is older than 6 hours and removes it if so."""
         current_time = time()
@@ -248,9 +262,10 @@ class UnarchivedDownloader:
         if thumbnail and os.path.exists(thumbnail):
             os.remove(thumbnail)
         self.livestream_downloader.stats["status"] = "Finished"
+        self.kill_this.set()
 
     def _scheduled_check(self, use_lock_file: bool):
-        """The job function called by the scheduler."""
+        """The job function called by the loop."""
         if use_lock_file:
             # Determine lock file path
             if os.path.exists("/dev/shm"):
@@ -269,53 +284,48 @@ class UnarchivedDownloader:
         else:
             self.is_video_private(self.id)
 
-    def _watchdog_check(self):
-        """
-        A high-frequency job that monitors the kill_this flag 
-        to shut down the scheduler immediately.
-        """
-        if self.kill_this.is_set() or kill_all.is_set():
-            self.logger.info("Watchdog detected kill signal. Shutting down scheduler.")
-            # wait=False allows the scheduler to exit even if the main job is mid-run
-            self.scheduler.shutdown(wait=False)
+    # REMOVED: kill_scheduler and _watchdog_check (no longer needed)
 
-    def kill_scheduler(self):
-        self.scheduler.remove_all_jobs()
-        self.scheduler.shutdown(wait=False)
-
-    def start_monitoring(self, interval=3600, use_lock_file=True):
+    def start_monitoring(self, interval=3600, use_lock_file=False):
         """
-        Starts the blocking scheduler.
-        Runs the check immediately, then every `interval` seconds.
+        Starts the monitoring loop (replaces scheduler).
         """
         self.logger.info(f"Starting unarchived monitor for {self.id} with interval {interval}s")
-        logging.getLogger("apscheduler").setLevel(logging.WARNING)
-        # Add the job
-        self.scheduler.add_job(
-            self._scheduled_check,
-            trigger=IntervalTrigger(seconds=interval),
-            args=[use_lock_file],
-            id=f"{self.id}_monitor",
-            max_instances=1, # Prevents new checks if the previous one (e.g. download) is still running
-            next_run_time=datetime.now() # Trigger first run immediately
-        )
+        self.livestream_downloader.stats["status"] = "Waiting"
 
-        self.scheduler.add_job(
-            self._watchdog_check,
-            trigger=IntervalTrigger(seconds=3), # Check the flag every 10 seconds
-            id=f"{self.id}_watchdog",
-            max_instances=1,
-            next_run_time=datetime.now()
-        )
+        # Loop until kill flag is set
+        while not self.kill_this.is_set() and not kill_all.is_set():
+            try:
+                # We calculate the target time we want to wake up for next run
+                jitter = random.uniform(0, 120)
+                wake_up_time = max(60, interval - jitter)
 
-        try:
-            self.livestream_downloader.stats["status"] = "Waiting"
-            self.scheduler.start()
-        except (KeyboardInterrupt, SystemExit):
-            self.logger.info("Scheduler stopping...")
-            self.kill_this.set()
-            if self.scheduler.running:
-                self.kill_scheduler()
+                # 1. Perform the check
+                self._scheduled_check(use_lock_file)
+                
+                # 2. Check flags again immediately after run (in case it finished processing and set kill flag)
+                if self.kill_this.is_set():
+                    break
+                
+                # 3. Wait for the interval
+                while time() < wake_up_time:
+                    # check triggers immediately
+                    if kill_all.is_set() or self.kill_this.wait(timeout=1.0):
+                        self.logger.info("Kill signal detected (during wait).")
+                        return
+                    
+            except (KeyboardInterrupt, SystemExit):
+                self.logger.info("Monitoring stopping due to interrupt...")
+                self.kill_this.set()
+                break
+            except Exception as e:
+                self.logger.error(f"Error in monitoring loop: {e}")
+                # Optional: Sleep briefly on error to avoid rapid-fire looping if something is broken
+                self.kill_this.set()
+                if self.kill_this.wait(timeout=5):
+                    break
+
+        self.logger.debug("Finished unarchived monitoring of {0}".format(self.id))
 
     def main(self):
         self.start_monitoring(use_lock_file=False)
