@@ -1,0 +1,79 @@
+{% macro get_status_color(status) -%}
+    {% set status_lower = status | lower %}
+    {% if 'recording' in status_lower and 'warning' in status_lower or 'error' in status_lower %}
+        bg-warning text-dark
+    {% elif 'error' in status_lower or 'kill_flag' in status_lower %}
+        bg-danger
+    {% elif 'recording' in status_lower %}
+        bg-primary
+    {% elif 'waiting' in status_lower or status == 'Unknown' %}
+        bg-secondary
+    {% else %}
+        bg-info
+    {% endif %}
+{%- endmacro %}
+
+{% if active_downloads %}
+
+<table class="table table-striped align-middle">
+    <thead>
+        <tr>
+            <th scope="col">Preview</th>
+            <th>Video ID</th>
+            <th>Title</th>
+            <th>Status</th>
+            <th>Video Segments</th>
+            <th>Audio Segments</th>
+            <th>Latest Segment</th>
+            <th>Size</th>
+            <th>Started At</th>
+            <th>Cancel</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for job in active_downloads %}
+        <tr>
+            <td>
+                <img src="https://img.youtube.com/vi/{{ job.id }}/maxresdefault.jpg" 
+                        alt="ID {{ job.id }}" 
+                        class="img-thumbnail"
+                        style="max-height: 60px; width: auto;">
+            </td>
+            
+            <td>
+                <a href="https://www.youtube.com/watch?v={{ job.id }}" target="_blank" rel="noopener noreferrer">
+                    {{ job.id }}
+                </a>
+            </td>
+            
+            <td>
+                <div style="max-height: 60px; overflow: hidden;" title="{{ job.info.get("fulltitle", "") }}">
+                    {{ job.info.get("fulltitle", "") or job.info.get("title", "") }}
+                </div>
+            </td>
+            
+            <td><span class="badge {{ get_status_color(job.stats.get('status', "Unknown")) }}">{{ job.stats.get('status', "Unknown") }}</span></td>
+            
+            <td>{{ job.stats.get('video', {}).get('downloaded_segments', 0) }}</td>
+            <td>{{ job.stats.get('audio', {}).get('downloaded_segments', 0) }}</td>
+            <td>{{ job.stats.get('video', {}).get('latest_sequence', 0) or job.stats.get('audio', {}).get('latest_sequence', 0) }}</td>
+            
+            <td>{{ (job.stats.get('video', {}).get('current_filesize', 0) + job.stats.get('audio', {}).get('current_filesize', 0)) | convert_bytes }}</td>
+            <td>{{ job.start_time }}</td>
+            <td>
+                <form action="/actions/cancel_unarchived/{{ job.id }}" method="POST" style="margin:0;">
+                    <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Stop recording {{ job.id }}?');" title="Stop Download">
+                        🗑️
+                    </button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% else %}
+<div class="text-center p-3">
+    <p class="text-muted mb-0">No unarchived monitors.</p>
+</div>
+{% endif %}
