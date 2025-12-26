@@ -84,6 +84,20 @@
                  <p class="text-center text-muted">Loading history...</p>
             </div>
         </div>
+
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-secondary text-white">
+                Unarchived Stream Downloads
+            </div>
+            <div class="card-body" 
+                 id="unarchive-monitor-container"
+                 hx-get="/data/unarchived"
+                 hx-trigger="load, every 30s" 
+                 hx-swap="innerHTML">
+                 
+                 <p class="text-center text-muted">Loading unarchived monitor activities...</p>
+            </div>
+        </div>
     </div>
 </body>
 </html>

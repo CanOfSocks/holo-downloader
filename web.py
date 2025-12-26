@@ -268,6 +268,25 @@ def get_active_jobs_data():
             })
     return current_jobs
 
+def get_active_unarchived_jobs_data():
+    """Prepares active download data for display."""
+    with LOCK:
+        current_jobs = []
+        for vid, job in active_unarchived_downloads.copy().items():
+            downloader: downloadVid.VideoDownloader = job['downloader']
+            display_info = {
+                'fulltitle': downloader.info_dict.get('fulltitle'),
+                'title': downloader.embed_info.get('title')
+            }
+
+            current_jobs.append({
+                'id': vid,
+                'stats': downloader.livestream_downloader.stats,
+                'info': display_info, # Pass the small dict, not the huge one
+                'start_time': job['start_time'].strftime('%H:%M:%S')
+            })
+    return current_jobs
+
 # --- Helper to format byte strings ---
 def convert_bytes(bytes):
         try:
@@ -297,6 +316,23 @@ def data_active():
     current_jobs = get_active_jobs_data()
     # 1. Render the active table
     rendered_table = render_template('active_table.html', active_downloads=current_jobs)
+    response = make_response(rendered_table)
+    
+    # 2. Check the signal list set by the background thread
+    with LOCK:
+        if history_update_event.is_set():
+            # Send HTMX trigger header, instructing the client to fire 'historyUpdated' event
+            response.headers['HX-Trigger'] = 'historyUpdated' 
+            history_update_event.clear() # Reset the flag
+            
+    return response
+
+@app.route('/data/unarchived')
+def data_unarchived():
+    """Endpoint for HTMX to poll active downloads table AND signal history update."""
+    current_jobs = get_active_unarchived_jobs_data()
+    # 1. Render the active table
+    rendered_table = render_template('unarchived_active_table.html', active_downloads=current_jobs)
     response = make_response(rendered_table)
     
     # 2. Check the signal list set by the background thread
@@ -391,6 +427,26 @@ def cancel_download(video_id):
     with LOCK:
         if video_id in active_downloads:
             job_entry = active_downloads[video_id]
+            downloader_instance: downloadVid.VideoDownloader = job_entry.get('downloader')
+            
+            # Navigate to the inner downloader object that holds the flag
+            # Based on your existing code: downloader -> livestream_downloader
+            try:
+                downloader_instance.kill_this.set()
+            except Exception as e:
+                common.logger.error(f"Failed to cancel {video_id}: {e}")
+                flash(f"Error cancelling {video_id}", "danger")
+        else:
+            flash(f"Stream {video_id} is not currently active.", "secondary")
+            
+    return redirect(url_for('index'))
+
+@app.route('/actions/cancel_unarchived/<video_id>', methods=['POST'])
+def cancel_unarchived(video_id):
+    """Sets the kill flag to True for a specific downloader."""
+    with LOCK:
+        if video_id in active_unarchived_downloads:
+            job_entry = active_unarchived_downloads[video_id]
             downloader_instance: downloadVid.VideoDownloader = job_entry.get('downloader')
             
             # Navigate to the inner downloader object that holds the flag

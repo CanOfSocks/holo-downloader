@@ -1,22 +1,32 @@
 import os
 import json
-
 import traceback
 import logging
-from shutil import move
-from time import time, sleep
+import threading
+import argparse
+from datetime import datetime
+from time import time
 from typing import Optional, Dict, Any
 
+# APScheduler imports
+from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.triggers.interval import IntervalTrigger
+
+# Local imports
 from getConfig import ConfigHandler
 from common import FileLock, setup_umask, initialize_logging, kill_all
 from livestream_dl import getUrls
 import discord_web
 from livestream_dl.download_Live import LiveStreamDownloader, FileInfo
-import threading
-import argparse
+
+# Import the Chat class (assuming it's in a file named chat_downloader.py or similar)
+# If in the same file, just ensure the class definition is above this one.
+from getChatOnly import ChatOnlyDownloader
+import requests
 
 class UnarchivedDownloader:
-    def __init__(self, id, config: ConfigHandler = None, logger: logging.Logger = None, kill_this: threading.Event = None,):
+    def __init__(self, id, config: ConfigHandler = None, logger: logging.Logger = None, kill_this: threading.Event = None):
+        
         if not id:
             raise Exception("No video ID provided, unable to continue")
         
@@ -27,6 +37,123 @@ class UnarchivedDownloader:
         self.livestream_downloader = LiveStreamDownloader(kill_all=kill_all, logger=self.logger, kill_this=self.kill_this)
         self.info_dict = {}
 
+        # Scheduling and Threading State
+        self.scheduler = BlockingScheduler()
+        self.chat_thread: Optional[threading.Thread] = None
+        response = requests.get("https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v={0}".format(id), timeout=30)
+        self.embed_info: Optional[Dict[str, Any]] = response.json() if response.status_code == 200 else {}
+
+    def _run_chat_thread(self, json_path, chat_out_path):
+        """Worker function to run ChatOnlyDownloader in a separate thread."""
+        try:
+            # We pass self.logger to share the logging context
+            chat_dl = ChatOnlyDownloader(
+                json_file=json_path, 
+                output_path=chat_out_path, 
+                config=self.config, 
+                logger=self.logger
+            )
+            chat_dl.main(use_lock_file=False)
+        except Exception as e:
+            self.logger.error(f"Error in chat thread: {e}")
+
+    def is_video_private(self, video_id: str) -> None:
+        """Checks video status, downloads info, thumbnail, and triggers download_private if needed."""
+        temp_folder = self.config.get_unarchived_temp_folder()
+        json_out_path = os.path.join(temp_folder, f"{video_id}.info.json")
+        chat_out_path = os.path.join(temp_folder, f"{video_id}.live_chat.zip")
+        jpg_out_path = os.path.join(temp_folder, f"{video_id}.jpg")
+
+        try:
+            additional_options = None
+            if self.config.get_ytdlp_options():
+                additional_options = json.loads(self.config.get_ytdlp_options())
+
+            info_dict, live_status = getUrls.get_Video_Info(
+                id=video_id,
+                wait=(60, 1800),
+                cookies=self.config.get_cookies_file(),
+                proxy=self.config.get_proxy(),
+                additional_options=additional_options,
+                include_dash=False,
+                include_m3u8=False,
+            )
+
+            if info_dict.get('live_status') in ['is_live', 'post_live']:
+                self.livestream_downloader.stats["status"] = "Monitoring"
+                import subprocess
+                os.makedirs(os.path.dirname(json_out_path), exist_ok=True)
+                with open(json_out_path, 'w', encoding='utf-8') as json_file:
+                    json.dump(info_dict, json_file, ensure_ascii=False, indent=4)
+                    self.logger.debug(f"Created/Updated {os.path.abspath(json_out_path)}")
+
+                # --- Optimized Chat Trigger ---
+                if self.config.get_unarchived_chat_dl() and info_dict.get('live_status') == 'is_live':
+                    # Check if thread is already alive to prevent duplicate downloads
+                    if self.chat_thread and self.chat_thread.is_alive():
+                        self.logger.debug("Chat download thread is already running.")
+                    else:
+                        self.logger.info("Stream is live. Starting chat download thread.")
+                        self.chat_thread = threading.Thread(
+                            target=self._run_chat_thread,
+                            args=(json_out_path, chat_out_path),
+                            name=f"ChatThread-{video_id}",
+                            daemon=True # Daemon ensures thread dies if main process is killed
+                        )
+                        self.chat_thread.start()
+                    self.livestream_downloader.stats["status"] = "Get Chat"
+                # ------------------------------
+
+                # Download Thumbnail (Aux)
+                aux_options = {
+                    'write_thumbnail': True,
+                    'temp_folder': temp_folder
+                }
+                downloaded_aux = self.livestream_downloader.download_auxiliary_files(info_dict=info_dict, options=aux_options)
+                file_obj = downloaded_aux[0].get('thumbnail', None)
+
+                # Thumbnail conversion logic (same as original)
+                if file_obj is not None and file_obj.exists() and not str(file_obj.suffix).endswith(".jpg"):
+                    subprocess.run([
+                        "ffmpeg", "-y", "-hide_banner", "-nostdin", "-loglevel", "error",
+                        "-i", str(file_obj.absolute()).replace('%', '%%'),
+                        "-q:v", "2",
+                        str(jpg_out_path).replace('%', '%%')
+                    ], check=True)
+                    file_obj.unlink()
+                elif file_obj is not None and file_obj.exists():
+                    os.rename(file_obj.absolute(), jpg_out_path)
+
+                return  # Exit successfully if live/post-live
+
+        except getUrls.VideoInaccessibleError as e:
+            self.logger.info(f"VideoInaccessibleError for {video_id}: {e}")
+            if os.path.exists(json_out_path):
+                self.download_private(info_dict_file=json_out_path, thumbnail=jpg_out_path, chat=chat_out_path)
+        except getUrls.VideoProcessedError as e:
+            self.logger.info(f"({video_id}) {e}")
+        except Exception as e:
+            self.logger.exception(f"Unexpected exception: {e}")
+            try:
+                discord_web.main(
+                    video_id, "error",
+                    message=str(f"{e}\n{traceback.format_exc()}")[-1000:],
+                    config=self.config
+                )
+            except Exception:
+                self.logger.exception("Unable to send discord error message")
+
+        # Cleanup old files
+        if os.path.exists(json_out_path):
+            if not self.check_ytdlp_age(json_out_path):
+                if os.path.exists(jpg_out_path):
+                    os.remove(jpg_out_path)
+                if os.path.exists(chat_out_path):
+                    os.remove(chat_out_path)
+                if self.scheduler.running:
+                    self.kill_scheduler()
+
+    # --- Existing Methods (check_ytdlp_age, download_private) remain unchanged ---
     def check_ytdlp_age(self, existing_file: str) -> bool:
         """Checks if a JSON info file is older than 6 hours and removes it if so."""
         current_time = time()
@@ -44,22 +171,17 @@ class UnarchivedDownloader:
         if data and 'epoch' in data:
             data_age_hours = (current_time - data['epoch']) / 3600.0
             if data_age_hours > 6 or file_age_hours > 6:
-                self.logger.info(f"JSON {os.path.basename(existing_file)} is older than 6 hours, removing…")
+                self.logger.info(f"JSON {os.path.basename(existing_file)} is older than 6 hours, removing...")
                 os.remove(existing_file)
                 return False
         elif file_age_hours > 6:
-            self.logger.info(f"JSON {os.path.basename(existing_file)} is older than 6 hours (mod time), removing…")
+            self.logger.info(f"JSON {os.path.basename(existing_file)} is older than 6 hours (mod time), removing...")
             os.remove(existing_file)
             return False
 
         return True
 
-    def download_private(
-        self,
-        info_dict_file: str,
-        thumbnail: Optional[str] = None,
-        chat: Optional[str] = None
-    ) -> None:
+    def download_private(self, info_dict_file: str, thumbnail: Optional[str] = None, chat: Optional[str] = None) -> None:
         """Downloads a private or post-live video using pre-fetched info."""
         with open(info_dict_file, 'r', encoding='utf-8') as file:
             info_dict = json.load(file)
@@ -103,17 +225,16 @@ class UnarchivedDownloader:
         if thumbnail and os.path.exists(thumbnail):
             self.livestream_downloader.file_names['thumbnail'] = FileInfo(thumbnail, file_type='thumbnail')
         if chat and os.path.exists(chat):
-            self.livestream_downloader.file_names.update({
-                'live_chat': FileInfo(chat, file_type='live_chat')
-            })
+            self.livestream_downloader.file_names.update({'live_chat': FileInfo(chat, file_type='live_chat')})
 
         try:
+            self.livestream_downloader.stats["status"] = "Recording"
             self.livestream_downloader.download_segments(info_dict=info_dict, resolution='best', options=options)
         except Exception as e:
             self.logger.exception(e)
+            self.livestream_downloader.stats["status"] = "Error"
             discord_web.main(
-                video_id,
-                "error",
+                video_id, "error",
                 message=str(f"{e}\n{traceback.format_exc()}")[-1000:],
                 config=self.config
             )
@@ -126,147 +247,98 @@ class UnarchivedDownloader:
             os.remove(info_dict_file)
         if thumbnail and os.path.exists(thumbnail):
             os.remove(thumbnail)
+        self.livestream_downloader.stats["status"] = "Finished"
 
-    def is_video_private(self, video_id: str) -> None:
-        """Checks video status, downloads info, thumbnail, and triggers download_private if needed."""
-        temp_folder = self.config.get_unarchived_temp_folder()
-        json_out_path = os.path.join(temp_folder, f"{video_id}.info.json")
-        chat_out_path = os.path.join(temp_folder, f"{video_id}.live_chat.zip")
-        jpg_out_path = os.path.join(temp_folder, f"{video_id}.jpg")
-
-        try:
-            additional_options = None
-            if self.config.get_ytdlp_options():
-                additional_options = json.loads(self.config.get_ytdlp_options())
-
-            info_dict, live_status = getUrls.get_Video_Info(
-                id=video_id,
-                wait=(60, 1800),
-                cookies=self.config.get_cookies_file(),
-                proxy=self.config.get_proxy(),
-                additional_options=additional_options,
-                include_dash=False,
-                include_m3u8=False,
-            )
-
-            if info_dict.get('live_status') in ['is_live', 'post_live']:
-                import subprocess
-                os.makedirs(os.path.dirname(json_out_path), exist_ok=True)
-                with open(json_out_path, 'w', encoding='utf-8') as json_file:
-                    json.dump(info_dict, json_file, ensure_ascii=False, indent=4)
-                    self.logger.debug(f"Created {os.path.abspath(json_out_path)}")
-
-                if self.config.get_unarchived_chat_dl() and info_dict.get('live_status') == 'is_live':
-                    chat_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'getChatOnly.py')
-                    command = [
-                        "python", chat_script,
-                        '--output-path', chat_out_path,
-                        '--', json_out_path
-                    ]
-                    subprocess.Popen(command, start_new_session=True)
-
-                aux_options = {
-                    'write_thumbnail': True,
-                    'temp_folder': temp_folder
-                }
-                downloaded_aux = self.livestream_downloader.download_auxiliary_files(info_dict=info_dict, options=aux_options)
-                file_obj = downloaded_aux[0].get('thumbnail', None)
-
-                if file_obj is not None and file_obj.exists() and not str(file_obj.suffix).endswith(".jpg"):
-                    subprocess.run([
-                        "ffmpeg", "-y", "-hide_banner", "-nostdin", "-loglevel", "error",
-                        "-i", file_obj.absolute(),
-                        "-q:v", "2",
-                        jpg_out_path
-                    ], check=True)
-                    self.logger.debug(f"Deleting original thumbnail: {file_obj.absolute()}")
-                    file_obj.unlink()
-                elif file_obj is not None and file_obj.exists():
-                    os.rename(file_obj.absolute(), jpg_out_path)
-
-                return  # exit successfully if live/post-live
-
-        except getUrls.VideoInaccessibleError as e:
-            self.logger.info(f"VideoInaccessibleError while checking {video_id}: {e}")
-            if os.path.exists(json_out_path):
-                self.download_private(info_dict_file=json_out_path, thumbnail=jpg_out_path, chat=chat_out_path)
-        except getUrls.VideoProcessedError as e:
-            self.logger.info(f"({video_id}) {e}")
-        except Exception as e:
-            self.logger.exception(f"Unexpected exception occurred: {e}")
-            try:
-                discord_web.main(
-                    video_id,
-                    "error",
-                    message=str(f"{e}\n{traceback.format_exc()}")[-1000:],
-                    config=self.config
-                )
-            except Exception as e_discord:
-                self.logger.exception("Unable to send discord error message")
-
-        # Cleanup
-        if os.path.exists(json_out_path):
-            if not self.check_ytdlp_age(json_out_path):
-                if os.path.exists(jpg_out_path):
-                    os.remove(jpg_out_path)
-                if os.path.exists(chat_out_path):
-                    os.remove(chat_out_path)
-
-    def main(self, use_lock_file=False) -> None:
-        """
-        Entry point: acquires lock and triggers processing logic.
-        """
-        
+    def _scheduled_check(self, use_lock_file: bool):
+        """The job function called by the scheduler."""
         if use_lock_file:
             # Determine lock file path
             if os.path.exists("/dev/shm"):
                 lock_file_path = f"/dev/shm/unarchived-{self.id}"
             else:
-                lock_file_path = os.path.join(
-                    self.config.get_temp_folder(),
-                    f"unarchived-{self.id}.lockfile"
-                )
+                lock_file_path = os.path.join(self.config.get_temp_folder(), f"unarchived-{self.id}.lockfile")
 
             try:
+                # We use a timeout or non-blocking acquire to avoid piling up threads if one is stuck
                 with FileLock(lock_file_path) as lock_file:
                     lock_file.acquire()
                     self.is_video_private(self.id)
                     lock_file.release()
-            except (IOError, BlockingIOError) as e:
-                self.logger.warning(f"Unable to acquire lock for {lock_file_path}, must be already downloading: {e}")
+            except (IOError, BlockingIOError):
+                self.logger.warning(f"Skipping check for {self.id}: Lock file active (process running).")
         else:
             self.is_video_private(self.id)
 
-if __name__ == "__main__":
+    def _watchdog_check(self):
+        """
+        A high-frequency job that monitors the kill_this flag 
+        to shut down the scheduler immediately.
+        """
+        if self.kill_this.is_set() or kill_all.is_set():
+            self.logger.info("Watchdog detected kill signal. Shutting down scheduler.")
+            # wait=False allows the scheduler to exit even if the main job is mid-run
+            self.scheduler.shutdown(wait=False)
 
+    def kill_scheduler(self):
+        self.scheduler.remove_all_jobs()
+        self.scheduler.shutdown(wait=False)
+
+    def start_monitoring(self, interval=3600, use_lock_file=True):
+        """
+        Starts the blocking scheduler.
+        Runs the check immediately, then every `interval` seconds.
+        """
+        self.logger.info(f"Starting unarchived monitor for {self.id} with interval {interval}s")
+        logging.getLogger("apscheduler").setLevel(logging.WARNING)
+        # Add the job
+        self.scheduler.add_job(
+            self._scheduled_check,
+            trigger=IntervalTrigger(seconds=interval),
+            args=[use_lock_file],
+            id=f"{self.id}_monitor",
+            max_instances=1, # Prevents new checks if the previous one (e.g. download) is still running
+            next_run_time=datetime.now() # Trigger first run immediately
+        )
+
+        self.scheduler.add_job(
+            self._watchdog_check,
+            trigger=IntervalTrigger(seconds=3), # Check the flag every 10 seconds
+            id=f"{self.id}_watchdog",
+            max_instances=1,
+            next_run_time=datetime.now()
+        )
+
+        try:
+            self.livestream_downloader.stats["status"] = "Waiting"
+            self.scheduler.start()
+        except (KeyboardInterrupt, SystemExit):
+            self.logger.info("Scheduler stopping...")
+            self.kill_this.set()
+            if self.scheduler.running:
+                self.kill_scheduler()
+
+    def main(self):
+        self.start_monitoring(use_lock_file=False)
+
+if __name__ == "__main__":
     try:
-    
-        # 2. Instantiate ConfigHandler once
         app_config = ConfigHandler()
-        
-        
-        # 3. Setup umask globally (as in original script)
         setup_umask() 
         
-        # We delay the logger creation until the ID is known (inside main), 
-        # but need a basic logger for the argparse block's exception.
-        # We use the logging system's root logger here, which is set up by initialize_logging if called.
-    
-    
-        # Create the parser
-        parser = argparse.ArgumentParser(description="Process an video by ID")
+        parser = argparse.ArgumentParser(description="Process an video by ID with internal scheduling")
         parser.add_argument('ID', type=str, help='The video ID (required)')
+        parser.add_argument('--interval', type=int, default=3600, help='Check interval in seconds (default: 3600)')
 
-        # Parse the arguments
         args = parser.parse_args()
         
+        # Initialize logger
         logger = initialize_logging(config=app_config, logger_name=f"{args.ID}-unarchived")
-        # Call main, passing the config object
-        # The main function will create the final logger instance specific to the ID
 
-        unarchived_downloader = UnarchivedDownloader(id=args.ID, config=app_config, logger=logger)
-        unarchived_downloader.main(use_lock_file=True)
+        downloader = UnarchivedDownloader(id=args.ID, config=app_config, logger=logger)
+        
+        # Start the long-running process
+        downloader.start_monitoring(interval=args.interval, use_lock_file=True)
         
     except Exception as e:
-        logging.exception("An unhandled error occurred when trying to run the unarchived stream checker")
+        logging.exception("An unhandled error occurred")
         raise

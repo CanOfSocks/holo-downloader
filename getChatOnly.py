@@ -1,12 +1,12 @@
-from livestream_dl.download_Live import LiveStreamDownloader
-import common
-from getConfig import ConfigHandler
-import json
-import argparse
 import os
+import json
 import logging
 import threading
-from common import initialize_logging, kill_all
+from typing import Optional
+
+from getConfig import ConfigHandler
+from common import FileLock, setup_umask, initialize_logging, kill_all
+from livestream_dl.download_Live import LiveStreamDownloader
 
 class ChatOnlyDownloader:
     def __init__(
@@ -21,25 +21,26 @@ class ChatOnlyDownloader:
         self.output_path = output_path
         self.kill_this = kill_this or threading.Event()
         self.config = config or ConfigHandler()
+        # Use provided logger or create a child logger to avoid messing with root handlers
         self.logger = logger or initialize_logging(self.config, logger_name="chat_downloader")
         self.downloader = LiveStreamDownloader(kill_all=kill_all, logger=self.logger, kill_this=self.kill_this)
 
     def main(self, use_lock_file=False) -> None:
-        # Setup environment
-        common.setup_umask()
+        # Only setup umask if we are the main thread/process; 
+        # skipped here to avoid redundant calls in threaded context
+        if threading.current_thread() is threading.main_thread():
+             setup_umask()
 
         # Load info_dict
         try:
             with open(self.json_file, 'r', encoding='utf-8') as f:
                 info_dict = json.load(f)
         except Exception as e:
-            self.logger.exception("Failed to load JSON file %s", self.json_file, exc_info=e)
+            self.logger.exception(f"Failed to load JSON file {self.json_file}")
             return None
 
-        # Re-initialize logger using video ID
         video_id = info_dict.get('id')
-        self.logger = initialize_logging(self.config, logger_name=f"{video_id}-chat")
-
+        
         # Build options
         options = {
             "ID": video_id,
@@ -59,23 +60,22 @@ class ChatOnlyDownloader:
                 f"chat-{options['ID']}.lockfile"
             )
 
-        # Acquire lock and download
+        # Download Logic
         if use_lock_file:
             try:
-                with common.FileLock(lock_file_path) as lock_file:
+                with FileLock(lock_file_path) as lock_file:
                     lock_file.acquire()
-                    result = self.downloader.download_live_chat(info_dict=info_dict, options=options)
-                    lock_file.release()
-                    return result
+                    self.logger.info(f"Starting chat download for {video_id}")
+                    return self.downloader.download_live_chat(info_dict=info_dict, options=options)
             except (IOError, BlockingIOError) as e:
-                self.logger.info("Unable to acquire lock for %s, must be already downloading: %s",
-                                lock_file_path, e)
+                self.logger.info(f"Chat lock active, skipping: {lock_file_path}")
         else:
             return self.downloader.download_live_chat(info_dict=info_dict, options=options)
 
     
 
 if __name__ == "__main__":
+    import argparse
     try:
         # Instantiate ConfigHandler once for the execution flow
         app_config = ConfigHandler()
