@@ -166,7 +166,9 @@ class UnarchivedDownloader:
                 # Or if the download_private finished successfully?
                 # Based on original logic, this kills the process.
                 self.logger.info("Processing complete or timed out. Stopping monitor.")
+                self.livestream_downloader.stats["status"] = "Expired"
                 self.kill_this.set()
+
 
     def check_ytdlp_age(self, existing_file: str) -> bool:
         """Checks if a JSON info file is older than 6 hours and removes it if so."""
