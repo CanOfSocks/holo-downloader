@@ -36,6 +36,12 @@ class ConfigHandler:
             return str(Path(self.download_options.get("cookies_file")))
         else:
             return None
+        
+    def get_community_tab_cookies(self):
+        if self.download_options.get("community_tab_cookies_file", None) is not None:
+            return str(Path(self.download_options.get("community_tab_cookies_file")))
+        else:
+            return self.get_cookies_file()
        
     def get_title_filter(self):
         return self.title_filter

@@ -45,8 +45,8 @@ def main(config: ConfigHandler = None, logger: logging = None):
             # Construct the base command
             command_list = ["python", "/app/ytct.py", "--reverse", "--dates", "-d", "{0}".format(path.join(com_tab_folder, channel))]
             
-            if config.get_cookies_file():
-                command_list += ["--cookies", config.get_cookies_file()]
+            if config.get_community_tab_cookies():
+                command_list += ["--cookies", config.get_community_tab_cookies()]
             
             if com_tab_archive:
                 command_list += ["--post-archive", com_tab_archive]
