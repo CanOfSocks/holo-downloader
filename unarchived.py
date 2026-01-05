@@ -88,7 +88,7 @@ class UnarchivedDownloader:
 
             if info_dict.get('live_status') in ['is_live', 'post_live']:
                 self.livestream_downloader.stats["status"] = "Monitoring"
-                import subprocess
+                
                 os.makedirs(os.path.dirname(json_out_path), exist_ok=True)
                 with open(json_out_path, 'w', encoding='utf-8') as json_file:
                     json.dump(info_dict, json_file, ensure_ascii=False, indent=4)
@@ -123,11 +123,12 @@ class UnarchivedDownloader:
 
                     # Thumbnail conversion logic
                     if file_obj is not None and file_obj.exists() and not str(file_obj.suffix).endswith(".jpg"):
+                        import subprocess
                         subprocess.run([
                             "ffmpeg", "-y", "-hide_banner", "-nostdin", "-loglevel", "error",
-                            "-i", str(file_obj.absolute()).replace('%', '%%'),
+                            "-i", str(file_obj.absolute()).replace("%", "％"),
                             "-q:v", "2",
-                            str(jpg_out_path).replace('%', '%%')
+                            str(jpg_out_path).replace("%", "％")
                         ], check=True)
                         file_obj.unlink()
                     elif file_obj is not None and file_obj.exists():

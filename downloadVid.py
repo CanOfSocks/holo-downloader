@@ -142,7 +142,7 @@ class VideoDownloader():
                 include_dash=self.config.get_include_dash(), 
                 include_m3u8=self.config.get_include_m3u8()
             )
-            outputFile = str(ydl.prepare_filename(info_dict))
+            outputFile = str(ydl.prepare_filename(info_dict)).replace("%", "％")
                 
         self.logger.debug("({0}) Info.json: {1}".format(video_url, json.dumps(info_dict)))
         self.logger.info("Output file: {0}".format(outputFile))
