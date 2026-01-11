@@ -21,6 +21,8 @@ import getVids
 
 from flask_caching import Cache
 
+import gc
+
 
 # --- Configuration & Constants ---
 config_file_path = 'config.toml'
@@ -54,6 +56,7 @@ history_update_event = threading.Event()
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
+    conn.execute('PRAGMA journal_mode=WAL;')
     c = conn.cursor()
     c.execute('''
         CREATE TABLE IF NOT EXISTS history (
@@ -65,6 +68,7 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    
     conn.commit()
     conn.close()
 
@@ -140,6 +144,7 @@ def thread_worker(video_id, downloader, thread_tracker: dict = active_downloads)
         with LOCK:
             if video_id in thread_tracker:
                 del thread_tracker[video_id]
+        gc.collect()
 
 def start_download(video_id):
     with LOCK:
@@ -562,4 +567,4 @@ if __name__ == '__main__':
     update_scheduler()
     scheduler.start()
     
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, load_dotenv=True)
