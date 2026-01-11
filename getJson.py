@@ -7,6 +7,7 @@ from datetime import datetime
 from getConfig import ConfigHandler
 import logging
 from typing import Optional, List, Dict, Any
+import queue
 
 # URL for the API endpoint (remains constant)
 url = "https://holo.dev/api/v1/lives/open"
@@ -100,7 +101,7 @@ def getStreams(unarchived: bool = False, config: ConfigHandler = None, logger: l
     return matching_streams
 
 # 4. main function updated to accept config
-def main(command: Optional[str] = None, unarchived: bool = False, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging = None) -> list[str] | str:
+def main(command: Optional[str] = None, unarchived: bool = False, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging = None, queue: queue.Queue = None) -> list[str] | str:
     # Instantiate ConfigHandler if it's not provided
     if config is None:
         config = ConfigHandler()
@@ -113,6 +114,10 @@ def main(command: Optional[str] = None, unarchived: bool = False, frequency: Opt
     if unarchived:
         # Assuming common.combine_unarchived is updated to accept config
         streams = common.combine_unarchived(streams, config)
+
+    if queue is not None:
+        for stream in streams:
+            queue.put(stream)
         
     # Assuming common.vid_executor is updated to accept config
     return common.vid_executor(streams, command, config, unarchived, frequency=frequency) 

@@ -23,6 +23,7 @@ from flask_caching import Cache
 
 import gc
 
+import queue
 
 # --- Configuration & Constants ---
 config_file_path = 'config.toml'
@@ -181,7 +182,7 @@ def start_unarchived_download(video_id):
         
         thread.start()
         return True
-
+"""
 def get_streams():
     common.logger.info("Running scheduled stream check...")
     streams = getVids.main(unarchived=False)
@@ -208,6 +209,49 @@ def get_members():
         # Have slightly randomised stream to help prevent rate limiting
         if len(streams) > 1:
             time.sleep(random.uniform(5.0, 10.0))
+"""
+def process_with_queue(discovery_func, download_func, *args, **kwargs):
+    """
+    Helper to run discovery in a thread and process items from a queue.
+    """
+    stream_queue = queue.Queue()
+    common.logger.info("Running scheduled stream check...")
+
+    # 1. Start discovery in a background thread
+    # Note: discovery_func (like getVids.main) must be updated to accept 'q'
+    discovery_thread = threading.Thread(
+        target=discovery_func, 
+        args=args, 
+        kwargs={'queue': stream_queue, **kwargs}
+    )
+    discovery_thread.start()
+
+    # 2. Process items as they arrive
+    while True:
+        try:
+            # Wait for an item (timeout ensures we check if thread is still alive)
+            stream = stream_queue.get(timeout=1)
+            
+            download_func(stream)
+
+            # Replicate your rate-limiting sleep logic
+            # Since we are processing 1 by 1, we sleep after each discovery
+            time.sleep(random.uniform(5.0, 10.0))
+            
+            stream_queue.task_done()
+        except queue.Empty:
+            # If queue is empty and discovery is done, we are finished
+            if not discovery_thread.is_alive():
+                break
+
+def get_streams():
+    process_with_queue(getVids.main, start_download, unarchived=False)
+
+def get_unarchived():
+    process_with_queue(getVids.main, start_unarchived_download, unarchived=True)
+
+def get_members():
+    process_with_queue(getMembers.main, start_download)
 
 def get_community_tab():
     common.logger.info("Running scheduled stream check...")

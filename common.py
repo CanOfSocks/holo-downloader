@@ -74,6 +74,8 @@ def vid_executor(streams: List[str], command: str, config: ConfigHandler = None,
             sleep_time = 60
         
         for i, live in enumerate(streams):
+            if kill_all.is_set():
+                break
             cmd_args = ["python", download_script, '--', live]
             logging.debug("Executing: {0}".format(' '.join(cmd_args)))
             Popen(cmd_args, start_new_session=True)
