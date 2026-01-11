@@ -301,7 +301,7 @@ class UnarchivedDownloader:
             try:
                 # We calculate the target time we want to wake up for next run
                 jitter = random.uniform(0, 120)
-                wake_up_time = max(60, interval - jitter)
+                wake_up_time = time() + max(60, interval - jitter)
 
                 # 1. Perform the check
                 self._scheduled_check(use_lock_file)
