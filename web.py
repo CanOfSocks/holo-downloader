@@ -232,13 +232,12 @@ def process_with_queue(discovery_func, download_func, *args, **kwargs):
             # Wait for an item (timeout ensures we check if thread is still alive)
             stream = stream_queue.get(timeout=1)
             
-            download_func(stream)
-
-            # Replicate your rate-limiting sleep logic
-            # Since we are processing 1 by 1, we sleep after each discovery
-            time.sleep(random.uniform(5.0, 10.0))
+            download_func(stream)            
             
             stream_queue.task_done()
+
+            # Spread out download starts
+            time.sleep(random.uniform(5.0, 10.0))
         except queue.Empty:
             # If queue is empty and discovery is done, we are finished
             if not discovery_thread.is_alive():
