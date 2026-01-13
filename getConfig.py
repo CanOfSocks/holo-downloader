@@ -225,6 +225,9 @@ class ConfigHandler:
     def get_include_m3u8(self):
         return self.download_options.get('include_m3u8', False)
     
+    def get_segment_wait_limit(self):
+        return self.download_options.get('segment_wait_limit', 0)
+    
     def get_discord_webhook(self):
         return self.webhook.get("url", None)
     
@@ -308,6 +311,7 @@ class ConfigHandler:
             "log_file_options": self.get_log_file_options(),
             "dash": self.get_include_dash(),
             "m3u8": self.get_include_m3u8(),
+            'wait_limit': self.get_segment_wait_limit(),
         }
 
         if self.get_remux_container() is not None:
