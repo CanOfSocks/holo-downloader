@@ -48,8 +48,8 @@ class VideoDownloader():
         self.config: ConfigHandler = config
 
         if logger is None:
-            logger = initialize_logging(config, logger_name=id)
-        self.logger: logging = logger
+            logger = initialize_logging(config, logger_name="Downloader", video_id=id)
+        self.logger: logging.Logger = logger
         
         self.livestream_downloader = download_Live.LiveStreamDownloader(kill_all=kill_all, logger=logger, kill_this=self.kill_this)
         
@@ -59,6 +59,8 @@ class VideoDownloader():
 
         response = requests.get("https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v={0}".format(id), timeout=30)
         self.embed_info: Optional[Dict[str, Any]] = response.json() if response.status_code == 200 else {}
+        # Remove iframe data
+        self.embed_info.pop('html', None)
         
 
     def createTorrent(self, output: str) -> None:
@@ -72,15 +74,15 @@ class VideoDownloader():
         # Use config methods to build the command
         subprocess.run(self.config.torrentBuilder(fullPath, folder), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
             
-    def downloader(self) -> None:
+    def downloader(self, info_dict: Dict[str, Any]) -> None:
         """
         Handles the main video segment download process.
         """
-        if not self.info_dict or self.outputFile is None:
+        if not info_dict or self.outputFile is None:
             raise Exception(("Unable to retrieve information about video {0}".format(self.id)))
 
         # Options retrieved using the passed config object
-        options = self.config.get_livestream_dl_options(info_dict=self.info_dict, output_template=self.outputFile)
+        options = self.config.get_livestream_dl_options(info_dict=info_dict, output_template=self.outputFile)
         
         # Start additional information downloaders (Discord notification)
         # NOTE: Assuming discord_web.main is updated to accept the config object
@@ -89,7 +91,7 @@ class VideoDownloader():
         
         try:            
             self.livestream_downloader.stats["status"] = "Recording"
-            self.livestream_downloader.download_segments(info_dict=self.info_dict, resolution=self.config.get_quality(), options=options)
+            self.livestream_downloader.download_segments(info_dict=info_dict, resolution=self.config.get_quality(), options=options)
             
             if self.kill_this.is_set():
                 self.livestream_downloader.stats["status"] = "Cancelled"
@@ -160,14 +162,23 @@ class VideoDownloader():
             self.livestream_downloader.stats["status"] = "Waiting"
             try:
                 # Pass config and logger
-                self.outputFile, self.info_dict = self.download_video_info(self.id)
+                self.outputFile, info_dict = self.download_video_info(self.id)
                 self.logger.debug("Output file: {0}".format(self.outputFile))
+
+                self.info_dict = {
+                    'id': info_dict.get('id'),
+                    'title': info_dict.get('title'),
+                    'fulltitle': info_dict.get('fulltitle'),
+                    'uploader': info_dict.get('uploader'),
+                    'thumbnail': info_dict.get('thumbnail'),
+                    'webpage_url': info_dict.get('webpage_url')
+                }
                 
                 if self.outputFile is None:
                     raise LookupError(("Unable to retrieve information about video {0}".format(id)))
                 
                 # Pass config and logger
-                self.downloader()
+                self.downloader(info_dict)
                 
             except Exception as e:
                 self.logger.exception("Error downloading video")

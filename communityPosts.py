@@ -56,13 +56,12 @@ def main(config: ConfigHandler = None, logger: logging = None):
             logger.debug(f"Executing command: {' '.join(command_list)}")
 
             # result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            result = subprocess.run(command_list, capture_output=True, text=True)
+            #result = subprocess.run(command_list, capture_output=True, text=True)
             
             log_file = path.join(com_tab_folder, channel, "log.txt")
-            with open(log_file, 'a') as f:
-                f.write(result.stdout)
-                f.write(result.stderr) # Write stderr as well, as it's useful for debugging
-                f.write('\n')
+            with open(log_file, 'a') as f:                
+                # Stream directly to file, do not capture in RAM
+                subprocess.run(command_list, stdout=f, stderr=subprocess.STDOUT, text=True)
 
 # Example of how you would run this script in your application entry point:
 if __name__ == "__main__":

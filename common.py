@@ -10,6 +10,8 @@ import logging
 import json
 from typing import List, Dict, Any, Optional, Union
 
+from livestream_dl.YoutubeURL import YTDLPLogger
+
 import signal
 
 import threading
@@ -38,7 +40,7 @@ else:
 
 from livestream_dl.download_Live import setup_logging
 
-def initialize_logging(config: ConfigHandler = None, logger_name = None, force = False):
+def initialize_logging(config: ConfigHandler = None, logger_name = None, force = False, video_id: str = None):
     if config is None:
         config = ConfigHandler()
         
@@ -48,7 +50,8 @@ def initialize_logging(config: ConfigHandler = None, logger_name = None, force =
         file=config.get_log_file(), 
         file_options=config.get_log_file_options(),
         logger_name=logger_name,
-        force=force
+        force=force,
+        video_id=video_id
     )
     return logger
 
@@ -192,9 +195,11 @@ def getAvailability(live: Any, config: ConfigHandler = None):
                 pass
     return live.availability
 
-def get_upcoming_or_live_videos(channel_id: str, config: ConfigHandler = None, tab: str = None) -> List[str]:
+def get_upcoming_or_live_videos(channel_id: str, config: ConfigHandler = None, tab: str = None, passed_logger: logging.Logger = None) -> List[str]:
     if config is None:
         config = ConfigHandler()
+    
+    this_logger = passed_logger or logger 
 
     ydl_opts = {
         'quiet': True,
@@ -203,7 +208,11 @@ def get_upcoming_or_live_videos(channel_id: str, config: ConfigHandler = None, t
         'sleep_interval_requests': 1,
         'no_warnings': True,
         'cookiefile': config.get_cookies_file(),
+        "logger": YTDLPLogger(logger=this_logger),
     }
+    if config.get_ytlp_playlist_limit():
+        ydl_opts.update({'playlist_items': '1:{0}'.format(config.get_ytlp_playlist_limit())})
+
     try:
         with YoutubeDL(ydl_opts) as ydl:
             if tab == "membership":
@@ -212,8 +221,9 @@ def get_upcoming_or_live_videos(channel_id: str, config: ConfigHandler = None, t
                 elif channel_id.startswith("UC") or channel_id.startswith("UU"):
                     url = "https://www.youtube.com/playlist?list={0}".format("UUMO" + channel_id[2:])
                 else:
-                    url = "https://www.youtube.com/channel/{0}/{1}".format(channel_id, tab)
                     ydl_opts.update({'playlist_items': '1:10'})
+                    url = "https://www.youtube.com/channel/{0}/{1}".format(channel_id, tab)
+                    
             elif tab == "streams":
                 if channel_id.startswith("UU"):
                     url = "https://www.youtube.com/playlist?list={0}".format(channel_id)
@@ -222,35 +232,38 @@ def get_upcoming_or_live_videos(channel_id: str, config: ConfigHandler = None, t
                 elif channel_id.startswith("UUMO"):
                     url = "https://www.youtube.com/playlist?list={0}".format("UU" + channel_id[4:])
                 else:
-                    url = "https://www.youtube.com/channel/{0}/{1}".format(channel_id, tab)
                     ydl_opts.update({'playlist_items': '1:10'})
+                    url = "https://www.youtube.com/channel/{0}/{1}".format(channel_id, tab)
+                    
             else:
-                url = "https://www.youtube.com/channel/{0}/{1}".format(channel_id, tab)
                 ydl_opts.update({'playlist_items': '1:10'})
+                url = "https://www.youtube.com/channel/{0}/{1}".format(channel_id, tab)
+                
             
             info = ydl.extract_info(url, download=False)
-            logging.debug(json.dumps(info))
+            #logging.debug(json.dumps(info))
             upcoming_or_live_videos = []
             
             for video in info['entries']:
                 # Config is passed explicitly here
                 is_future = withinFuture(config, video.get('release_timestamp', None))
                 passes_filter = filtering(video, video.get('channel_id'), config)
+                this_logger.debug("({1}) live_status = {0}".format(video.get('live_status'),video.get('id')))
 
-                if (video.get('live_status') == 'is_live' or video.get('live_status') == 'post_live' or (video.get('live_status') == 'is_upcoming' and is_future)) and passes_filter:
-                    logging.debug("({1}) live_status = {0}".format(video.get('live_status'),video.get('id')))
-                    logging.debug(json.dumps(video))
+                if (video.get('live_status') == 'is_live' or video.get('live_status') == 'post_live' or (video.get('live_status') == 'is_upcoming' and is_future)) and passes_filter:                    
+                    #logging.debug(json.dumps(video))
                     upcoming_or_live_videos.append(video.get('id'))
 
             return list(set(upcoming_or_live_videos))
     except Exception as e:
-        logging.exception("An unexpected error occurred when trying to fetch videos")
+        this_logger.exception("An unexpected error occurred when trying to fetch videos")
         raise
     
-def combine_unarchived(ids: List[str], config: ConfigHandler = None) -> List[str]:
+def combine_unarchived(ids: List[str], config: ConfigHandler = None, passed_logger: logging.Logger = None) -> List[str]:
     if config is None:
         config = ConfigHandler()
-
+    this_logger = passed_logger or logger
+    
     yta_pattern = r"^([0-9A-Za-z_-]{10}[048AEIMQUYcgkosw])\.info\.json$"
     directory = config.get_unarchived_temp_folder()
     if not os.path.exists(directory):
@@ -259,14 +272,14 @@ def combine_unarchived(ids: List[str], config: ConfigHandler = None) -> List[str
         f for f in os.listdir(directory)
         if os.path.isfile(os.path.join(directory, f))
     ]
-    logging.debug("Existing files: {0}".format(files))
+    this_logger.debug("Existing files: {0}".format(files))
     id_set = set(ids)
 
     for file in files:
         match = re.match(yta_pattern, file)
         if match:
             group1 = match.group(1)  
-            logging.debug("[Unarchived] Found ID {0} from filename {1}".format(group1, file))          
+            this_logger.debug("[Unarchived] Found ID {0} from filename {1}".format(group1, file))          
             id_set.add(str(group1))
     
     return list(id_set)

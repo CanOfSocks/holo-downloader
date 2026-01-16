@@ -58,6 +58,9 @@ class ConfigHandler:
             output_folder = str(PurePath(output_folder, output_folder))
 
         return str(Path(output_folder))
+    
+    def get_ytlp_playlist_limit(self):
+        return self.download_options.get("yt_dlp_playlist_limit", 20)
 
     def vid_only(self):
         return self.download_options.get("video_only", False)

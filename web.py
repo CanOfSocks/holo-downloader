@@ -25,6 +25,13 @@ import gc
 
 import queue
 
+# Set stack size to 1MB (1024*1024 bytes)
+# Note: This applies to all new threads created subsequently.
+try:
+    threading.stack_size(1024 * 1024) 
+except ValueError:
+    pass # Some platforms have strict page size requirements
+
 # --- Configuration & Constants ---
 config_file_path = 'config.toml'
 DB_FILE = 'stream_history.db'
@@ -210,7 +217,7 @@ def get_members():
         if len(streams) > 1:
             time.sleep(random.uniform(5.0, 10.0))
 """
-def process_with_queue(discovery_func, download_func, *args, **kwargs):
+def get_videos_with_queue(discovery_func, download_func, *args, **kwargs):
     """
     Helper to run discovery in a thread and process items from a queue.
     """
@@ -244,13 +251,13 @@ def process_with_queue(discovery_func, download_func, *args, **kwargs):
                 break
 
 def get_streams():
-    process_with_queue(getVids.main, start_download, unarchived=False)
+    get_videos_with_queue(getVids.main, start_download, unarchived=False)
 
 def get_unarchived():
-    process_with_queue(getVids.main, start_unarchived_download, unarchived=True)
+    get_videos_with_queue(getVids.main, start_unarchived_download, unarchived=True)
 
 def get_members():
-    process_with_queue(getMembers.main, start_download)
+    get_videos_with_queue(getMembers.main, start_download)
 
 def get_community_tab():
     common.logger.info("Running scheduled stream check...")
@@ -303,10 +310,9 @@ def get_active_jobs_data():
         current_jobs = []
         for vid, job in active_downloads.copy().items():
             downloader: downloadVid.VideoDownloader = job['downloader']
-            display_info = {
-                'fulltitle': downloader.info_dict.get('fulltitle'),
-                'title': downloader.embed_info.get('title')
-            }
+
+            display_info = downloader.info_dict if hasattr(downloader, 'info_dict') else {}
+            display_info['title'] = downloader.embed_info.get('title')
 
             current_jobs.append({
                 'id': vid,

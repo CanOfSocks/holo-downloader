@@ -32,7 +32,7 @@ class UnarchivedDownloader:
         self.id = id
         self.kill_this = kill_this or threading.Event()
         self.config = config or ConfigHandler()
-        self.logger = logger or initialize_logging(self.config, logger_name="unarchived_downloader")
+        self.logger = logger or initialize_logging(config, logger_name="unarchived_downloader", video_id=id)
         self.livestream_downloader = LiveStreamDownloader(kill_all=kill_all, logger=self.logger, kill_this=self.kill_this)
         self.info_dict = {}
 
