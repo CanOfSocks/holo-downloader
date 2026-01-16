@@ -137,7 +137,7 @@ class UnarchivedDownloader:
                         os.rename(file_obj.absolute(), jpg_out_path)
 
                 return  # Exit successfully if live/post-live
-
+            del info_dict
         except getUrls.VideoInaccessibleError as e:
             self.logger.info(f"VideoInaccessibleError for {video_id}: {e}")
             if os.path.exists(json_out_path):
