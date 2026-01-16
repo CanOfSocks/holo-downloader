@@ -43,6 +43,7 @@ class UnarchivedDownloader:
         try:
             response = requests.get("https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v={0}".format(id), timeout=30)
             self.embed_info: Optional[Dict[str, Any]] = response.json() if response.status_code == 200 else {}
+            self.embed_info.pop("html", None)
         except Exception as e:
             self.logger.warning(f"Could not fetch oembed info: {e}")
             self.embed_info = {}
@@ -84,6 +85,7 @@ class UnarchivedDownloader:
                 additional_options=additional_options,
                 include_dash=False,
                 include_m3u8=False,
+                clean_info_dict=self.config.get_clean_info_json(),
             )
 
             if info_dict.get('live_status') in ['is_live', 'post_live']:

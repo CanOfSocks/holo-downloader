@@ -59,6 +59,9 @@ class ConfigHandler:
 
         return str(Path(output_folder))
     
+    def get_clean_info_json(self):
+        return self.download_options.get("clean_info_json", False)
+    
     def get_ytlp_playlist_limit(self):
         return self.download_options.get("yt_dlp_playlist_limit", 20)
 

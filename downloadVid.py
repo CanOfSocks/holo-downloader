@@ -6,7 +6,6 @@ from getConfig import ConfigHandler
 from pathlib import Path
 
 import discord_web
-import traceback
 from time import sleep, asctime
 # Import FileLock, setup_umask, AND the shared kill_all event from common
 from common import FileLock, setup_umask, kill_all, initialize_logging
@@ -15,8 +14,10 @@ import argparse
 import logging
 from typing import Optional, Tuple, Dict, Any
 
-from livestream_dl import download_Live
+from livestream_dl import download_Live,getUrls
 import requests
+
+import json
 
 '''
 # --- Logging Initialization Helper (Define locally for modularity) ---
@@ -126,8 +127,7 @@ class VideoDownloader():
             'no_warnings': True      
         }
         
-        import json
-        from livestream_dl import getUrls
+        
         
         with yt_dlp.YoutubeDL(options) as ydl:
             additional_ytdlp_options = None
@@ -142,7 +142,8 @@ class VideoDownloader():
                 proxy=self.config.get_proxy(), 
                 additional_options=additional_ytdlp_options, 
                 include_dash=self.config.get_include_dash(), 
-                include_m3u8=self.config.get_include_m3u8()
+                include_m3u8=self.config.get_include_m3u8(),
+                clean_info_dict=self.config.get_clean_info_json(),
             )
             outputFile = str(ydl.prepare_filename(info_dict)).replace("%", "％")
                 
@@ -165,6 +166,7 @@ class VideoDownloader():
                 self.outputFile, info_dict = self.download_video_info(self.id)
                 self.logger.debug("Output file: {0}".format(self.outputFile))
 
+                # Create distilled info_dict for web ui
                 self.info_dict = {
                     'id': info_dict.get('id'),
                     'title': info_dict.get('title'),

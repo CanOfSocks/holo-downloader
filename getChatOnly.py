@@ -40,6 +40,7 @@ class ChatOnlyDownloader:
             return None
 
         video_id = info_dict.get('id')
+
         
         # Build options
         options = {
@@ -50,6 +51,8 @@ class ChatOnlyDownloader:
             "log_level": self.config.get_log_level(),
             "log_file": self.config.get_log_file(),
         }
+
+        self.downloader.remove_format_segment_playlist_from_info_dict(info_dict)
 
         # Determine lock file path
         if os.path.exists("/dev/shm"):
