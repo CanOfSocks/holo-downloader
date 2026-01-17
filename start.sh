@@ -5,8 +5,15 @@ USERNAME=holouser
 PUID=${PUID:-}
 PGID=${PGID:-}
 
+# Gunicorn Settings
+APP_MODULE="web:app"  # 'filename_without_py:flask_variable_name'
+PORT=${PORT:-5000}    
+# We use 1 worker to preserve Global State/Scheduler
+# We use multiple threads to keep the UI responsive
+WORKERS=1
+THREADS=10
+
 if [ -n "$PUID" ] && [ -n "$PGID" ]; then
-    # If group with PGID doesn't exist, create it
     if ! getent group "$PGID" >/dev/null 2>&1; then
         GROUPNAME="holoweb-$PGID"
         groupadd -g "$PGID" "$GROUPNAME"
@@ -14,30 +21,37 @@ if [ -n "$PUID" ] && [ -n "$PGID" ]; then
         GROUPNAME=$(getent group "$PGID" | cut -d: -f1)
     fi
 
-    # Create user if not exists
     if ! id -u "$USERNAME" >/dev/null 2>&1; then
-        # -M: do not create home directory; -N: do not create group with same name; -s: shell
         useradd -u "$PUID" -g "$PGID" -N -s /bin/sh "$USERNAME"
     fi
 
-    # Fix ownership of /app (and its contents) — adjust as needed for nested dirs
     chown "$PUID:$PGID" /app /app/*
 fi
 
-# Run pre-start script as root (or the initial user)
+# Run pre-start script
 python /app/discord_web.py '0' 'starting'
 
 if [ -n "$UMASK" ]; then
     umask "$UMASK"
 fi
 
-# Start the main application
+cd /app
+
+# Start the main application with Gunicorn
+# --timeout 0: Disables workers being killed for taking too long (essential for downloads)
+# --access-logfile / --error-logfile -: Sends logs to Docker stdout/stderr
+GUNICORN_CMD="gunicorn \
+    --bind 0.0.0.0:$PORT \
+    --workers $WORKERS \
+    --threads $THREADS \
+    --timeout 0 \
+    --keep-alive 30 \
+    --access-logfile - \
+    --error-logfile - \
+    $APP_MODULE"
+
 if [ -n "$PUID" ] && [ -n "$PGID" ]; then
-    # 4. Use 'su-exec' or 'gosu' for safe privilege drop in Alpine,
-    # or a simpler busybox 'su' without a login shell.
-    # The 'su -' logic is safer if the user has a shell configured.
-    # /bin/sh is the default minimal shell on Alpine.
-    exec gosu "$PUID:$PGID" python /app/web.py
+    exec gosu "$PUID:$PGID" $GUNICORN_CMD
 else
-    exec python /app/web.py
+    exec $GUNICORN_CMD
 fi

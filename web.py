@@ -82,22 +82,25 @@ def init_db():
 
 def save_to_history(video_id, stats, download_type="unknown"):
     """Saves finished stream to DB and ensures only last 50 exist."""
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    
-    download_size = stats.get('video', {}).get("current_filesize", 0) + stats.get('audio', {}).get("current_filesize", 0)
+    # Use context manager for auto-closing
+    with sqlite3.connect(DB_FILE) as conn:
+        c = conn.cursor()
+        
+        # Safe access to nested dicts using .get with defaults
+        vid_size = stats.get('video', {}).get("current_filesize", 0) or 0
+        aud_size = stats.get('audio', {}).get("current_filesize", 0) or 0
+        download_size = vid_size + aud_size
 
-    c.execute('INSERT INTO history (video_id, type, total_size, status) VALUES (?, ?, ?, ?)',
-              (video_id, download_type, download_size, stats.get("status", None)))
-    
-    c.execute('''
-        DELETE FROM history WHERE id NOT IN (
-            SELECT id FROM history ORDER BY id DESC LIMIT 50
-        )
-    ''')
-    
-    conn.commit()
-    conn.close()
+        c.execute('INSERT INTO history (video_id, type, total_size, status) VALUES (?, ?, ?, ?)',
+                  (video_id, download_type, download_size, stats.get("status", None)))
+        
+        # Cleanup old history
+        c.execute('''
+            DELETE FROM history WHERE id NOT IN (
+                SELECT id FROM history ORDER BY id DESC LIMIT 50
+            )
+        ''')
+        conn.commit()
 
 def get_history():
     conn = sqlite3.connect(DB_FILE)
@@ -135,12 +138,11 @@ def save_config(content):
 # --- Core Logic & Threading ---
 
 def thread_worker(video_id, downloader, thread_tracker: dict = active_downloads):
-    global recently_finished # <-- Use global variable for signaling
+    global recently_finished
     try:
         downloader.main()
-        save_to_history(video_id, downloader.livestream_downloader.stats, download_type=thread_tracker.get(video_id, {}).get("type", "Unknown"))
-
-        # Clear cache of history table
+        # ... (save logic) ...
+        
         with app.app_context():
             cache.delete_memoized(data_history)
         
@@ -148,11 +150,17 @@ def thread_worker(video_id, downloader, thread_tracker: dict = active_downloads)
             
     except Exception as e:
         common.logger.error(f"Error downloading {video_id}: {e}", file=sys.stderr)
+        e = None
     finally:
         with LOCK:
+            # Explicitly clear the downloader reference BEFORE popping
             if video_id in thread_tracker:
-                del thread_tracker[video_id]
-        gc.collect()
+                thread_tracker[video_id]['downloader'] = None # Help GC
+                thread_tracker[video_id]['thread'] = None     # Help GC
+                thread_tracker.pop(video_id, None)
+        
+        # REMOVED: gc.collect() 
+        # (Let Python manage this. Only run manual GC on a schedule if absolutely necessary)
 
 def start_download(video_id):
     with LOCK:
@@ -229,7 +237,8 @@ def get_videos_with_queue(discovery_func, download_func, *args, **kwargs):
     discovery_thread = threading.Thread(
         target=discovery_func, 
         args=args, 
-        kwargs={'queue': stream_queue, **kwargs}
+        kwargs={'queue': stream_queue, **kwargs},
+        daemon=True
     )
     discovery_thread.start()
 
@@ -281,7 +290,10 @@ def update_scheduler():
             scheduler.add_job(
                 method, 
                 trigger=trigger,
-                id=schedule_name
+                id=schedule_name,
+                max_instances=1,      # <-- Prevent overlapping checks
+                coalesce=True,        # <-- If missed run, run once only
+                replace_existing=True # <-- Ensure old job is overwritten
             )
             return True, f"Scheduler updated with: {cron_string}"
         except ValueError as e:
@@ -438,7 +450,10 @@ def manual_check():
         get_streams, 
         trigger='date',
         run_date=datetime.now(),
-        id=manual_check_id
+        id=manual_check_id,
+        max_instances=1,
+        coalesce=True,
+        replace_existing=True
         # Copying job stores, executor, etc. is often unnecessary
         # but you might want to specify executor if you need a different one.
     )
@@ -490,6 +505,7 @@ def cancel_download(video_id):
             except Exception as e:
                 common.logger.error(f"Failed to cancel {video_id}: {e}")
                 flash(f"Error cancelling {video_id}", "danger")
+                e = None
         else:
             flash(f"Stream {video_id} is not currently active.", "secondary")
             
@@ -510,6 +526,7 @@ def cancel_unarchived(video_id):
             except Exception as e:
                 common.logger.error(f"Failed to cancel {video_id}: {e}")
                 flash(f"Error cancelling {video_id}", "danger")
+                e = None
         else:
             flash(f"Stream {video_id} is not currently active.", "secondary")
             
@@ -578,7 +595,14 @@ def force_run_job(job_name):
             flash("Manual stream check already triggered, please wait for existing check to finish", "warning")
         else:    
             # Run it immediately as a one-off job
-            scheduler.add_job(func, trigger='date', run_date=datetime.now(), id=manual_check_id, name=manual_check_id)
+            scheduler.add_job(func, 
+                              trigger='date', 
+                              run_date=datetime.now(), 
+                              id=manual_check_id, name=manual_check_id, 
+                              max_instances=1,      # <-- Prevent overlapping checks
+                              coalesce=True,        # <-- If missed run, run once only
+                              replace_existing=True # <-- Ensure old job is overwritten
+                            )
             common.logger.debug(f"Successfully triggered immediate run for job ID: {manual_check_id}")
             flash(f"Force-run triggered for {job_name}", "info")
     else:
@@ -595,25 +619,43 @@ def data_scheduler():
     # Note: If you moved templates to files, use render_template('scheduler_table.html', ...)
     return render_template('schedule_table.html', jobs=jobs)
 
-# --- Main Entry Point ---
 
+# ---------------------------------------------------------
+# 1. Determine Config Path
+# ---------------------------------------------------------
 if __name__ == '__main__':
-    common.setup_umask()
     import argparse
-    parser = argparse.ArgumentParser(description="Web App runner")
-    parser.add_argument('--config', type=str, default="config.toml", help='Config file (defaults to "config.toml")')
+    # CASE A: Local Development (python web.py)
+    # We use argparse so you can use flags like --config
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', type=str, default="config.toml")
     args = parser.parse_args()
-
     config_file_path = args.config
+    print("Running in Developer Mode")
 
-    config = load_config()
-    GLOBAL_THEME = config.get_webui_theme()
+else:
+    # CASE B: Production (Waitress / Docker)
+    # We use Environment Variables because we can't pass args to an import
+    config_file_path = os.environ.get('CONFIG_FILE', 'config.toml')
 
-    # Initialize DB
-    init_db()
-    
-    # Initialize Config & Scheduler
-    update_scheduler()
-    scheduler.start()
-    
+# ---------------------------------------------------------
+# 2. Common Initialization (Runs in BOTH cases)
+# ---------------------------------------------------------
+# Now that we know where the config is, we load it and start the app
+# regardless of how it was launched.
+
+common.setup_umask()
+config: ConfigHandler = load_config(config_file_path) # Use the path we determined above
+GLOBAL_THEME = config.get_webui_theme()
+
+init_db()
+
+update_scheduler()
+scheduler.start()
+
+# ---------------------------------------------------------
+# 3. Start Local Server
+# ---------------------------------------------------------
+if __name__ == '__main__':
+    # This only runs if called directly. Waitress ignores this.
     app.run(host='0.0.0.0', port=5000, load_dotenv=True)
