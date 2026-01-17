@@ -17,7 +17,7 @@ if [ -n "$PUID" ] && [ -n "$PGID" ]; then
     # Create user if not exists
     if ! id -u "$USERNAME" >/dev/null 2>&1; then
         # -M: do not create home directory; -N: do not create group with same name; -s: shell
-        useradd -u "$PUID" -g "$PGID" -M -N -s /bin/sh "$USERNAME"
+        useradd -u "$PUID" -g "$PGID" -N -s /bin/sh "$USERNAME"
     fi
 
     # Fix ownership of /app (and its contents) — adjust as needed for nested dirs
