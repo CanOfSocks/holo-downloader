@@ -63,24 +63,20 @@ history_update_event = threading.Event()
 # --- Database Management ---
 
 def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    conn.execute('PRAGMA journal_mode=WAL;')
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            video_id VARCHAR(11),
-            type VARCHAR(20),
-            status VARCHAR(20),
-            total_size INTEGER,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    conn.commit()
-    conn.close()
+    with sqlite3.connect(DB_FILE) as conn:
+        conn.execute('PRAGMA journal_mode=WAL;')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                video_id VARCHAR(11),
+                type VARCHAR(20),
+                status VARCHAR(20),
+                total_size INTEGER,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
 
-def save_to_history(video_id, stats, download_type="unknown"):
+def save_to_history(video_id, stats, download_type="Unknown"):
     """Saves finished stream to DB and ensures only last 50 exist."""
     # Use context manager for auto-closing
     with sqlite3.connect(DB_FILE) as conn:
@@ -103,13 +99,11 @@ def save_to_history(video_id, stats, download_type="unknown"):
         conn.commit()
 
 def get_history():
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute('SELECT * FROM history ORDER BY id DESC')
-    rows = c.fetchall()
-    conn.close()
-    return rows
+    with sqlite3.connect(DB_FILE) as conn:
+        conn.row_factory = sqlite3.Row
+        # We execute directly on the connection for brevity
+        rows = conn.execute('SELECT * FROM history ORDER BY id DESC').fetchall()
+        return rows
 
 # --- Config Management (Unchanged from previous update) ---
 
@@ -141,7 +135,7 @@ def thread_worker(video_id, downloader, thread_tracker: dict = active_downloads)
     global recently_finished
     try:
         downloader.main()
-        # ... (save logic) ...
+        save_to_history(video_id, downloader.livestream_downloader.stats, download_type=thread_tracker.get(video_id, {}).get("type", "Unknown"))
         
         with app.app_context():
             cache.delete_memoized(data_history)
