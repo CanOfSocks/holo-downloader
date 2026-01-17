@@ -11,7 +11,7 @@ PORT=${PORT:-5000}
 # We use 1 worker to preserve Global State/Scheduler
 # We use multiple threads to keep the UI responsive
 WORKERS=1
-THREADS=10
+THREADS=3
 
 if [ -n "$PUID" ] && [ -n "$PGID" ]; then
     if ! getent group "$PGID" >/dev/null 2>&1; then
