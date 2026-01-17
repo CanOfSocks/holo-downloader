@@ -41,6 +41,7 @@ cd /app
 # --timeout 0: Disables workers being killed for taking too long (essential for downloads)
 # --access-logfile / --error-logfile -: Sends logs to Docker stdout/stderr
 GUNICORN_CMD="gunicorn \
+    -c /app/gunicorn.conf.py \
     --bind 0.0.0.0:$PORT \
     --workers $WORKERS \
     --threads $THREADS \

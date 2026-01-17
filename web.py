@@ -357,7 +357,7 @@ def get_active_unarchived_jobs_data():
 def convert_bytes(bytes):
         try:
             int(float(bytes))
-        except Exception as e:
+        except Exception:
             common.logger.exception("Error converting {0} to number".format(bytes))
             return "Invalid Value"
         # List of units in order
