@@ -645,7 +645,7 @@ else:
 # regardless of how it was launched.
 
 common.setup_umask()
-config: ConfigHandler = load_config(config_file_path) # Use the path we determined above
+config: ConfigHandler = load_config() # Use the path we determined above
 GLOBAL_THEME = config.get_webui_theme()
 
 init_db()
