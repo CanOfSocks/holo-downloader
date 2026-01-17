@@ -7,15 +7,14 @@ def post_worker_init(worker):
     This runs inside the worker process AFTER gunicorn has 
     initialized it and set up its own signal handlers.
     """
-    def handle_shutdown(signum, frame):
-        worker.log.info(f"Worker (pid:{os.getpid()}) received signal {signum}. Triggering cleanup...")
-        
+    def handle_shutdown(signum, frame):        
         # Access your app's global state
         # Note: You may need to import your 'kill_all' event here
         try:
             import common
+            common.logger.info(f"Worker (pid:{os.getpid()}) received signal {signum}. Triggering cleanup...")
             common.handle_shutdown(signum, frame)
-            worker.log.info("kill_all event set successfully.")
+            
         except ImportError:
             worker.log.error("Could not import kill_all event.")
 
