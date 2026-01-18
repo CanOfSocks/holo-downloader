@@ -41,7 +41,7 @@ jobs:
             ghcr.io/canofsocks/holo-downloader
           tags: |
             type=edge,branch=main
-            type=edge,branch=webui
+            type=raw,value=webui
             type=raw,value=latest
             type=schedule
             type=ref,event=branch
