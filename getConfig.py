@@ -1,15 +1,18 @@
 from sys import argv
 from pathlib import Path, PurePath
-import os
-import tomllib as toml
-#import json
+import tomlkit
+
+config_file_path = "config.toml"
 
 class ConfigHandler:
-    def __init__(self, config=None, config_file="config.toml"):
+    def __init__(self, config=None, config_file=config_file_path):
+        # If no dict provided, load via tomlkit
         if config is None and config_file:
-            config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), config_file)
-            with open(config_file, "rb") as toml_file:
-                config = toml.load(toml_file)
+            #config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), config_file)
+            with open(config_file, "rt", encoding="utf-8") as toml_file:
+                config_doc = tomlkit.load(toml_file)
+            # Convert tomlkit document to plain dict for easier usage
+            config = config_doc.unwrap()  # or access config_doc[...] directly if you prefer
         self.channel_ids_to_match: dict = config.get("channel_ids_to_match", {})
         self.unarchived_channel_ids_to_match: dict = config.get("unarchived_channel_ids_to_match", {})
         self.community_tab_channels: dict = config.get("community_tab", {})
@@ -19,22 +22,26 @@ class ConfigHandler:
         self.members_only: dict = config.get("members_only", {})
         self.community_tab: dict = config.get("community_tab", {})
         self.webhook: dict = config.get("webhook", {})
+
+        self.cron_schedule = config.get("cron_schedule", {})
         
         self.download_options: dict = config.get("download_options", {})
-        
-        #print(self.download_options)
-        
         self.torrent_options: dict = config.get("torrent_options", {})
-        
         self.community_tab_options: dict = config.get("community_tab_options", {})
-        
-        
+
+        self.webui_options = config.get("webui", {})
 
     def get_cookies_file(self):
         if self.download_options.get("cookies_file", None) is not None:
             return str(Path(self.download_options.get("cookies_file")))
         else:
             return None
+        
+    def get_community_tab_cookies(self):
+        if self.community_tab_options.get("cookies_file", None) is not None:
+            return str(Path(self.community_tab_options.get("cookies_file")))
+        else:
+            return self.get_cookies_file()
        
     def get_title_filter(self):
         return self.title_filter
@@ -51,6 +58,12 @@ class ConfigHandler:
             output_folder = str(PurePath(output_folder, output_folder))
 
         return str(Path(output_folder))
+    
+    def get_clean_info_json(self):
+        return self.download_options.get("clean_info_json", False)
+    
+    def get_ytlp_playlist_limit(self):
+        return self.download_options.get("yt_dlp_playlist_limit", 20)
 
     def vid_only(self):
         return self.download_options.get("video_only", False)
@@ -218,6 +231,9 @@ class ConfigHandler:
     def get_include_m3u8(self):
         return self.download_options.get('include_m3u8', False)
     
+    def get_segment_wait_limit(self):
+        return self.download_options.get('segment_wait_limit', 0)
+    
     def get_discord_webhook(self):
         return self.webhook.get("url", None)
     
@@ -257,6 +273,15 @@ class ConfigHandler:
     def get_remux_container(self):
         return self.download_options.get('remux_extension', None)
     
+    def get_cron_schedule(self, timer=None):
+        if not timer:
+            return self.cron_schedule
+        else:
+            return self.cron_schedule.get(timer, None)
+        
+    def get_webui_theme(self):
+        return self.webui_options.get("theme", "dark")
+    
     def get_livestream_dl_options(self, info_dict, output_template):
         options = {
             "ID": info_dict.get('id'),
@@ -292,6 +317,7 @@ class ConfigHandler:
             "log_file_options": self.get_log_file_options(),
             "dash": self.get_include_dash(),
             "m3u8": self.get_include_m3u8(),
+            'wait_limit': self.get_segment_wait_limit(),
         }
 
         if self.get_remux_container() is not None:

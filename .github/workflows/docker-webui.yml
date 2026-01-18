@@ -2,9 +2,9 @@ name: Docker Image CI
 
 on:
   push:
-    branches: [ "webui" ]
+    branches: [ "web-ui" ]
   pull_request:
-    branches: [ "webui" ]
+    branches: [ "web-ui" ]
   schedule:
     - cron: "5 0 6 * *"
   repository_dispatch:
@@ -42,11 +42,10 @@ jobs:
             type=edge,branch=webui
             type=ref,event=branch
             type=sha
-            # (you can omit other tags like latest/raw if you don't want them)
 
       - name: Build and publish
         uses: docker/build-push-action@v4
-        if: github.ref == 'refs/heads/webui'
+        if: github.ref == 'refs/heads/web-ui'
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}

@@ -24,9 +24,7 @@ RUN git clone "https://github.com/CanOfSocks/livestream_dl" /app/livestream_dl
 # Apply patches
 RUN wget -q -O "/app/ytct.py" https://raw.githubusercontent.com/HoloArchivists/youtube-community-tab/master/ytct.py
 
-ARG DENO_INSTALL=/usr
-# Install Deno
-RUN curl -fsSL https://deno.land/install.sh | sh
+FROM denoland/deno:bin AS deno_source
 
 # Final minimal image setup
 FROM python:3.13-slim
@@ -36,7 +34,7 @@ COPY --from=builder /usr/bin/ffmpeg /usr/bin/
 COPY --from=builder /usr/bin/ffprobe /usr/bin/
 COPY --from=builder /app/livestream_dl /app/livestream_dl
 COPY --from=builder /app/ytct.py /app/ytct.py
-COPY --from=builder /usr/bin/deno /usr/bin/
+COPY --from=deno_source /deno /usr/bin/
 
 WORKDIR /app
 
@@ -44,22 +42,19 @@ WORKDIR /app
 COPY . .
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-         procps cron git curl && \
+         git curl gosu && \
          apt-get clean -y
 
-# Set permissions for Python scripts and Cron file
-RUN chmod +x *.py /app/startCron.sh
+# Set permissions for Python scripts and start file
+RUN chmod +x *.py /app/start.sh
 
 # Install remaining dependencies
 RUN pip install --no-cache-dir -r /app/livestream_dl/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 RUN pip install --no-cache-dir -e "git+https://github.com/HoloArchivists/youtube-community-tab.git#egg=youtube-community-tab&subdirectory=youtube-community-tab"
+RUN pip install --no-cache-dir -U gunicorn
 
 # Modify yt-dlp
 RUN (sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" /usr/local/lib/python*/site-packages/chat_downloader/sites/youtube.py) ; (sed -i "/if[[:space:]]\+fmt_stream\.get('targetDurationSec'):/,/^[[:space:]]*continue/s/^[[:space:]]*/&#/" "$(pip show yt-dlp | awk '/Location/ {print $2}')/yt_dlp/extractor/youtube/_video.py")
 
-# Set environment variables and cron schedule
-ENV VIDEOSCHEDULE='*/2 * * * *'
-ENV MEMBERSCHEDULE='*/5 * * * *'
-
-ENTRYPOINT [ "bash", "-c", "/app/startCron.sh" ]
+ENTRYPOINT [ "sh", "-c", "/app/start.sh" ]

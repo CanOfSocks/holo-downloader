@@ -9,7 +9,9 @@ import discord_web
 from random import uniform
 from time import sleep
 
-def main(command: Optional[str] = None, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging = None) -> list[str] | str:
+import queue
+
+def main(command: Optional[str] = None, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging = None, queue: queue.Queue= None) -> list[str] | str:
     """
     Fetches member-only videos for the given channels and executes a command on them.
     
@@ -28,6 +30,8 @@ def main(command: Optional[str] = None, frequency: Optional[str] = None, config:
     members_only = config.members_only
 
     for channel_name, channel_id in members_only.items():
+        if common.kill_all.is_set():
+            break
         # Rate limit the API calls
         sleep(uniform(5.0, 10.0))
         
@@ -36,6 +40,9 @@ def main(command: Optional[str] = None, frequency: Optional[str] = None, config:
             
             # Assuming common.get_upcoming_or_live_videos is updated to accept config
             lives = common.get_upcoming_or_live_videos(channel_id, config, tab="membership")
+            if queue is not None:
+                for live in lives:
+                    queue.put(live)
             all_lives.extend(lives)
             
         except Exception as e:

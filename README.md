@@ -3,16 +3,18 @@ A downloader for getting all streams for given hololive channels. This repo is d
 
 [Build on Docker Hub](https://hub.docker.com/r/canofsocks/holo-downloader)
 
-Feature requests are welcomed
+Feature requests are welcomed.
 
 ## Features
 This program get the video, thumbnail, description, live chat and yt-dlp info.json file for all streams of given channels. It uses a temporary directory before moving all the files to a final folder after processing.
 
+A web-ui is included for monitoring and basic control and configuration. The web ui is run on port 5000.
+
 It also incorperates Discord Webhooks for status monitoring.
 
-Please check out [Hoshinova](https://github.com/HoloArchivists/hoshinova) or [auto-ytarchive-raw](https://github.com/Spicadox/auto-ytarchive-raw/) for more advanced and/or customisable solutions, especially if you don't need a temporary folder and/or want only the video file.
-
 Requires [livestream_dl](https://github.com/CanOfSocks/livestream_dl) and [ffmpeg](https://ffmpeg.org/)
+
+Inspired by [Hoshinova](https://github.com/HoloArchivists/hoshinova) and [auto-ytarchive-raw](https://github.com/Spicadox/auto-ytarchive-raw/).
 
 ## Usage
 To use this container, you will need to have a temporary folder, a final folder and a cookie file.
@@ -23,11 +25,24 @@ If using a container, you will need to create a copy of the config.toml file for
 Example with Docker hub:
 ```
 docker pull 'canofsocks/holo-downloader:latest'
-docker run -d --name='holo-downloader' --cpus=".75" -e TZ="Europe/London" -e HOST_CONTAINERNAME="holo-downloader" -e VIDEOSCHEDULE='*/2 * * * *' -e MEMBERSCHEDULE='*/5 * * * *' -e COMMUNITYSCHEDULE='0 */3 * * *' -v '/mnt/holo-downloader/config/config.toml':'/app/config.toml':'rw' -v '/mnt/holo-downloader/temp/':'/app/temp':'rw' -v '/mnt/holo-downloader/Done/':'/app/Done':'rw' -v '/mnt/holo-downloader/config/cookies.txt':'/app/cookies.txt':'rw' --restart always 'canofsocks/holo-downloader:latest'
+docker run -d --name='holo-downloader' --cpus=".75" -e TZ="Europe/London" -e HOST_CONTAINERNAME="holo-downloader" -p '10765:5000/tcp' -v '/mnt/holo-downloader/config/config.toml':'/app/config.toml':'rw' -v '/mnt/holo-downloader/temp/':'/app/temp':'rw' -v '/mnt/holo-downloader/Done/':'/app/Done':'rw' -v '/mnt/holo-downloader/config/cookies.txt':'/app/cookies.txt':'rw' --restart always 'canofsocks/holo-downloader:web-ui'
 ```
 ## Configuration
 Configuration is applied via the [`config.toml`](https://github.com/CanOfSocks/holo-downloader/blob/main/config.toml) file. Currently this must be placed in the same location as the [`getConfig.py`](https://github.com/CanOfSocks/holo-downloader/blob/main/getConfig.py) file. Ideas for making this more flexible are welcome.
 Please check the `config.toml` file in this repo for the most up to date options.
+
+### Scheduling
+There are 4 different schedules: normal stream checks, members stream checks, private video (unarchived) checks and community posts check. These are configured separately using a cron schedule.
+```
+[cron_schedule]
+streams = "*/30 * * * *"
+members_only = "15,45 * * * *"
+unarchived = "45 * * * *"
+community_posts = "0 0 * * *"
+```
+For stream checks, a sleep of 10 seconds (not including time to make requests) is performed between each channel check. It is recommended to not set the checking interval lower than the observed time to check all the channels.
+
+If a scheduled event is running during the next scheduled run, the next scheduled run is skipped. I.e. only one instance of the scheduled check is run at a time, regardless of frequency.
 
 ### Adding channels
 To add channels, add to the channel_ids_to_match block with a name and the channel ID of the video. The channel ID can be found at the share channel button on the about page for a channel.

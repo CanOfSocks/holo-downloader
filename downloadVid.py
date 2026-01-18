@@ -4,9 +4,8 @@ import os
 import threading
 from getConfig import ConfigHandler
 from pathlib import Path
-import subprocess
+
 import discord_web
-import traceback
 from time import sleep, asctime
 # Import FileLock, setup_umask, AND the shared kill_all event from common
 from common import FileLock, setup_umask, kill_all, initialize_logging
@@ -15,7 +14,10 @@ import argparse
 import logging
 from typing import Optional, Tuple, Dict, Any
 
-from livestream_dl import download_Live
+from livestream_dl import download_Live,getUrls
+import requests
+
+import json
 
 '''
 # --- Logging Initialization Helper (Define locally for modularity) ---
@@ -40,25 +42,30 @@ class VideoDownloader():
         
         self.id = id        
         
-        self.kill_this = kill_this or threading.Event()
+        self.kill_this: threading.Event = kill_this or threading.Event()
 
         if config is None:
             config = ConfigHandler()
-        self.config = config
+        self.config: ConfigHandler = config
 
         if logger is None:
-            logger = setup_logging(config, logger_name=id)
-        self.logger = logger
+            logger = initialize_logging(config, logger_name="Downloader", video_id=id)
+        self.logger: logging.Logger = logger
         
-        self.kill_current = threading.Event()
         self.livestream_downloader = download_Live.LiveStreamDownloader(kill_all=kill_all, logger=logger, kill_this=self.kill_this)
-        self.config = config
+        
 
-        self.info_dict = None
+        self.info_dict = {}
         self.outputFile = None
+
+        response = requests.get("https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v={0}".format(id), timeout=30)
+        self.embed_info: Optional[Dict[str, Any]] = response.json() if response.status_code == 200 else {}
+        # Remove iframe data
+        self.embed_info.pop('html', None)
         
 
     def createTorrent(self, output: str) -> None:
+        import subprocess
         """Creates a torrent file for the given output path using the provided config."""
         if not self.config.getTorrent():
             return
@@ -68,27 +75,36 @@ class VideoDownloader():
         # Use config methods to build the command
         subprocess.run(self.config.torrentBuilder(fullPath, folder), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
             
-    def downloader(self) -> None:
+    def downloader(self, info_dict: Dict[str, Any]) -> None:
         """
         Handles the main video segment download process.
         """
-        if not self.info_dict or self.outputFile is None:
+        if not info_dict or self.outputFile is None:
             raise Exception(("Unable to retrieve information about video {0}".format(self.id)))
 
         # Options retrieved using the passed config object
-        options = self.config.get_livestream_dl_options(info_dict=self.info_dict, output_template=self.outputFile)
+        options = self.config.get_livestream_dl_options(info_dict=info_dict, output_template=self.outputFile)
         
         # Start additional information downloaders (Discord notification)
         # NOTE: Assuming discord_web.main is updated to accept the config object
         discord_notify = threading.Thread(target=discord_web.main, kwargs={"id": self.id, "status": "recording", "config": self.config, "logger": self.logger}, daemon=True)
         discord_notify.start() 
         
-        try:
-            # Pass the imported kill_all event and the logger instance
-            downloader = download_Live.LiveStreamDownloader(kill_all=kill_all, logger=self.logger)
-            downloader.download_segments(info_dict=self.info_dict, resolution=self.config.get_quality(), options=options)
+        try:            
+            self.livestream_downloader.stats["status"] = "Recording"
+            self.livestream_downloader.download_segments(info_dict=info_dict, resolution=self.config.get_quality(), options=options)
+            
+            if self.kill_this.is_set():
+                self.livestream_downloader.stats["status"] = "Cancelled"
+            else:
+                self.livestream_downloader.stats["status"] = "Finished"
+        except KeyboardInterrupt as e:
+            self.livestream_downloader.stats["status"] = "Cancelled"
+            self.logger.warning("Download of {0} was cancelled".format(self.id))
+            return
         except Exception as e:
             self.logger.exception("Error occured {0}".format(self.id))
+            self.livestream_downloader.stats["status"] = "Error"
             sleep(1.0)
             raise Exception(("{2} - Error downloading video: {0}, Code: {1}".format(self.id, e, asctime())))
         finally:
@@ -111,8 +127,7 @@ class VideoDownloader():
             'no_warnings': True      
         }
         
-        import json
-        from livestream_dl import getUrls
+        
         
         with yt_dlp.YoutubeDL(options) as ydl:
             additional_ytdlp_options = None
@@ -122,14 +137,15 @@ class VideoDownloader():
             # Call get_Video_Info with config dependencies
             info_dict, live_status = getUrls.get_Video_Info(
                 id=video_url, 
-                wait=(10,900), 
+                wait=(60,900), 
                 cookies=self.config.get_cookies_file(), 
                 proxy=self.config.get_proxy(), 
                 additional_options=additional_ytdlp_options, 
                 include_dash=self.config.get_include_dash(), 
-                include_m3u8=self.config.get_include_m3u8()
+                include_m3u8=self.config.get_include_m3u8(),
+                clean_info_dict=self.config.get_clean_info_json(),
             )
-            outputFile = str(ydl.prepare_filename(info_dict))
+            outputFile = str(ydl.prepare_filename(info_dict)).replace("%", "％")
                 
         self.logger.debug("({0}) Info.json: {1}".format(video_url, json.dumps(info_dict)))
         self.logger.info("Output file: {0}".format(outputFile))
@@ -144,17 +160,27 @@ class VideoDownloader():
         def run_download():
             # Use the config object for pre-download notification
             discord_web.main(self.id, "waiting", config=self.config)
-            
+            self.livestream_downloader.stats["status"] = "Waiting"
             try:
                 # Pass config and logger
-                self.outputFile, self.info_dict = self.download_video_info(self.id)
+                self.outputFile, info_dict = self.download_video_info(self.id)
                 self.logger.debug("Output file: {0}".format(self.outputFile))
+
+                # Create distilled info_dict for web ui
+                self.info_dict = {
+                    'id': info_dict.get('id'),
+                    'title': info_dict.get('title'),
+                    'fulltitle': info_dict.get('fulltitle'),
+                    'uploader': info_dict.get('uploader'),
+                    'thumbnail': info_dict.get('thumbnail'),
+                    'webpage_url': info_dict.get('webpage_url')
+                }
                 
                 if self.outputFile is None:
                     raise LookupError(("Unable to retrieve information about video {0}".format(id)))
                 
                 # Pass config and logger
-                self.downloader()
+                self.downloader(info_dict)
                 
             except Exception as e:
                 self.logger.exception("Error downloading video")

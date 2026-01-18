@@ -2,12 +2,14 @@
 import argparse
 import common
 import time
+import discord_web
 from getConfig import ConfigHandler
 import logging
 from typing import Optional, Dict, List, Any
-from common import initialize_logging
+from common import initialize_logging, kill_all
+import queue
 
-def getVideos(channel_ids_to_match: Dict[str, str], command: Optional[str] = None, unarchived: bool = False, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging.Logger = None) -> list[str] | str:
+def getVideos(channel_ids_to_match: Dict[str, str], command: Optional[str] = None, unarchived: bool = False, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging.Logger = None, queue: queue.Queue = None) -> list[str] | str:
     """
     Fetches streams for the given channels and executes a command on them.
     
@@ -27,22 +29,32 @@ def getVideos(channel_ids_to_match: Dict[str, str], command: Optional[str] = Non
     all_lives: List[str] = []
     
     for channel in channel_ids_to_match:
+        if kill_all.is_set():
+            break
         try:
             logger.debug("Looking for: {0}".format(channel))
             # Assuming common.get_upcoming_or_live_videos is updated to accept config
             lives = common.get_upcoming_or_live_videos(channel_ids_to_match[channel], config, tab="streams")
+            if queue is not None:
+                for live in lives:
+                    queue.put(live)
+
             all_lives.extend(lives)
         except Exception as e:
+            discord_web.main(channel_ids_to_match[channel], "playlist-error", message=f"Error getting streams:\n{type(e).__name__}: {str(e)}"[-500:], config=config)
             logger.exception("Error fetching streams for {0}. Check cookies.".format(channel))
             
     if unarchived:
         # Assuming common.combine_unarchived is updated to accept config
         all_lives = common.combine_unarchived(all_lives, config)
+        if queue is not None:
+            for live in all_lives:
+                queue.put(live)
 
     # Pass the config object and other arguments to the executor
     return common.vid_executor(streams=all_lives, command=command, config=config, frequency=frequency, unarchived=unarchived)
         
-def main(command: Optional[str] = None, unarchived: bool = False, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging.Logger = None) -> list[str] | str:
+def main(command: Optional[str] = None, unarchived: bool = False, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging.Logger = None, queue: queue.Queue = None) -> list[str] | str:
     """
     Main execution logic to determine which channel list to use and start fetching videos.
     
@@ -68,7 +80,7 @@ def main(command: Optional[str] = None, unarchived: bool = False, frequency: Opt
             channel_ids_to_match = common.random_sample(channel_ids_to_match)
             
         # Pass the config and logger objects down
-        return getVideos(channel_ids_to_match, command, unarchived, frequency=frequency, config=config, logger=logger)
+        return getVideos(channel_ids_to_match, command, unarchived, frequency=frequency, config=config, logger=logger, queue=queue)
 
     
 if __name__ == "__main__":
