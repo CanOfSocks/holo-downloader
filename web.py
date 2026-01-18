@@ -6,7 +6,7 @@ import sqlite3
 import random
 import sys
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, flash, make_response # <-- ADD make_response
+from flask import Flask, render_template, request, redirect, url_for, flash, make_response, jsonify
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.job import Job
 from apscheduler.triggers.cron import CronTrigger
@@ -612,6 +612,40 @@ def data_scheduler():
     jobs = get_scheduler_jobs()
     # Note: If you moved templates to files, use render_template('scheduler_table.html', ...)
     return render_template('schedule_table.html', jobs=jobs)
+
+# --- JSON API Endpoints ---
+
+@app.route('/api/active')
+def api_active():
+    """JSON equivalent of the active stream downloads."""
+    # get_active_jobs_data returns the raw 'stats' dict containing bytes
+    # It does format the start_time to HH:MM:SS string, but keeps stats raw.
+    data = get_active_jobs_data()
+    return jsonify(data)
+
+@app.route('/api/unarchived')
+def api_unarchived():
+    """JSON equivalent of the active unarchived downloads."""
+    data = get_active_unarchived_jobs_data()
+    return jsonify(data)
+
+@app.route('/api/history')
+def api_history():
+    """JSON equivalent of the download history."""
+    rows = get_history()
+    
+    # SQLite Rows are not directly JSON serializable, convert to dict.
+    # The 'total_size' field in DB is INTEGER (bytes), so no conversion needed.
+    history_data = [dict(row) for row in rows]
+    
+    return jsonify(history_data)
+
+@app.route('/api/scheduler')
+def api_scheduler():
+    """JSON equivalent of the scheduler status."""
+    # Returns the list of jobs with their next run times and status
+    data = get_scheduler_jobs()
+    return jsonify(data)
 
 
 # ---------------------------------------------------------
