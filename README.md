@@ -1,183 +1,256 @@
-# holo-downloader
-A downloader for getting all streams for given hololive channels. This repo is designed primarily to be used in a Docker container, but the program should work on both Windows and Linux as is (with your choice of scheduler)
+# Holo-Downloader (StreamArchiver)
 
-[Build on Docker Hub](https://hub.docker.com/r/canofsocks/holo-downloader)
+A robust, schedule-based downloader designed for archiving live streams from YouTube channels. While designed primarily for **Hololive** content, it works with any YouTube channel.
 
-Feature requests are welcomed.
+The program supports standard streams, members-only content, unarchived (private/deleted) streams, and community posts. It is designed primarily to be used in a Docker container, but works on Windows and Linux (with `livestream_dl` and `ffmpeg` installed).
+
+**[Build on Docker Hub](https://hub.docker.com/r/canofsocks/holo-downloader)**
 
 ## Features
-This program get the video, thumbnail, description, live chat and yt-dlp info.json file for all streams of given channels. It uses a temporary directory before moving all the files to a final folder after processing.
 
-A web-ui is included for monitoring and basic control and configuration. The web ui is run on port 5000.
+* **Comprehensive Archiving**: Downloads video, thumbnail, description, live chat, and `info.json` metadata.
+* **Multiple Modes**:
+* **Standard**: Archives upcoming and live streams.
+* **Members Only**: Archives streams from the membership tab (requires cookies).
+* **Unarchived**: Monitors and captures streams that are set to private or deleted immediately after ending (uses "stream recovery" logic).
+* **Community Tab**: Archives community posts and images.
 
-It also incorperates Discord Webhooks for status monitoring.
 
-Requires [livestream_dl](https://github.com/CanOfSocks/livestream_dl) and [ffmpeg](https://ffmpeg.org/)
+* **Resiliency**: Uses `livestream_dl` (a custom wrapper around `yt-dlp` and `ffmpeg`) to handle stream interruptions and segment merging.
+* **Web UI**: A Flask-based interface (port 5000) to view active downloads, history, and active schedules.
+* **Notifications**: Integrates with Discord Webhooks for status updates (Recording, Done, Error).
+* **Flexible Filtering**: Filter downloads by regex matching on video titles or descriptions.
 
-Inspired by [Hoshinova](https://github.com/HoloArchivists/hoshinova) and [auto-ytarchive-raw](https://github.com/Spicadox/auto-ytarchive-raw/).
+## Docker Usage
 
-## Usage
-To use this container, you will need to have a temporary folder, a final folder and a cookie file.
-Clone the repo and build the Docker container from within the root of the repo.
+The recommended way to run this application is via Docker. You will need to create a `config.toml`, a temporary folder, a final download folder, and a `cookies.txt` file (if using Members/Unarchived features).
 
-If using a container, you will need to create a copy of the config.toml file for a persistent configuration.
+### Run Command
 
-Example with Docker hub:
-```
+```bash
 docker pull 'canofsocks/holo-downloader:latest'
-docker run -d --name='holo-downloader' --cpus=".75" -e TZ="Europe/London" -e HOST_CONTAINERNAME="holo-downloader" -p '10765:5000/tcp' -v '/mnt/holo-downloader/config/config.toml':'/app/config.toml':'rw' -v '/mnt/holo-downloader/temp/':'/app/temp':'rw' -v '/mnt/holo-downloader/Done/':'/app/Done':'rw' -v '/mnt/holo-downloader/config/cookies.txt':'/app/cookies.txt':'rw' --restart always 'canofsocks/holo-downloader:web-ui'
-```
-## Configuration
-Configuration is applied via the [`config.toml`](https://github.com/CanOfSocks/holo-downloader/blob/main/config.toml) file. Currently this must be placed in the same location as the [`getConfig.py`](https://github.com/CanOfSocks/holo-downloader/blob/main/getConfig.py) file. Ideas for making this more flexible are welcome.
-Please check the `config.toml` file in this repo for the most up to date options.
 
-### Scheduling
-There are 4 different schedules: normal stream checks, members stream checks, private video (unarchived) checks and community posts check. These are configured separately using a cron schedule.
+docker run -d \
+  --name='holo-downloader' \
+  --cpus=".75" \
+  --restart always \
+  -e TZ="Europe/London" \
+  -e PUID=99 \
+  -e PGID=100 \
+  -p '10765:5000/tcp' \
+  -v '/mnt/holo-downloader/config/config.toml':'/app/config.toml':'rw' \
+  -v '/mnt/holo-downloader/temp/':'/app/temp':'rw' \
+  -v '/mnt/holo-downloader/Done/':'/app/Done':'rw' \
+  -v '/mnt/holo-downloader/config/cookies.txt':'/app/cookies.txt':'rw' \
+  'canofsocks/holo-downloader:web-ui'
+
 ```
+
+### Environment Variables
+
+These variables configure the container runtime.
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PUID` | *None* | User ID to run the application as. Maps file permissions on the host. |
+| `PGID` | *None* | Group ID to run the application as. Maps file permissions on the host. |
+| `TZ` | *None* | Timezone for the container (e.g., `Europe/London`). |
+| `PORT` | `5000` | The port the Web UI listens on inside the container. |
+| `UMASK` | *None* | Sets the file creation mask (permissions) for downloaded files. |
+| `VIDEOSCHEDULE` | *Internal Cron* | Override the check frequency for videos (e.g., `'*/2 * * * *'`). |
+| `MEMBERSCHEDULE` | *Internal Cron* | Override the check frequency for members streams (e.g., `'*/5 * * * *'`). |
+| `SECRET_KEY` | `dev-key...` | Secret key for Flask sessions. Change for security in production. |
+
+---
+
+## Configuration (`config.toml`)
+
+Configuration is applied via the `config.toml` file. This file must be mounted to `/app/config.toml` in the container.
+
+### 1. Global Schedules
+
+Define Cron expressions for how often different checks run.
+*Format: Minute Hour Day_of_Month Month Day_of_Week*
+
+> **Note:** If a scheduled event is running during the next scheduled run, the new run is skipped. Only one instance of a check runs at a time.
+
+```toml
 [cron_schedule]
-streams = "*/30 * * * *"
-members_only = "15,45 * * * *"
-unarchived = "45 * * * *"
-community_posts = "0 0 * * *"
-```
-For stream checks, a sleep of 10 seconds (not including time to make requests) is performed between each channel check. It is recommended to not set the checking interval lower than the observed time to check all the channels.
+streams = "*/30 * * * *"          # Check standard streams
+members_only = "15,45 * * * *"    # Check members-only tab
+unarchived = "45 * * * *"         # Check for unarchived streams
+community_posts = "0 0 * * *"     # Check community posts
 
-If a scheduled event is running during the next scheduled run, the next scheduled run is skipped. I.e. only one instance of the scheduled check is run at a time, regardless of frequency.
-
-### Adding channels
-To add channels, add to the channel_ids_to_match block with a name and the channel ID of the video. The channel ID can be found at the share channel button on the about page for a channel.
 ```
+
+### 2. Channels
+
+Channels are defined by their display name and Channel ID (found in the URL of the channel).
+
+**Standard Channels**
+
+```toml
 [channel_ids_to_match]
+"Saba" = "UCxsZ6NCzjU_t4YSxQLBcM5A"
 "Gawr Gura Ch. hololive-EN" = "UCoSrY_IQQVpmIRZ9Xf-y93g"
-"Watson Amelia Ch. hololive-EN" = "UCyl1z3jo3XHR1riLFKG5UAg"
-"Mori Calliope Ch. hololive-EN" = "UCL_qhgtOy0dy1Agp8vkySQg"
 "Fauna" = "UCO_aKKYxn4tvrqPjcTzZ6EQ"
-```
-### Filtering
-For all of the filters, __if a filter is present then it will not be filtered__. For example, if no description filter is available, then no description filtering will be executed and filtering will rely on any remaining filters. Filters are applied in an inclusive or format - if either (or both) title/description filter matches, it will be downloaded.
 
-For title and description filtering, you will need to add the channel id along with a REGEX string to the respecive block. For example:
 ```
+
+**Members Only**
+*Channels here have their "Membership" tab scanned. Requires `cookies.txt`.*
+
+```toml
+[members_only]
+"Saba" = "UCxsZ6NCzjU_t4YSxQLBcM5A"
+"Gawr Gura Ch. hololive-EN" = "UCoSrY_IQQVpmIRZ9Xf-y93g"
+
+```
+
+**Unarchived (Privated) Streams**
+*Monitors for streams that become unavailable/private immediately after ending. Requires `cookies.txt`.*
+
+```toml
+[unarchived_channel_ids_to_match]
+"Gawr Gura Ch. hololive-EN" = "UCoSrY_IQQVpmIRZ9Xf-y93g"
+
+```
+
+### 3. Filtering
+
+Filters allow you to restrict downloads based on REGEX strings.
+
+* **Logic:** If a filter is present, it **will** be used. Filters are **inclusive OR**; if either the title OR description matches the regex, the video is downloaded.
+* **Syntax:** Python `re` library syntax.
+
+```toml
 [title_filter]
-"UCoSrY_IQQVpmIRZ9Xf-y93g" = "(?i).asmr|unarchive|karaoke|unarchived|no archive|WATCH-A-LONG|WATCHALONG|watch-along|birthday|offcollab|off-collab|off collab|SINGING."
+"UCoSrY_IQQVpmIRZ9Xf-y93g" = "(?i).asmr|unarchive|karaoke|watch-along"
 
 [description_filter]
 "UCoSrY_IQQVpmIRZ9Xf-y93g" = ".Calliope."
-```
-These strings are based off of the Python re library, so use syntax appropriate for that library.
 
-### Members Only
-Similar to the regular channel block. Any channels in this block have the "Membership" tab scanned when the getMembers script is run (periodically in the docker). Currently this gets all membership videos and does not use title or description filters.
-The membership tab only scans the first 10 videos for possible live videos to reduce direct youtube requests. It is assumed that there will not be that many upcoming/live videos at once in almost all cases.
-```
-[members_only]
-"Gawr Gura Ch. hololive-EN" = "UCoSrY_IQQVpmIRZ9Xf-y93g"
 ```
 
-### Unarchived (privated) streams
-Similar to regular channels, this block defines any channels that are monitored for streams that become privated/unavailable after they go live. This works by grabbing the video info of an ongoing stream to a temporary directory, updating it with each scheduled run. After the stream has finished, the video info is kept for up to 6 hours after the last video info was collected as the stream URLs that the stream recovery function of livestream_dl will work with.
-**The cleanup for this function is not perfect with some temporary files may not be cleaned up properly. It is recommended to use the ```unarchived_tempdir``` option and remove any files more than 24 hours old on a regular schedule using your own preferred method.**
+### 4. Webhook
 
-### Webhook
-This block is used to define webhooks for notifications. This currently only supports a single discord webhook. Most output from the application will be sent to the webhook; stdout is mostly empty at this time.
-```
+Defines the Discord webhook for notifications.
+
+```toml
 [webhook]
 url = "https://discord.com/api/webhooks/xxxxxxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyy"
+
 ```
 
-### Download Options
-The download options must be under a `[download_options]` block.
+### 5. Download Options
 
-#### Output
-For the output templates, consult [yt-dlp documentation](https://github.com/yt-dlp/yt-dlp#output-template)
-The ```output_path``` contains the parent folder and names for children within that folder. 
-This is required to have a depth >= 2 and the parent should be an option that will be unique to the video, such as %(fulltitle)s/%(fulltitle)s. If the depth is 1, the name will be duplicated to make a parent folder, for example ```output_folder = %(fulltitle)s``` will result in a structure of ```%(fulltitle)s/%(fulltitle)s``` in the output. This allows the easy movement of all resulting files from the temporary directory to the final directory.
+These options control file paths, quality, and processing logic. Place these under `[download_options]`.
 
-A **good and recommended** example for this program is:
-```
-output_path = "%(channel)s/[%(upload_date)s] %(fulltitle)s - %(channel)s (%(id)s)/[%(upload_date)s] %(fulltitle)s - %(channel)s (%(id)s)"
-```
+#### Output Path Configuration
 
-There are several root folders for each type of stream. If a stream of a specific type below isn't listed the ```done_dir``` value is used.
-```done_dir``` - Output directory for "regular" livestreams
-```members_dir``` - Output directory for "Members Only" livestreams
-```unarchived_dir``` - Output directory for unarchived streams that were retrieved by the stream recovery function of livestream_dl
+The `output_path` template follows [yt-dlp output template](https://github.com/yt-dlp/yt-dlp#output-template) rules.
 
-There are also options for temporary folders:
-```temp_dir``` - Temporary folder for livestreams during recording
-```unarchived_tempdir``` - Stores info.jsons for unarchived stream recovery and temporary video data for stream recovery functions. ```temp_dir``` is used if this is not defined
+> **Important:** The path requires a depth ≥ 2. The parent folder should be unique to the video to allow easy movement from the `temp` folder to `done` folder.
+> * **Bad:** `%(fulltitle)s`
+> * **Good:** `%(channel)s/[%(upload_date)s] %(fulltitle)s (%(id)s)/[%(upload_date)s] %(fulltitle)s (%(id)s)`
+> 
+> 
 
-#### Other download options
-* ```video_fetch_method``` - Method for obtaining streams. ```ytdlp``` uses yt-dlp on the "streams" of a channel and checks the *first 10* videos if they are upcoming or live, which works for any youtube channel. ```json``` uses the [holo.dev api](https://holo.dev/api/v1/lives/open) to check for live and upcoming *Hololive* streams. If you're only scanning for Hololive content, it is highly recommended to use the ```json``` option. Channels specified in ```members_only``` config option will always use the ```ytdlp``` option.
-* ```mux_file``` - Tells livestream_dl whether to combine the videos with ffmpeg after downloading, or leave the ts files with the mux command saved in a txt file
-* ```download_threads``` - Sets the number of threads livestream_dl will use to download videos per video/audio stream. Default 4
-* ```video_quality``` - Sets video quality
-* ```video_only``` - When set to true, only the video is downloaded. Any other items (chat, thumbnail etc.) will not be downloaded
-* ```download_chat``` - Downloads chat if true
-* ```thumbnail``` - Downloads thumbnail to file if true
-* ```info_json``` - Saves the info_json as a file if true
-* ```description``` - Writes description file if true
-* ```cookies_file``` - Absolute path for cookies file. This is required for membership and age-restricted streams. If you are using Docker, you should leave this as the default ```"/app/cookies.txt"``` and create a mount/mapping for the container instead.
-* ```look_ahead``` - How many hours into the future to wait for a video e.g. 48 hours. Streams with a start time further in the future than this value will be ignored
-* ```log_file``` - Log file to write to
-* ```log_level``` - Log level to use. Can be DEBUG, INFO, WARNING, ERROR, CRITICAL
-* ```log_file_max_size``` - Maximum size of log before rotating [https://docs.python.org/3/library/logging.handlers.html#timedrotatingfilehandler](https://docs.python.org/3/library/logging.handlers.html#timedrotatingfilehandler)
-* ```log_file_rotate_when``` - What time to rotate the log file 
-* ```log_file_keep_backup``` - Number of log files to keep
-* ```keep_ts_files``` - Preserves .ts files made during recording
-* ```write_ffmpeg_command``` - Writes the ffmpeg command used for merging to a file
-* ```randomise_lists``` - Randomises channel fetch and video execution lists each runtime.
-* ```remove_ip``` - Removes any IP addresses from info.json files
-* ```clean_urls``` - Removes stream urls that could potentially be used for identification and replaces them with a dummy URL. This has little effect longterm due to expiry of most URLs.
-* ```remux_extension``` - Sets the extension for FFmpeg to merge the final file into
-* ```ytdlp_options``` - A JSON formatted string for options to add to yt-dlp python module options
-* ```proxy``` - Set proxies to use for downloading videos. Currently does not include video checks. Must be contained between double quotes, eg. `proxy: "http://10.0.1.2:3128"` See: [https://github.com/CanOfSocks/livestream_dl?tab=readme-ov-file#usage](https://github.com/CanOfSocks/livestream_dl?tab=readme-ov-file#usage)
-* ```unarchived_download_chat``` - Downloads live chat while a livestream is live and keeps it if the stream goes private/removed after stream recovery activates.
-* ```keep_ts_files``` - Keeps temporary .ts files
-* ```include_dash``` - Enable "dash" urls as a fallback - true/false
-* ```include_m3u8``` - Enable "m3u8" urls as a fallback - true/false
+#### Options Table
 
-#### Community tab options
-The container also includes the [Youtube Community Tab](https://github.com/HoloArchivists/youtube-community-tab) to grab community posts.
-Like the video downloads, it has its own fields:
-```
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| **Path Options** |  |  |  |
+| `output_path` | String | `%(fulltitle)s/%(fulltitle)s` | **Required.** Template for output filename/path. |
+| `temp_dir` | String | `/app/temp/` | Directory for active/temporary downloads. |
+| `done_dir` | String | `/app/Done/` | Directory for finished standard downloads. |
+| `members_dir` | String | `/app/Done/` | Directory for finished members-only downloads. |
+| `unarchived_dir` | String | `/app/Done/` | Directory for finished unarchived downloads. |
+| `cookies_file` | String | `/app/cookies.txt` | Path to cookies file (Required for Members/Age-gated). |
+| **Quality & Fetching** |  |  |  |
+| `video_quality` | String | `best` | Target resolution (e.g., `best`, `1080p`, `720p`). |
+| `download_threads` | Int | `4` | Threads used by livestream_dl for downloading. |
+| `video_fetch_method` | String | `ytdlp` | `ytdlp` (scans channel page) or `json` (uses holo.dev API, Hololive only). |
+| `look_ahead` | Int | `48` | Hours into the future to schedule downloads for. |
+| `proxies` | String | *None* | Proxy URL (e.g., `"http://10.0.1.2:3128"`). |
+| `randomise_lists` | Bool | `False` | Randomize channel check order to reduce bot detection patterns. |
+| `ytdlp_options` | String| *None* | A JSON string that will be added to the yt-dlp options for stream URL extraction. E.g `'{"extractor_args":{"youtubepot-bgutilhttp":{"base_url":["http://bgutil-provider:4416"]}}}'` |
+| **Processing** |  |  |  |
+| `mux_file` | Bool | `True` | Merge video/audio into a single file after download. |
+| `remux_extension` | String | *None* | Extension to remux final file to (e.g., `mp4`, `mkv`). |
+| `keep_ts_files` | Bool | `False` | Keep the raw `.ts` segments after merging. |
+| `write_ffmpeg_command` | Bool | `False` | Writes the FFmpeg command used to a text file (debugging). |
+| **Metadata & Extras** |  |  |  |
+| `video_only` | Bool | `False` | If true, skips chat, thumbnails, and metadata. |
+| `download_chat` | Bool | `False` | Download live chat (archived streams). |
+| `thumbnail` | Bool | `False` | Download and embed thumbnail. |
+| `info_json` | Bool | `False` | Write `info.json` metadata file. |
+| `description` | Bool | `False` | Write description to a text file. |
+| `clean_info_json` | Bool | `False` | Strip internal metadata from `info.json` to keep it clean. |
+| `remove_ip` | Bool | `False` | Remove IP addresses from `info.json`. |
+| `clean_urls` | Bool | `False` | Remove transient URLs from `info.json`. |
+| **Fallback** |  |  |  |
+| `include_dash` | Bool | `False` | Allow DASH formats as a fallback. |
+| `include_m3u8` | Bool | `False` | Allow HLS/m3u8 formats as a fallback. |
+
+### 6. Unarchived Specific Options
+
+These apply to the "Unarchived" recorder module.
+
+> **Warning:** Cleanup for this function is not perfect. It is recommended to remove files in `unarchived_tempdir` older than 24 hours via an external cron job.
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `unarchived_tempdir` | String | *Same as temp* | Temp folder specifically for unarchived streams. |
+| `unarchived_download_chat` | Bool | `False` | Download live chat in real-time while the stream is live. |
+| `unarchived_force_merge` | Bool | `False` | Force FFmpeg merge even if segments are missing. |
+
+### 7. Community Tab Options
+
+Downloads community posts (text and images).
+
+**Channel Config**
+
+```toml
 [community_tab]
 "Saba" = "UCxsZ6NCzjU_t4YSxQLBcM5A"
 
-[community_tab_options]
-archive_file = "/app/com-tab-archive.txt"
-community_dir = "/app/CommunityPosts"
 ```
-Each channel is defined under community_tab.
 
-The community_tab_options are:
-* ```archive_file``` - Post archive to prevent downloading the same post multiple times
-* ```community_dir``` - Output folder. Each channel has its own sub-folder under this directory
+**Options Config**
 
-### Scheduling
-For container usage, you can change the frequency of how often videos and membership streams are checked for by adding docker environment variables ```VIDEOSCHEDULE``` and ```MEMBERSCHEDULE```. This must be in the cron format. For help: [crontab.guru](https://crontab.guru).
+```toml
+[community_tab_options]
+community_dir = "/app/CommunityPosts"        # Output directory
+archive_file = "/app/com-tab-archive.txt"    # File tracking downloaded post IDs
 
-For example:
-```-e VIDEOSCHEDULE='*/2 * * * *' -e MEMBERSCHEDULE='*/5 * * * *'```
+```
 
-By default, videos are checked every 2 minutes and membership videos every 5 minutes.
+### 8. Logging Options
 
-### Running as non-root user (WIP)
-Attempts are being made to allow for each script to be run as a user and group specified by environment variables `PUID` and `PGID`. Currently both a user and group must be specified. 
-An outstanding issue is yt-dlp receives permission errors when attempting to update the thumbnail when refreshing data, causing false positive stream removal detection.
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `log_level` | String | `INFO` | Level (DEBUG, INFO, WARNING, ERROR). |
+| `log_file` | String | *None* | Path to write logs to. |
+| `log_file_max_size` | Int | *None* | Max size in bytes before log rotation. |
+| `log_file_keep_backup` | Int | *None* | Number of log backups to keep. |
 
-### To-Do
-While some components have been marked as added, testing of full functionalility may be required
-- [x] Option to mux file or not
-- [x] Options for auxillary data (thumbnails, description, info-json, chat)
-- [x] Start time look-ahead config
-- [x] Cookie file option
-- [x] Downloader options
-- [x] Title filtering
-- [x] Description filtering
-- [x] Membership only filtering
-- [x] Automatic torrent creation
-- [x] Configurable checking frequency
-- [x] Improve error detection
-- [x] ytarchive-raw integration (implemented similar functionality through livestream_dl)
-- [ ] Allow for non-root users for docker instances
+### 9. Torrent & Web UI Options
+
+**Torrent Creation (currently disabled)**
+Automatically create torrents after download.
+
+```toml
+[torrent_options]
+enabled = false
+torrentOptions = []              # List of args passed to py3createtorrent
+
+```
+
+**Web UI Theme**
+
+```toml
+[webui]
+theme = "dark"                   # "light" or "dark"
+
+```
