@@ -87,7 +87,7 @@ community_posts = "0 0 * * *"     # Check community posts
 
 Channels are defined by their display name and Channel ID (found in the URL of the channel).
 
-**Standard Channels**
+#### Standard Channels
 
 ```toml
 [channel_ids_to_match]
@@ -97,7 +97,7 @@ Channels are defined by their display name and Channel ID (found in the URL of t
 
 ```
 
-**Members Only**
+#### Members Only
 *Channels here have their "Membership" tab scanned. Requires `cookies.txt`.*
 
 ```toml
@@ -107,7 +107,7 @@ Channels are defined by their display name and Channel ID (found in the URL of t
 
 ```
 
-**Unarchived (Privated) Streams**
+#### Unarchived (Privated) Streams
 *Monitors for streams that become unavailable/private immediately after ending. Requires `cookies.txt`.*
 
 ```toml
@@ -209,7 +209,7 @@ These apply to the "Unarchived" recorder module.
 
 Downloads community posts (text and images).
 
-**Channel Config**
+#### Channel Config
 
 ```toml
 [community_tab]
@@ -217,8 +217,7 @@ Downloads community posts (text and images).
 
 ```
 
-**Options Config**
-
+#### Community Tab Options
 ```toml
 [community_tab_options]
 community_dir = "/app/CommunityPosts"        # Output directory
@@ -237,7 +236,7 @@ archive_file = "/app/com-tab-archive.txt"    # File tracking downloaded post IDs
 
 ### 9. Torrent & Web UI Options
 
-**Torrent Creation (currently disabled)**
+#### Torrent Creation (currently disabled)
 Automatically create torrents after download.
 
 ```toml
@@ -247,7 +246,7 @@ torrentOptions = []              # List of args passed to py3createtorrent
 
 ```
 
-**Web UI Theme**
+#### Web UI Theme
 
 ```toml
 [webui]
