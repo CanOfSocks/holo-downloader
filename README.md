@@ -198,7 +198,7 @@ The `output_path` template follows [yt-dlp output template](https://github.com/y
 ### 6. Unarchived Specific Options
 
 These apply to the "Unarchived" recorder module.
-
+> **Warning:** Unarchived recovery is currently unreliable. For streams that are important to you, download them live.
 > **Warning:** Cleanup for this function is not perfect. It is recommended to remove files in `unarchived_tempdir` older than 24 hours via an external cron job.
 
 | Option | Type | Default | Description |
