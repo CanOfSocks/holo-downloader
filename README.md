@@ -10,10 +10,10 @@ The program supports standard streams, members-only content, unarchived (private
 
 * **Comprehensive Archiving**: Downloads video, thumbnail, description, live chat, and `info.json` metadata.
 * **Multiple Modes**:
-* **Standard**: Archives upcoming and live streams.
-* **Members Only**: Archives streams from the membership tab (requires cookies).
-* **Unarchived**: Monitors and captures streams that are set to private or deleted immediately after ending (uses "stream recovery" logic).
-* **Community Tab**: Archives community posts and images.
+  * **Standard**: Archives upcoming and live streams.
+  * **Members Only**: Archives streams from the membership tab (requires cookies).
+  * **Unarchived**: Monitors and captures streams that are set to private or deleted immediately after ending (uses "stream recovery" logic).
+  * **Community Tab**: Archives community posts and images.
 
 
 * **Resiliency**: Uses `livestream_dl` (a custom wrapper around `yt-dlp` and `ffmpeg`) to handle stream interruptions and segment merging.
