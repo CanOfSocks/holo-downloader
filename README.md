@@ -108,7 +108,7 @@ Channels are defined by their display name and Channel ID (found in the URL of t
 ```
 
 #### Unarchived (Privated) Streams
-*Monitors for streams that become unavailable/private immediately after ending. Requires `cookies.txt`.*   
+*Monitors for streams that become unavailable/private immediately after ending.*   
 The "unarchived channels" option saves the video stream urls (info.json file) to the temporary directory and refreshes it periodically (hourly). If a stream becomes inaccessible before the stream URLs expire (about 6 hours after extraction), an attempt to download the stream via livesteam_dl's `--recovery` option is triggered using the saved info.json file.  
 
 > **Warning:** This option should be treated as a last resort option as it is currently unreliable. Streams that are important to you should always be recorded live.
