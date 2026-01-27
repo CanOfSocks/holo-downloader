@@ -6,7 +6,7 @@ import sqlite3
 import random
 import sys
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, flash, make_response, jsonify
+from flask import Flask, abort, render_template, request, redirect, send_from_directory, url_for, flash, make_response, jsonify
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.job import Job
 from apscheduler.triggers.cron import CronTrigger
@@ -646,6 +646,14 @@ def api_scheduler():
     # Returns the list of jobs with their next run times and status
     data = get_scheduler_jobs()
     return jsonify(data)
+
+
+@app.route('/favicon.ico')
+def favicon():
+    try:
+        return make_response(send_from_directory('static', 'favicon.ico'))
+    except FileNotFoundError:
+        abort(404)
 
 
 # ---------------------------------------------------------
