@@ -21,7 +21,7 @@ import getVids
 
 from flask_caching import Cache
 
-import gc
+import re
 
 import queue
 
@@ -455,10 +455,34 @@ def manual_check():
     flash("Manual check triggered! Tables will update shortly.", "success")
     return redirect(url_for('index'))
 
+
+
+def extract_youtube_id(url: str):
+    """
+    Extracts the YouTube video ID from various URL formats.
+    Returns the ID string if found, otherwise None.
+    """
+
+    url = url.strip()
+
+    # Check if the input is ALREADY a valid 11-character ID
+    # ^ and $ ensure the entire string matches, not just a part of it
+    if re.match(r'^[a-zA-Z0-9_-]{11}$', url):
+        return url
+    # Regex pattern to capture the 11-character ID
+    # Handles: youtube.com/watch?v=, youtu.be/, youtube.com/embed/, 
+    # youtube.com/shorts/, and youtube.com/live/
+    pattern = r'(?:https?:\/\/)?(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})'
+    
+    match = re.search(pattern, url)
+    
+    return match.group(1) if match else None
+
 @app.route('/actions/add', methods=['POST'])
 def manual_add():
     video_id = request.form.get('video_id')
     if video_id:
+        video_id = extract_youtube_id(str(video_id)) or video_id
         if start_download(video_id):
             flash(f"Started download for {video_id}", "success")
         else:
