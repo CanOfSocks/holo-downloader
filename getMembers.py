@@ -11,7 +11,7 @@ from time import sleep
 
 import queue
 
-def main(command: Optional[str] = None, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging = None, queue: queue.Queue= None) -> list[str] | str:
+def main(command: Optional[str] = None, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging = None, queue: queue.Queue= None, return_dict: bool = False) -> list[str] | str:
     """
     Fetches member-only videos for the given channels and executes a command on them.
     
@@ -42,7 +42,12 @@ def main(command: Optional[str] = None, frequency: Optional[str] = None, config:
             lives = common.get_upcoming_or_live_videos(channel_id, config, tab="membership")
             if queue is not None:
                 for live in lives:
-                    queue.put(live)
+                    if return_dict:
+                        queue.put({"id": live, "channel_id": channel_id})
+                    else:
+                        queue.put(live)
+            elif return_dict:
+                lives = [{"channel_id": channel_id, "id": id} for id in lives]
             all_lives.extend(lives)
             
         except Exception as e:

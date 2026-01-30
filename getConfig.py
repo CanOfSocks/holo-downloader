@@ -54,7 +54,8 @@ class ConfigHandler:
         if not channel_id:
             return None
         else:
-            return self.per_channel_output_template.get(str(channel_id), None)
+            #print("Found trying custom channel template {0}".format(self.per_channel_output_template.get(channel_id, None)))
+            return self.per_channel_output_template.get(channel_id, None)
 
     def get_ytdlp(self, channel_id: str = None):        
         output_folder = self.get_channel_output_template(channel_id=channel_id) or self.download_options.get('output_path', "")
@@ -63,7 +64,7 @@ class ConfigHandler:
 
         if len(Path(output_folder).parents) <= 1:
             output_folder = str(PurePath(output_folder, output_folder))
-
+        #print("yt-dlp path: {0}".format(str(Path(output_folder))))
         return str(Path(output_folder))
     
     def get_clean_info_json(self):

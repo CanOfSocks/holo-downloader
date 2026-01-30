@@ -12,7 +12,7 @@ from common import FileLock, setup_umask, kill_all, initialize_logging
 
 import argparse
 import logging
-from typing import Optional, Tuple, Dict, Any
+from typing import Union, Optional, Tuple, Dict, Any
 
 from livestream_dl import download_Live,getUrls
 import requests
@@ -37,10 +37,15 @@ def initialize_logging(config: ConfigHandler, logger_name: Optional[str] = None)
 # --- Core Functions Updated with Dependencies ---
 class VideoDownloader():
     def __init__(self, id, config: ConfigHandler = None, logger: logging.Logger = None, kill_this: threading.Event = None):
-        if not id:
+        if isinstance(id, dict):
+            self.id = id.get('id', None) or id.get('video_id', None) # added option in case additional fields are included in future
+            self.channel_id = id.get('channel_id', None)
+        else:
+            self.id = id
+            self.channel_id = None
+
+        if not self.id:
             raise ValueError("No video ID provided, unable to continue")
-        
-        self.id = id        
         
         self.kill_this: threading.Event = kill_this or threading.Event()
 
@@ -122,7 +127,7 @@ class VideoDownloader():
         Uses the passed config and logger objects.
         """
         options = {
-            'outtmpl': self.config.get_ytdlp(),
+            'outtmpl': self.config.get_ytdlp(self.channel_id),
             'quiet': True,
             'no_warnings': True      
         }

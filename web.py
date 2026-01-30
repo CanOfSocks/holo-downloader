@@ -123,7 +123,7 @@ def load_config():
 def save_config(content):
     try:
         tomlkit.parse(content)
-        with open(config_file_path, "w", encoding="utf-8") as f:
+        with open(config_file_path, "w", encoding="utf-8", newline="") as f:
             f.write(content)
         return True, "Config saved"
     except Exception as e:
@@ -157,14 +157,18 @@ def thread_worker(video_id, downloader, thread_tracker: dict = active_downloads)
         # (Let Python manage this. Only run manual GC on a schedule if absolutely necessary)
 
 def start_download(video_id):
+    if isinstance(video_id, dict):
+        id = video_id.get('id', None) or video_id.get('video_id', None) # added option in case additional fields are included in future
+    else:
+        id = video_id
     with LOCK:
-        if video_id in active_downloads:
+        if id in active_downloads:
             return False 
 
         downloader = downloadVid.VideoDownloader(id=video_id)
-        thread = threading.Thread(target=thread_worker, args=(video_id, downloader, active_downloads), daemon=True)
+        thread = threading.Thread(target=thread_worker, args=(id, downloader, active_downloads), daemon=True)
         
-        active_downloads[video_id] = {
+        active_downloads[id] = {
             'downloader': downloader,
             'thread': thread,
             'type': "stream",
@@ -254,13 +258,13 @@ def get_videos_with_queue(discovery_func, download_func, *args, **kwargs):
                 break
 
 def get_streams():
-    get_videos_with_queue(getVids.main, start_download, unarchived=False)
+    get_videos_with_queue(getVids.main, start_download, unarchived=False, return_dict=True)
 
 def get_unarchived():
-    get_videos_with_queue(getVids.main, start_unarchived_download, unarchived=True)
+    get_videos_with_queue(getVids.main, start_unarchived_download, unarchived=True, return_dict=False)
 
 def get_members():
-    get_videos_with_queue(getMembers.main, start_download)
+    get_videos_with_queue(getMembers.main, start_download, return_dict=True)
 
 def get_community_tab():
     common.logger.info("Running scheduled stream check...")

@@ -37,7 +37,7 @@ class json_object:
         return getattr(self, property, default)
 
 # 3. getStreams function updated to accept config
-def getStreams(unarchived: bool = False, config: ConfigHandler = None, logger: logging = None) -> List[str]:
+def getStreams(unarchived: bool = False, config: ConfigHandler = None, logger: logging = None, return_dict: bool = False) -> List[str]:
     # Instantiate ConfigHandler if it's not provided
     if config is None:
         config = ConfigHandler()
@@ -91,17 +91,23 @@ def getStreams(unarchived: bool = False, config: ConfigHandler = None, logger: l
                     if unarchived:
                         # Assuming common.withinFuture is updated to accept config
                         if common.withinFuture(config, live.start_at.timestamp()):
-                            matching_streams.append(live.get('id'))
+                            if return_dict:
+                                matching_streams.append({"id": live.get('id'), "channel_id": live.get("channel")})
+                            else:
+                                matching_streams.append(live.get('id'))
                     else:
                         # Assuming common.filtering is updated to accept config
                         if (common.withinFuture(config, live.start_at.timestamp()) and 
                             common.filtering(live, live.get('channel_id'), config)):
-                            matching_streams.append(live.get('id'))
+                            if return_dict:
+                                matching_streams.append({"id": live.get('id'), "channel_id": live.get("channel")})
+                            else:
+                                matching_streams.append(live.get('id'))
                             
     return matching_streams
 
 # 4. main function updated to accept config
-def main(command: Optional[str] = None, unarchived: bool = False, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging = None, queue: queue.Queue = None) -> list[str] | str:
+def main(command: Optional[str] = None, unarchived: bool = False, frequency: Optional[str] = None, config: ConfigHandler = None, logger: logging = None, queue: queue.Queue = None, return_dict: bool = False) -> list[str] | str:
     # Instantiate ConfigHandler if it's not provided
     if config is None:
         config = ConfigHandler()
@@ -109,7 +115,7 @@ def main(command: Optional[str] = None, unarchived: bool = False, frequency: Opt
     if logger is None:
         logger = common.initialize_logging(config, "GetJson")
         
-    streams = getStreams(unarchived, config)
+    streams = getStreams(unarchived, config, return_dict)
     
     if unarchived:
         # Assuming common.combine_unarchived is updated to accept config
