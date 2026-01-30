@@ -21,6 +21,7 @@ class ConfigHandler:
         self.description_filter: dict = config.get("description_filter", {})
         self.members_only: dict = config.get("members_only", {})
         self.community_tab: dict = config.get("community_tab", {})
+        self.per_channel_output_template: dict = config.get("per_channel_output_template", {})
         self.webhook: dict = config.get("webhook", {})
 
         self.cron_schedule = config.get("cron_schedule", {})
@@ -48,9 +49,15 @@ class ConfigHandler:
     
     def get_desc_filter(self):
         return self.description_filter
+    
+    def get_channel_output_template(self, channel_id:str):
+        if not channel_id:
+            return None
+        else:
+            return self.per_channel_output_template.get(str(channel_id), None)
 
-    def get_ytdlp(self):
-        output_folder = self.download_options.get('output_path', "")
+    def get_ytdlp(self, channel_id: str = None):        
+        output_folder = self.get_channel_output_template(channel_id=channel_id) or self.download_options.get('output_path', "")
         if not output_folder:
             output_folder = "%(fulltitle)s"
 
