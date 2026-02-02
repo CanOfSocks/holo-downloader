@@ -13,6 +13,25 @@ PORT=${PORT:-5000}
 WORKERS=1
 THREADS=10
 
+# 1. Capture the current version
+OLD_VER=$(python -m pip show yt-dlp | awk '/Version:/ {print $2}')
+
+# 2. Run the update
+python -m pip install -U yt-dlp
+
+# 3. Capture the new version
+NEW_VER=$(python -m pip show yt-dlp | awk '/Version:/ {print $2}')
+
+# 4. Compare and run sed if they differ
+if [ "$OLD_VER" != "$NEW_VER" ]; then
+    echo "yt-dlp updated from $OLD_VER to $NEW_VER. Patching files..."
+    
+    sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" /usr/local/lib/python*/site-packages/chat_downloader/sites/youtube.py
+    
+    YT_PATH=$(pip show yt-dlp | awk '/Location/ {print $2}')
+    sed -i "/if[[:space:]]\+fmt_stream\.get('targetDurationSec'):/,/^[[:space:]]*continue/s/^[[:space:]]*/&#/" "$YT_PATH/yt_dlp/extractor/youtube/_video.py"
+fi
+
 if [ -n "$PUID" ] && [ -n "$PGID" ]; then
     if ! getent group "$PGID" >/dev/null 2>&1; then
         GROUPNAME="holoweb-$PGID"
