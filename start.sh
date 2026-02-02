@@ -17,7 +17,7 @@ THREADS=10
 OLD_VER=$(python -m pip show yt-dlp | awk '/Version:/ {print $2}')
 
 # 2. Run the update
-python -m pip install -U yt-dlp --root-user-action --quiet
+python -m pip install -U yt-dlp --root-user-action "ignore" --quiet
 
 # 3. Capture the new version
 NEW_VER=$(python -m pip show yt-dlp | awk '/Version:/ {print $2}')
