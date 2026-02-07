@@ -54,7 +54,7 @@ class VideoDownloader():
         self.config: ConfigHandler = config
 
         if logger is None:
-            logger = initialize_logging(config, logger_name="Downloader", video_id=id)
+            logger = initialize_logging(config, logger_name="Downloader", video_id=self.id)
         self.logger: logging.Logger = logger
         
         self.livestream_downloader = download_Live.LiveStreamDownloader(kill_all=kill_all, logger=logger, kill_this=self.kill_this)
@@ -63,10 +63,13 @@ class VideoDownloader():
         self.info_dict = {}
         self.outputFile = None
 
-        response = requests.get("https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v={0}".format(id), timeout=30)
-        self.embed_info: Optional[Dict[str, Any]] = response.json() if response.status_code == 200 else {}
-        # Remove iframe data
-        self.embed_info.pop('html', None)
+        try:
+            response = requests.get("https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v={0}".format(self.id), timeout=30)
+            self.embed_info: Optional[Dict[str, Any]] = response.json() if response.status_code == 200 else {}
+            self.embed_info.pop("html", None)
+        except Exception as e:
+            self.logger.warning(f"Could not fetch oembed info: {e}")
+            self.embed_info = {}
         
 
     def createTorrent(self, output: str) -> None:
