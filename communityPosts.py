@@ -60,7 +60,7 @@ def main(config: ConfigHandler = None, logger: logging = None):
             
             log_file = os.path.join(com_tab_folder, channel, "log.txt")
             os.makedirs(os.path.dirname(log_file), exist_ok=True)
-            with open(log_file, 'a') as f:                
+            with open(log_file, 'a', encoding='utf-8') as f:                
                 # Stream directly to file, do not capture in RAM
                 subprocess.run(command_list, stdout=f, stderr=subprocess.STDOUT, text=True)
 
