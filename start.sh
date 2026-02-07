@@ -41,7 +41,7 @@ if [ -n "$PUID" ] && [ -n "$PGID" ]; then
     fi
 
     if ! id -u "$USERNAME" >/dev/null 2>&1; then
-        useradd -u "$PUID" -g "$PGID" -N -s /bin/sh "$USERNAME"
+        useradd -u "$PUID" -g "$PGID" -m -N -s /bin/sh "$USERNAME"
     fi
 
     chown "$PUID:$PGID" /app /app/*
@@ -59,7 +59,9 @@ cd /app
 # Start the main application with Gunicorn
 # --timeout 0: Disables workers being killed for taking too long (essential for downloads)
 # --access-logfile / --error-logfile -: Sends logs to Docker stdout/stderr
-GUNICORN_CMD="gunicorn \
+
+# Define base arguments
+GUNICORN_ARGS=" \
     -c /app/gunicorn.conf.py \
     --bind 0.0.0.0:$PORT \
     --workers $WORKERS \
@@ -70,8 +72,13 @@ GUNICORN_CMD="gunicorn \
     --error-logfile - \
     $APP_MODULE"
 
-if [ -n "$PUID" ] && [ -n "$PGID" ]; then
-    exec gosu "$PUID:$PGID" $GUNICORN_CMD
-else
-    exec $GUNICORN_CMD
+# Append user/group if variables are set
+if [ -n "$PUID" ]; then
+    GUNICORN_ARGS="$GUNICORN_ARGS --user $PUID"
 fi
+
+if [ -n "$PGID" ]; then
+    GUNICORN_ARGS="$GUNICORN_ARGS --group $PGID"
+fi
+
+exec gunicorn $GUNICORN_ARGS
