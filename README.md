@@ -42,7 +42,7 @@ docker run -d \
   -v '/mnt/holo-downloader/temp/':'/app/temp':'rw' \
   -v '/mnt/holo-downloader/Done/':'/app/Done':'rw' \
   -v '/mnt/holo-downloader/config/cookies.txt':'/app/cookies.txt':'rw' \
-  'canofsocks/holo-downloader:web-ui'
+  'canofsocks/holo-downloader:latest'
 
 ```
 
