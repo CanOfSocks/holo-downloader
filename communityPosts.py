@@ -1,7 +1,7 @@
 #!/usr/local/bin/python
 import subprocess
 from getConfig import ConfigHandler
-from os import path
+import os
 import logging
 from typing import Optional, Dict, Any
 from common import initialize_logging, kill_all
@@ -43,7 +43,7 @@ def main(config: ConfigHandler = None, logger: logging = None):
             id = community_tab[channel]
             
             # Construct the base command
-            command_list = ["python", "/app/ytct.py", "--reverse", "--dates", "-d", "{0}".format(path.join(com_tab_folder, channel))]
+            command_list = ["python", "/app/ytct.py", "--reverse", "--dates", "-d", "{0}".format(os.path.join(com_tab_folder, channel))]
             
             if config.get_community_tab_cookies():
                 command_list += ["--cookies", config.get_community_tab_cookies()]
@@ -58,7 +58,8 @@ def main(config: ConfigHandler = None, logger: logging = None):
             # result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             #result = subprocess.run(command_list, capture_output=True, text=True)
             
-            log_file = path.join(com_tab_folder, channel, "log.txt")
+            log_file = os.path.join(com_tab_folder, channel, "log.txt")
+            os.makedirs(os.path.dirname(log_file), exist_ok=True)
             with open(log_file, 'a') as f:                
                 # Stream directly to file, do not capture in RAM
                 subprocess.run(command_list, stdout=f, stderr=subprocess.STDOUT, text=True)
