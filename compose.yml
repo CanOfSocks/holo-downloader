@@ -1,17 +1,19 @@
 services:
-    holo-downloader:
-        image: canofsocks/holo-downloader:latest
-        container_name: holo-downloader
-        restart: unless-stopped
-        environment:
-            - TZ=Etc/UTC
-            - HOST_CONTAINERNAME=holo-downloader
-            - 'VIDEOSCHEDULE=*/2 * * * *'
-            - 'MEMBERSCHEDULE=*/5 * * * *'
-            - 'COMMUNITYSCHEDULE=0 */3 * * *'
-        volumes:
-            - $PWD/config/config.toml:/app/config.toml:rw
-            - $PWD/config/cookies.txt:/app/cookies.txt:rw
-            - $PWD/download/temp/:/app/temp:rw
-            - $PWD/download/done/:/app/Done:rw
-            - $PWD/download/communityposts:/app/CommunityPosts:rw
+  holo-downloader:
+    image: ghcr.io/canofsocks/holo-downloader:main
+    container_name: holo-downloader
+    restart: unless-stopped
+    environment:
+      - TZ=Etc/UTC
+    volumes:
+      - $PWD/config.toml:/app/config.toml
+      - $PWD/cookies.txt:/app/cookies.txt
+      - $PWD/tmp:/app/temp
+      - $PWD/downloads/done:/app/done
+      - $PWD/downloads/CommunityPosts:/app/CommunityPosts
+    ports: # this port mapping is for the included webui. optional if you don't intend to use the webui
+      - 5000:5000
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
