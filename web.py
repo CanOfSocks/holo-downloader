@@ -321,8 +321,11 @@ def get_active_jobs_data():
         for vid, job in active_downloads.copy().items():
             downloader: downloadVid.VideoDownloader = job['downloader']
 
-            display_info = downloader.info_dict if hasattr(downloader, 'info_dict') else {}
-            display_info['title'] = downloader.embed_info.get('title')
+            downloader: downloadVid.VideoDownloader = job['downloader']
+            display_info = {
+                'fulltitle': downloader.info_dict.get('fulltitle'),
+                'title': downloader.embed_info.get('title')
+            }
 
             current_jobs.append({
                 'id': vid,
