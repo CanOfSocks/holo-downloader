@@ -50,9 +50,7 @@ fi
 # Run pre-start script
 python /app/discord_web.py '0' 'starting'
 
-if [ -n "$UMASK" ]; then
-    umask "$UMASK"
-fi
+
 
 cd /app
 
@@ -66,11 +64,16 @@ GUNICORN_ARGS=" \
     --bind 0.0.0.0:$PORT \
     --workers $WORKERS \
     --threads $THREADS \
+    --worker-tmp-dir /dev/shm \
     --timeout 0 \
     --keep-alive 30 \
     --access-logfile - \
-    --error-logfile - \
-    $APP_MODULE"
+    --error-logfile - "
+
+if [ -n "$UMASK" ]; then
+    umask "$UMASK"
+    GUNICORN_ARGS="$GUNICORN_ARGS --umask $UMASK"
+fi
 
 # Append user/group if variables are set
 if [ -n "$PUID" ]; then
@@ -80,5 +83,7 @@ fi
 if [ -n "$PGID" ]; then
     GUNICORN_ARGS="$GUNICORN_ARGS --group $PGID"
 fi
+
+GUNICORN_ARGS="$GUNICORN_ARGS $APP_MODULE"
 
 exec gunicorn $GUNICORN_ARGS
