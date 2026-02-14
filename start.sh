@@ -6,15 +6,13 @@ PUID=${PUID:-}
 PGID=${PGID:-}
 
 # Gunicorn Settings
-APP_MODULE="web:app"  # 'filename_without_py:flask_variable_name'
+APP_MODULE="web:app"
 PORT=${PORT:-5000}    
-# We use 1 worker to preserve Global State/Scheduler
-# We use multiple threads to keep the UI responsive
 WORKERS=1
 THREADS=10
 
 # 1. Capture the current version
-OLD_VER=$(python -m pip show yt-dlp | awk '/Version:/ {print $2}')
+OLD_VER=$(python -m pip show yt-dlp 2>/dev/null | awk '/Version:/ {print $2}')
 
 # 2. Run the update
 python -m pip install --disable-pip-version-check --root-user-action "ignore" --quiet --no-cache-dir --pre -U yt-dlp
@@ -29,23 +27,34 @@ if [ "$UPDATEYTDLP" = "true" ]; then
     if [ "$OLD_VER" != "$NEW_VER" ]; then
         echo "yt-dlp updated from $OLD_VER to $NEW_VER. Patching files..."
         
-        sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" /usr/local/lib/python*/site-packages/chat_downloader/sites/youtube.py
+        # Patch chat_downloader
+        sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" /usr/local/lib/python*/site-packages/chat_downloader/sites/youtube.py 2>/dev/null || true
         
+        # Patch yt-dlp
         YT_PATH=$(pip show yt-dlp | awk '/Location/ {print $2}')
-        sed -i "s/\(^[[:space:]]*\)if[[:space:]]\+fmt_stream\.get('targetDurationSec'):/\1if fmt_stream.get('targetDurationSec') and not 'adaptive' in format_types:/" "$YT_PATH/yt_dlp/extractor/youtube/_video.py"
+        sed -i "s/\(^[[:space:]]*\)if[[:space:]]\+fmt_stream\.get('targetDurationSec'):/\1if fmt_stream.get('targetDurationSec') and not 'live_adaptive' in format_types:/" "$YT_PATH/yt_dlp/extractor/youtube/_video.py"
     fi
 fi
 
+# Alpine-specific User/Group logic
 if [ -n "$PUID" ] && [ -n "$PGID" ]; then
-    if ! getent group "$PGID" >/dev/null 2>&1; then
+    # Check if group GID already exists in /etc/group
+    EXISTING_GROUP=$(grep ":x:$PGID:" /etc/group | cut -d: -f1)
+    
+    if [ -z "$EXISTING_GROUP" ]; then
         GROUPNAME="holoweb-$PGID"
-        groupadd -g "$PGID" "$GROUPNAME"
+        addgroup -g "$PGID" "$GROUPNAME"
     else
-        GROUPNAME=$(getent group "$PGID" | cut -d: -f1)
+        GROUPNAME="$EXISTING_GROUP"
     fi
 
+    # Check if user exists
     if ! id -u "$USERNAME" >/dev/null 2>&1; then
-        useradd -u "$PUID" -g "$PGID" -m -N -s /bin/sh "$USERNAME"
+        # -D: Don't assign password
+        # -G: Add to group
+        # -u: User ID
+        # -s: Shell
+        adduser -u "$PUID" -G "$GROUPNAME" -s /bin/sh -D "$USERNAME"
     fi
 
     chown "$PUID:$PGID" /app /app/*
@@ -54,15 +63,9 @@ fi
 # Run pre-start script
 python /app/discord_web.py '0' 'starting'
 
-
-
 cd /app
 
-# Start the main application with Gunicorn
-# --timeout 0: Disables workers being killed for taking too long (essential for downloads)
-# --access-logfile / --error-logfile -: Sends logs to Docker stdout/stderr
-
-# Define base arguments
+# Define Gunicorn arguments
 GUNICORN_ARGS=" \
     -c /app/gunicorn.conf.py \
     --bind 0.0.0.0:$PORT \
