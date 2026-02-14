@@ -11,15 +11,14 @@ PORT=${PORT:-5000}
 WORKERS=1
 THREADS=10
 
-# 1. Capture the current version
-OLD_VER=$(python -m pip show yt-dlp 2>/dev/null | awk '/Version:/ {print $2}')
-
-# 2. Run the update
-python -m pip install --disable-pip-version-check --root-user-action "ignore" --quiet --no-cache-dir --pre -U yt-dlp
-
 # Only run the check and patch logic if UPDATEYTDLP is set to "true"
 if [ "$UPDATEYTDLP" = "true" ]; then
 
+    # 1. Capture the current version
+    OLD_VER=$(python -m pip show yt-dlp 2>/dev/null | awk '/Version:/ {print $2}')
+
+    # 2. Run the update
+    python -m pip install --disable-pip-version-check --root-user-action "ignore" --quiet --no-cache-dir --pre -U yt-dlp
     # Capture the new version
     NEW_VER=$(python -m pip show yt-dlp | awk '/Version:/ {print $2}')
 
