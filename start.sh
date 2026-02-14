@@ -19,17 +19,21 @@ OLD_VER=$(python -m pip show yt-dlp | awk '/Version:/ {print $2}')
 # 2. Run the update
 python -m pip install --disable-pip-version-check --root-user-action "ignore" --quiet --no-cache-dir --pre -U yt-dlp
 
-# 3. Capture the new version
-NEW_VER=$(python -m pip show yt-dlp | awk '/Version:/ {print $2}')
+# Only run the check and patch logic if UPDATEYTDLP is set to "true"
+if [ "$UPDATEYTDLP" = "true" ]; then
 
-# 4. Compare and run sed if they differ
-if [ "$OLD_VER" != "$NEW_VER" ]; then
-    echo "yt-dlp updated from $OLD_VER to $NEW_VER. Patching files..."
-    
-    sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" /usr/local/lib/python*/site-packages/chat_downloader/sites/youtube.py
-    
-    YT_PATH=$(pip show yt-dlp | awk '/Location/ {print $2}')
-    sed -i "/if[[:space:]]\+fmt_stream\.get('targetDurationSec'):/,/^[[:space:]]*continue/s/^[[:space:]]*/&#/" "$YT_PATH/yt_dlp/extractor/youtube/_video.py"
+    # Capture the new version
+    NEW_VER=$(python -m pip show yt-dlp | awk '/Version:/ {print $2}')
+
+    # Compare and run sed if they differ
+    if [ "$OLD_VER" != "$NEW_VER" ]; then
+        echo "yt-dlp updated from $OLD_VER to $NEW_VER. Patching files..."
+        
+        sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" /usr/local/lib/python*/site-packages/chat_downloader/sites/youtube.py
+        
+        YT_PATH=$(pip show yt-dlp | awk '/Location/ {print $2}')
+        sed -i "s/\(^[[:space:]]*\)if[[:space:]]\+fmt_stream\.get('targetDurationSec'):/\1if fmt_stream.get('targetDurationSec') and not 'adaptive' in format_types:/" "$YT_PATH/yt_dlp/extractor/youtube/_video.py"
+    fi
 fi
 
 if [ -n "$PUID" ] && [ -n "$PGID" ]; then
