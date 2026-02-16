@@ -62,7 +62,7 @@ fi
 # Run pre-start script
 python /app/discord_web.py '0' 'starting'
 
-mkdir ~/.cache && chmod -R 777 ~/.cache
+mkdir -p ~/.cache && chmod -R 777 ~/.cache
 
 cd /app
 
