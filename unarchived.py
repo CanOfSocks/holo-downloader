@@ -212,7 +212,7 @@ class UnarchivedDownloader:
 
         options = {
             "ID": video_id,
-            "resolution": "best",
+            "resolution": self.config.get_quality() or "bv+ba/best",
             "video_format": None,
             "audio_format": None,
             "threads": 20,

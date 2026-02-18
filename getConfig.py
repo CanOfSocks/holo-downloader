@@ -128,7 +128,7 @@ class ConfigHandler:
         return options
 
     def get_quality(self):
-        return self.download_options.get("video_quality", "best")
+        return self.download_options.get("video_quality", "bv+ba/best")
 
     def get_temp_folder(self):
         return self.download_options.get('temp_dir', "/app/temp/")
