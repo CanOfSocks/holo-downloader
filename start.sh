@@ -16,6 +16,7 @@ if [ "$UPDATEYTDLP" = "true" ]; then
     python -m pip install --disable-pip-version-check --root-user-action "ignore" --quiet --no-cache-dir --pre -U yt-dlp
 fi
 
+mkdir -p ~/.cache && chmod -R 777 ~/.cache
 # Alpine-specific User/Group logic
 if [ -n "$PUID" ] && [ -n "$PGID" ]; then
     # Check if group GID already exists in /etc/group
@@ -37,13 +38,13 @@ if [ -n "$PUID" ] && [ -n "$PGID" ]; then
         adduser -u "$PUID" -G "$GROUPNAME" -s /bin/sh -D "$USERNAME"
     fi
 
-    chown "$PUID:$PGID" /app /app/*
+    chown "$PUID:$PGID" /app /app/* ~/.cache
 fi
 
 # Run pre-start script
 python /app/discord_web.py '0' 'starting'
 
-mkdir -p ~/.cache && chmod -R 777 ~/.cache
+
 
 cd /app
 
