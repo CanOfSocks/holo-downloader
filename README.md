@@ -57,8 +57,7 @@ These variables configure the container runtime.
 | `TZ` | *None* | Timezone for the container (e.g., `Europe/London`). |
 | `PORT` | `5000` | The port the Web UI listens on inside the container. |
 | `UMASK` | *None* | Sets the file creation mask (permissions) for downloaded files. |
-| `VIDEOSCHEDULE` | *Internal Cron* | Override the check frequency for videos (e.g., `'*/2 * * * *'`). |
-| `MEMBERSCHEDULE` | *Internal Cron* | Override the check frequency for members streams (e.g., `'*/5 * * * *'`). |
+| `UPDATEYTDLP` | *None* | Update yt-dlp to the latest nightly release on startup when set to `true`. |
 | `SECRET_KEY` | `dev-key...` | Secret key for Flask sessions. Change for security in production. |
 
 ---
@@ -171,7 +170,7 @@ The `output_path` template follows [yt-dlp output template](https://github.com/y
 | `unarchived_dir` | String | `/app/Done/` | Directory for finished unarchived downloads. |
 | `cookies_file` | String | `/app/cookies.txt` | Path to cookies file (Required for Members/Age-gated). |
 | **Quality & Fetching** |  |  |  |
-| `video_quality` | String | `best` | Target resolution (e.g., `best`, `1080p`, `720p`). |
+| `video_quality` | String | `bv+ba/best` | Target resolution. Uses [yt-dlp's format selector](https://github.com/yt-dlp/yt-dlp#format-selection) or an alias (`audio_only`, `144p`, `240p`, `360p`, `480p`, `720p`, `720p60`, `1080p`, `1080p60`, `1440p`, `1440p60`, `2160p`, `2160p60`, `best`). |
 | `download_threads` | Int | `4` | Threads used by livestream_dl for downloading. |
 | `video_fetch_method` | String | `ytdlp` | `ytdlp` (scans channel page) or `json` (uses holo.dev API, Hololive only). |
 | `look_ahead` | Int | `48` | Hours into the future to schedule downloads for. |
