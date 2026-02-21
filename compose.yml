@@ -9,7 +9,8 @@ services:
       - $PWD/config.toml:/app/config.toml
       - $PWD/cookies.txt:/app/cookies.txt
       - $PWD/tmp:/app/temp
-      - $PWD/downloads/done:/app/done
+      - $PWD/downloads/done:/app/Done
+      - $PWD/downloads/members:/app/Members
       - $PWD/downloads/CommunityPosts:/app/CommunityPosts
     ports: # this port mapping is for the included webui. optional if you don't intend to use the webui
       - 5000:5000
