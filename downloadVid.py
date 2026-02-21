@@ -114,7 +114,7 @@ class VideoDownloader():
             self.logger.exception("Error occured {0}".format(self.id))
             self.livestream_downloader.stats["status"] = "Error"
             sleep(1.0)
-            raise Exception(("{2} - Error downloading video: {0}, Code: {1}".format(self.id, e, asctime())))
+            raise Exception(("{3} - Error downloading video: {0}, {1}: {2}".format(self.id, type(e).__name__, e, asctime())))
         finally:
             # Wait for remaining processes, up to 60s
             discord_notify.join(timeout=60.0)

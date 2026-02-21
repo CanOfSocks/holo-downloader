@@ -2,6 +2,8 @@ from sys import argv
 from pathlib import Path, PurePath
 import tomlkit
 
+from livestream_dl.YoutubeURL import quality_aliases
+
 config_file_path = "config.toml"
 
 class ConfigHandler:
@@ -327,6 +329,12 @@ class ConfigHandler:
             "m3u8": self.get_include_m3u8(),
             'wait_limit': self.get_segment_wait_limit(),
         }
+
+        if options.get("resolution") and quality_aliases.get(options.get("resolution")):
+            alias: dict = quality_aliases.get(options.get("resolution"))
+            options["resolution"] = alias.get("format")
+            if alias.get("sort"):
+                options["custom_sort"] = alias.get("sort")
 
         if self.get_remux_container() is not None:
             options.update({'ext': str(self.get_remux_container())})
