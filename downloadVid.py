@@ -15,7 +15,7 @@ import logging
 from typing import Union, Optional, Tuple, Dict, Any
 
 from livestream_dl import download_Live,getUrls
-import requests
+import httpx
 
 import json
 
@@ -64,7 +64,7 @@ class VideoDownloader():
         self.outputFile = None
 
         try:
-            response = requests.get("https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v={0}".format(self.id), timeout=30)
+            response = httpx.get("https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v={0}".format(self.id), timeout=30)
             self.embed_info: Optional[Dict[str, Any]] = response.json() if response.status_code == 200 else {}
             self.embed_info.pop("html", None)
         except Exception as e:

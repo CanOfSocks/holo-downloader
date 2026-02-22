@@ -20,7 +20,7 @@ from livestream_dl.download_Live import LiveStreamDownloader, FileInfo
 
 # Import the Chat class
 from getChatOnly import ChatOnlyDownloader
-import requests
+import httpx
 import random
 
 class UnarchivedDownloader:
@@ -41,7 +41,7 @@ class UnarchivedDownloader:
         self.chat_thread: Optional[threading.Thread] = None
         
         try:
-            response = requests.get("https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v={0}".format(id), timeout=30)
+            response = httpx.get("https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v={0}".format(id), timeout=30)
             self.embed_info: Optional[Dict[str, Any]] = response.json() if response.status_code == 200 else {}
             self.embed_info.pop("html", None)
         except Exception as e:

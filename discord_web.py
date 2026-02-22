@@ -1,5 +1,5 @@
 
-import requests
+import httpx
 import sys
 from discord_webhook import DiscordWebhook, DiscordEmbed
 from getConfig import ConfigHandler
@@ -56,7 +56,7 @@ def send_webhook(url: str, id: str = "Unknown", status: str = "error", message: 
     
     embed_error: Optional[str] = None
     try:
-        response = requests.get("https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v={0}".format(id), timeout=30)
+        response = httpx.get("https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v={0}".format(id), timeout=30)
         response_data: Optional[Dict[str, Any]] = response.json() if response.status_code == 200 else None
     except Exception as e:
         embed_error = str(e)

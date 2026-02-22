@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-import requests
+import httpx
 import argparse
 import common
 import json
@@ -48,10 +48,10 @@ def getStreams(unarchived: bool = False, config: ConfigHandler = None, logger: l
     matching_streams: List[str] = []
 
     try:
-        response = requests.get(url)
+        response = httpx.get(url)
         response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
-    except requests.exceptions.RequestException as e:
-        logging.exception(f"Error retrieving streams")
+    except httpx.HTTPError as e:
+        logger.exception(f"Error retrieving streams")
         return []
 
     # Parse the JSON data from the response
