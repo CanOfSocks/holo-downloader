@@ -1,7 +1,7 @@
 # gunicorn.conf.py
-import signal
-import os
-
+#import signal
+#import os
+'''
 def post_worker_init(worker):
     """
     This runs inside the worker process AFTER gunicorn has 
@@ -24,3 +24,12 @@ def post_worker_init(worker):
     # Re-register the signals inside the worker
     signal.signal(signal.SIGTERM, handle_shutdown)
     signal.signal(signal.SIGINT, handle_shutdown)
+'''
+from common import kill_all
+def worker_int(worker):
+    worker.log.info("worker received SIGINT")
+    kill_all.set()
+
+def worker_abort(worker):
+    worker.log.info("worker received SIGABRT")
+    kill_all.set()
