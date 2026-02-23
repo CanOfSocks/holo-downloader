@@ -184,6 +184,9 @@ class ConfigHandler:
 
     def get_membership_directory(self):
         return self.download_options.get('members_dir', None) or self.get_done_folder()
+    
+    def get_new_segment_wait_limit(self):
+        return self.download_options.get('new_segment_wait_limit', 1800)
 
     def get_membership_output_path(self, output):
         return Path(self.get_membership_directory()) / Path(output)
@@ -316,7 +319,8 @@ class ConfigHandler:
             "recovery": False,
             "database_in_memory": False,
             "direct_to_ts": self.get_direct_to_ts(),
-            "wait_for_video": None,
+            "wait_for_video": (30,600),
+            "wait_limit": self.get_new_segment_wait_limit(),
             "json_file": None,
             "remove_ip_from_json": self.get_remove_ip(),
             "clean_urls": self.get_remove_url(),
