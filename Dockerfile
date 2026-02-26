@@ -1,75 +1,44 @@
-# Stage 1: Get the Deno binary
-FROM denoland/deno:bin AS deno_bin
+# Use the existing livestream_dl as the base
+FROM ghcr.io/canofsocks/livestream_dl:latest
 
-# Stage 2: Get the GLIBC libraries (Required for Deno on Alpine)
-FROM gcr.io/distroless/cc AS cc
-
-# Stage 3: Builder (Clone repos and fetch scripts)
-FROM alpine:latest AS builder
-WORKDIR /build
-RUN apk add --no-cache git wget
-
-# Clone the repository
-RUN git clone "https://github.com/CanOfSocks/livestream_dl" /app/livestream_dl
-
-# Download standalone script
-RUN wget -q -O "/app/ytct.py" https://raw.githubusercontent.com/HoloArchivists/youtube-community-tab/master/ytct.py
-
-# Stage 4: Final Image
-FROM python:3.13-alpine
-
+# Switch to /app (the base image ends in /app/downloads) 
 WORKDIR /app
 
+# --- Reorganize Files ---
+# Create the subdirectory holo-downloader expects 
+# Then move the existing livestream_dl files into it.
+RUN mkdir -p /app/livestream_dl && \
+    find . -maxdepth 1 ! -name 'livestream_dl' ! -name '.' -exec mv {} /app/livestream_dl/ \;
+
 # --- System Dependencies ---
-# 1. Install Alpine-native tools
-# Note: We use the native Alpine FFmpeg instead of the Jellyfin binary for stability.
-# We add the 'testing' repo specifically to get 'gosu'.
+# Install curl to fetch the standalone script and git for the community-tab repo
 RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/repositories && \
-    apk add --no-cache \
-    ffmpeg \
-    git \
-    curl
+    apk add --no-cache git curl
 
-# --- Deno Setup (The Secret Sauce) ---
-# 2. Copy GLIBC libraries for Deno (from Stage 2)
-COPY --from=cc /lib/*-linux-gnu/* /usr/glibc/lib/
-COPY --from=cc /lib/ld-linux-* /lib/
-
-# 3. Set up the dynamic loader symlink
-RUN mkdir /lib64 && ln -s /usr/glibc/lib/ld-linux-* /lib64/
-
-# 4. Copy the Deno binary
-COPY --from=deno_bin /deno /usr/local/bin/deno-raw
-
-# 5. Create the Deno Wrapper
-# This ensures Deno uses the side-loaded glibc, while the rest of the OS uses musl.
-RUN echo '#!/bin/sh' > /usr/local/bin/deno && \
-    echo 'LD_LIBRARY_PATH=/usr/glibc/lib exec /usr/local/bin/deno-raw "$@"' >> /usr/local/bin/deno && \
-    chmod +x /usr/local/bin/deno
+# --- Fetch Missing Scripts ---
+# Download the standalone script directly into /app 
+RUN curl -s -o "/app/ytct.py" https://raw.githubusercontent.com/HoloArchivists/youtube-community-tab/master/ytct.py
 
 # --- Application Setup ---
-
-# Copy repositories and scripts from builder
-COPY --from=builder /app/livestream_dl /app/livestream_dl
-COPY --from=builder /app/ytct.py /app/ytct.py
-
-# Copy local application files
+# Copy your local holo-downloader files 
 COPY . .
 
 # Set permissions
 RUN chmod +x *.py /app/start.sh
 
 # --- Python Dependencies ---
-# We install build-base to ensure any C-extensions in pip packages can compile, then remove it to keep image small.
+# Install only the additional dependencies needed for holo-downloader
 RUN pip install --no-cache-dir -r /app/livestream_dl/requirements.txt && \
     pip install --no-cache-dir -r /app/requirements.txt && \
     pip install --no-cache-dir -e "git+https://github.com/HoloArchivists/youtube-community-tab.git#egg=youtube-community-tab&subdirectory=youtube-community-tab" && \
     pip install --no-cache-dir -U gunicorn
 
 # --- Patches ---
-RUN (sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" /usr/local/lib/python*/site-packages/chat_downloader/sites/youtube.py) ;
+# Apply the specific YouTube chat patch
+RUN sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" /usr/local/lib/python*/site-packages/chat_downloader/sites/youtube.py
 
 # --- Verify Tools ---
+# Ensure the "Secret Sauce" Deno wrapper from the base image is still working [cite: 7, 10]
 RUN python --version && deno --version && ffmpeg -version
-
+CMD []
 ENTRYPOINT [ "sh", "-c", "/app/start.sh" ]
