@@ -15,9 +15,6 @@ RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/reposi
 
 RUN mkdir -p /app/livestream_dl && \
     find . -maxdepth 1 ! -name 'livestream_dl' ! -name '.' -exec mv {} /app/livestream_dl/ \;
-    
-# Finally pull livestream_dl git repo to ensure latest update
-RUN git -C /app/livestream_dl pull;
 
 # --- Fetch Missing Scripts ---
 # Download the standalone script directly into /app 
