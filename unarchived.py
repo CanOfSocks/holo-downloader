@@ -17,6 +17,7 @@ from common import FileLock, setup_umask, initialize_logging, kill_all
 from livestream_dl import getUrls
 import discord_web
 from livestream_dl.download_Live import LiveStreamDownloader, FileInfo
+from livestream_dl.YoutubeURL import quality_aliases
 
 # Import the Chat class
 from getChatOnly import ChatOnlyDownloader
@@ -239,6 +240,12 @@ class UnarchivedDownloader:
             "write_ffmpeg_command": self.config.get_ffmpeg_command(),
         }
 
+        if options.get("resolution") and quality_aliases.get(options.get("resolution")):
+            alias: dict = quality_aliases.get(options.get("resolution"))
+            options["resolution"] = alias.get("format")
+            if alias.get("sort"):
+                options["custom_sort"] = alias.get("sort")
+
         self.logger.info(f"Output path: {options.get('output')}")
 
         if thumbnail and os.path.exists(thumbnail):
@@ -248,7 +255,7 @@ class UnarchivedDownloader:
 
         try:
             self.livestream_downloader.stats["status"] = "Recording"
-            self.livestream_downloader.download_segments(info_dict=info_dict, resolution='best', options=options)
+            self.livestream_downloader.download_segments(info_dict=info_dict, resolution='bv+ba/best', options=options)
         except Exception as e:
             self.logger.exception(e)
             self.livestream_downloader.stats["status"] = "Error"

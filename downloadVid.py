@@ -91,7 +91,7 @@ class VideoDownloader():
             raise Exception(("Unable to retrieve information about video {0}".format(self.id)))
 
         # Options retrieved using the passed config object
-        options = self.config.get_livestream_dl_options(info_dict=info_dict, output_template=self.outputFile)
+        options: dict = self.config.get_livestream_dl_options(info_dict=info_dict, output_template=self.outputFile)
         
         # Start additional information downloaders (Discord notification)
         # NOTE: Assuming discord_web.main is updated to accept the config object
@@ -100,7 +100,7 @@ class VideoDownloader():
         
         try:            
             self.livestream_downloader.stats["status"] = "Recording"
-            self.livestream_downloader.download_segments(info_dict=info_dict, resolution=self.config.get_quality(), options=options)
+            self.livestream_downloader.download_segments(info_dict=info_dict, resolution=options.get("resolution"), options=options)
             
             if self.kill_this.is_set():
                 self.livestream_downloader.stats["status"] = "Cancelled"

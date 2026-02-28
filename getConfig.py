@@ -299,8 +299,6 @@ class ConfigHandler:
         options = {
             "ID": info_dict.get('id'),
             "resolution": self.get_quality(),
-            "video_format": None,
-            "audio_format": None,
             "threads": self.get_download_threads(),
             "batch_size": 5,
             "segment_retries": 10,
