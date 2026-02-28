@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [ "main" ]
   schedule:
-    - cron: "5 0 6 * *"
+    - cron: "5 0 26 * *"
   repository_dispatch:
     types: [yt-dlp_release_update]
   workflow_dispatch:
