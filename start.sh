@@ -13,7 +13,7 @@ THREADS=10
 
 # Only run the check and patch logic if UPDATEYTDLP is set to "true"
 if [ "$UPDATEYTDLP" = "true" ]; then
-    python -m pip install --disable-pip-version-check --root-user-action "ignore" --quiet --no-cache-dir --pre -U yt-dlp
+    python -m pip install --disable-pip-version-check --root-user-action "ignore" --quiet --no-cache-dir --pre -U yt-dlp[default]
 fi
 
 mkdir -p ~/.cache && chmod -R 777 ~/.cache
