@@ -29,8 +29,8 @@ RUN chmod +x *.py /app/start.sh
 
 # --- Python Dependencies ---
 # Install only the additional dependencies needed for holo-downloader
-RUN pip install --no-cache-dir -r /app/livestream_dl/requirements.txt && \
-    pip install --no-cache-dir -r /app/requirements.txt && \
+RUN pip install --no-cache-dir -U -r /app/livestream_dl/requirements.txt && \
+    pip install --no-cache-dir -U -r /app/requirements.txt && \
     pip install --no-cache-dir -e "git+https://github.com/HoloArchivists/youtube-community-tab.git#egg=youtube-community-tab&subdirectory=youtube-community-tab" && \
     pip install --no-cache-dir -U gunicorn
 
