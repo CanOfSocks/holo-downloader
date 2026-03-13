@@ -13,7 +13,7 @@ RUN mkdir -p /app/livestream_dl && \
 ARG COMMIT_HASH
 
 # Only create the file if COMMIT_HASH is not empty
-RUN [ -n "$COMMIT_HASH" ] && echo "Commit: $COMMIT_HASH" && echo "$COMMIT_HASH" > /app/commit_txt ;
+RUN [ -n "$COMMIT_HASH" ] && echo "Commit: $COMMIT_HASH" && echo "$COMMIT_HASH" > /app/commit_txt || echo "[Debug] No hash provided."
 
 COPY . .
 
