@@ -1,11 +1,19 @@
 # Use the existing livestream_dl as the base
 FROM ghcr.io/canofsocks/livestream_dl:latest
 
+ARG PYTHONDONTWRITEBYTECODE=1
+
 # Switch to /app (the base image ends in /app/downloads) 
 WORKDIR /app
 
 RUN mkdir -p /app/livestream_dl && \
     find . -maxdepth 1 ! -name 'livestream_dl' ! -name '.' -exec mv {} /app/livestream_dl/ \;
+
+# Define the commit hash for the build argument
+ARG COMMIT_HASH
+
+# Only create the file if COMMIT_HASH is not empty
+RUN [ -n "$COMMIT_HASH" ] && echo "Commit: $COMMIT_HASH" && echo "$COMMIT_HASH" > /app/commit_txt ;
 
 COPY . .
 
