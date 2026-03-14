@@ -9,11 +9,9 @@ WORKDIR /app
 RUN mkdir -p /app/livestream_dl && \
     find . -maxdepth 1 ! -name 'livestream_dl' ! -name '.' -exec mv {} /app/livestream_dl/ \;
 
-# Define the commit hash for the build argument
+# Keep github commit hash
 ARG COMMIT_HASH
-
-# Only create the file if COMMIT_HASH is not empty
-RUN [ -n "$COMMIT_HASH" ] && echo "Commit: $COMMIT_HASH" && echo "$COMMIT_HASH" > /app/commit_txt || echo "[Debug] No hash provided."
+ENV COMMIT_HASH=${COMMIT_HASH}
 
 COPY . .
 
