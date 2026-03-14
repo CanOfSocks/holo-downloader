@@ -10,8 +10,9 @@ RUN mkdir -p /app/livestream_dl && \
     find . -maxdepth 1 ! -name 'livestream_dl' ! -name '.' -exec mv {} /app/livestream_dl/ \;
 
 # Keep github commit hash
-ARG COMMIT_HASH
-ENV COMMIT_HASH=${COMMIT_HASH}
+ARG HOLO_COMMIT_HASH
+ENV LIVESTREAM_DL_COMMIT_HASH=${COMMIT_HASH}
+ENV COMMIT_HASH=${HOLO_COMMIT_HASH}
 
 COPY . .
 

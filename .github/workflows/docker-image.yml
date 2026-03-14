@@ -63,4 +63,4 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            COMMIT_HASH=${{ steps.gitsha.outputs.value }}
+            HOLO_COMMIT_HASH=${{ steps.gitsha.outputs.value }}
