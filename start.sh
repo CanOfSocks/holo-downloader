@@ -1,6 +1,8 @@
 #!/bin/sh
 set -e
 
+echo "Holo-downloader commit: $COMMIT_HASH | Livestream_dl commit: $LIVESTREAM_DL_COMMIT_HASH"
+
 USERNAME=holouser
 PUID=${PUID:-}
 PGID=${PGID:-}
