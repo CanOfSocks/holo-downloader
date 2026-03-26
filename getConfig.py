@@ -187,6 +187,9 @@ class ConfigHandler:
     
     def get_new_segment_wait_limit(self):
         return self.download_options.get('new_segment_wait_limit', 1800)
+    
+    def upcoming_video_max_wait(self):
+        return self.download_options.get('upcoming_wait_for_video_max', 900)
 
     def get_membership_output_path(self, output):
         return Path(self.get_membership_directory()) / Path(output)

@@ -80,7 +80,7 @@ class UnarchivedDownloader:
 
             info_dict, live_status = getUrls.get_Video_Info(
                 id=video_id,
-                wait=(60, 1800),
+                wait=(60, max(self.config.upcoming_video_max_wait(), 60)*2),
                 cookies=self.config.get_cookies_file(),
                 proxy=self.config.get_proxy(),
                 additional_options=additional_options,

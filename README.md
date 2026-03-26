@@ -174,6 +174,7 @@ The `output_path` template follows [yt-dlp output template](https://github.com/y
 | `download_threads` | Int | `4` | Threads used by livestream_dl for downloading. |
 | `video_fetch_method` | String | `ytdlp` | `ytdlp` (scans channel page) or `json` (uses holo.dev API, Hololive only). |
 | `look_ahead` | Int | `48` | Hours into the future to schedule downloads for. |
+| `upcoming_wait_for_video_max` | Float | `900` | Seconds to set yt-dlp's maximum time for `--wait-for-video` (Minimum: 60). Increasing helps reduce extraction attempts while waiting for a stream to start, but can increase time until recording starts if a livestream starts late. Value is doubled for unarchived checker function. |
 | `proxies` | String | *None* | Proxy URL (e.g., `"http://10.0.1.2:3128"`). |
 | `randomise_lists` | Bool | `False` | Randomize channel check order to reduce bot detection patterns. |
 | `ytdlp_options` | String| *None* | A JSON string that will be added to the yt-dlp options for stream URL extraction. E.g `'{"extractor_args":{"youtubepot-bgutilhttp":{"base_url":["http://bgutil-provider:4416"]}}}'` |
