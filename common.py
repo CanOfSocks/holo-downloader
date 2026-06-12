@@ -203,15 +203,16 @@ def get_upcoming_or_live_videos(channel_id: str, config: ConfigHandler = None, t
 
     ydl_opts = {
         'quiet': True,
-        'extract_flat': True,
+        #'extract_flat': True,
         'sleep_interval': 1,
         'sleep_interval_requests': 1,
         'no_warnings': True,
         'cookiefile': config.get_cookies_file(),
         "logger": YTDLPLogger(logger=this_logger),
+        'playlist_items': '1:{0}'.format(config.get_ytlp_playlist_limit() or 3),
     }
-    if config.get_ytlp_playlist_limit():
-        ydl_opts.update({'playlist_items': '1:{0}'.format(config.get_ytlp_playlist_limit())})
+    #if config.get_ytlp_playlist_limit():
+    #    ydl_opts.update({'playlist_items': '1:{0}'.format(config.get_ytlp_playlist_limit() or 3)})
 
     try:
         with YoutubeDL(ydl_opts) as ydl:
