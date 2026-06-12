@@ -179,6 +179,7 @@ The `output_path` template follows [yt-dlp output template](https://github.com/y
 | `randomise_lists` | Bool | `False` | Randomize channel check order to reduce bot detection patterns. |
 | `ytdlp_options` | String| *None* | A JSON string that will be added to the yt-dlp options for stream URL extraction. E.g `'{"extractor_args":{"youtubepot-bgutilhttp":{"base_url":["http://bgutil-provider:4416"]}}}'` |
 | `new_segment_wait_limit` | Int | 1800 | Maximum wait cycles for new segments before stopping download (if end is not detected first). Each cycle is approximately 10 second. E.g. 1800 is 18000 seconds (5 hours) |
+| `yt_dlp_playlist_limit` | Int | 3 | Number of playlist items to check for a live video |
 | **Processing** |  |  |  |
 | `mux_file` | Bool | `True` | Merge video/audio into a single file after download. |
 | `remux_extension` | String | *None* | Extension to remux final file to (e.g., `mp4`, `mkv`). |
@@ -196,6 +197,7 @@ The `output_path` template follows [yt-dlp output template](https://github.com/y
 | **Fallback** |  |  |  |
 | `include_dash` | Bool | `False` | Allow DASH formats as a fallback. |
 | `include_m3u8` | Bool | `False` | Allow HLS/m3u8 formats as a fallback. |
+
 
 ### 6. Unarchived Specific Options
 
