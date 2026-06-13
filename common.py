@@ -203,13 +203,13 @@ def get_upcoming_or_live_videos(channel_id: str, config: ConfigHandler = None, t
 
     ydl_opts = {
         'quiet': True,
-        #'extract_flat': True,
+        'extract_flat': True,
         'sleep_interval': 1,
         'sleep_interval_requests': 1,
         'no_warnings': True,
         #'cookiefile': config.get_cookies_file(),
         "logger": YTDLPLogger(logger=this_logger),
-        'playlist_items': '1:{0}'.format(config.get_ytlp_playlist_limit() or 3),
+        'playlist_items': '1:{0}'.format(config.get_ytlp_playlist_limit() or 10),
     }
     #if config.get_ytlp_playlist_limit():
     #    ydl_opts.update({'playlist_items': '1:{0}'.format(config.get_ytlp_playlist_limit() or 3)})
@@ -252,7 +252,9 @@ def get_upcoming_or_live_videos(channel_id: str, config: ConfigHandler = None, t
                 
                 this_logger.debug("({1}) live_status = {0}".format(video.get('live_status'),video.get('id')))
 
-                if (video.get('live_status') == 'is_live' or video.get('live_status') == 'post_live' or (video.get('live_status') == 'is_upcoming' and is_future) or (video.get('live_status', None) is None and video.get('duration') is None)) and passes_filter:                    
+                if (video.get('live_status') == 'is_live' or video.get('live_status') == 'post_live' or (video.get('live_status') == 'is_upcoming' and is_future) \
+                    or (video.get('live_status', None) is None and video.get('duration') is None)) \
+                    and passes_filter:                    
                     #logging.debug(json.dumps(video))
                     upcoming_or_live_videos.append(video.get('id'))
 
