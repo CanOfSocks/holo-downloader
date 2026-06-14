@@ -207,7 +207,7 @@ def get_upcoming_or_live_videos(channel_id: str, config: ConfigHandler = None, t
         'sleep_interval': 1,
         'sleep_interval_requests': 1,
         'no_warnings': True,
-        #'cookiefile': config.get_cookies_file(),
+        'cookiefile': config.get_cookies_file(),
         "logger": YTDLPLogger(logger=this_logger),
         'playlist_items': '1:{0}'.format(config.get_ytlp_playlist_limit() or 10),
     }
