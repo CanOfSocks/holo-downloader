@@ -246,14 +246,22 @@ def get_upcoming_or_live_videos(channel_id: str, config: ConfigHandler = None, t
             upcoming_or_live_videos = []
             
             for video in info['entries']:
+
+                # Fallback if video availability doesn't exist in extracted info
+                if video.get('live_status', None) is None and video.get('duration') is None:
+                    try:
+                        video = ydl.extract_info(video.get('url'), download=False)
+                    except Exception as e:
+                        logger.error("Unable to find availability information for video {0}: {1}".format(video.get('url'), str(e)))
+                        continue
+
                 # Config is passed explicitly here
                 passes_filter = filtering(video, video.get('channel_id') or channel_id, config)
                 is_future = withinFuture(config, video.get('release_timestamp', None))
                 
                 this_logger.debug("({1}) live_status = {0}".format(video.get('live_status'),video.get('id')))
 
-                if (video.get('live_status') == 'is_live' or video.get('live_status') == 'post_live' or (video.get('live_status') == 'is_upcoming' and is_future) \
-                    or (video.get('live_status', None) is None and video.get('duration') is None)) and passes_filter:                    
+                if (video.get('live_status') == 'is_live' or video.get('live_status') == 'post_live' or (video.get('live_status') == 'is_upcoming' and is_future)) and passes_filter:                    
                     #logging.debug(json.dumps(video))
                     upcoming_or_live_videos.append(video.get('id'))
 
