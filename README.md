@@ -9,6 +9,7 @@ The program supports standard streams, members-only content, unarchived (private
 ## Features
 
 * **Comprehensive Archiving**: Downloads video, thumbnail, description, live chat, and `info.json` metadata.
+* **S3 Uploads**: Optionally copy finished archives to Amazon S3 or an S3-compatible store (Cloudflare R2, MinIO, Wasabi, Backblaze B2).
 * **Multiple Modes**:
   * **Standard**: Archives upcoming and live streams.
   * **Members Only**: Archives streams from the membership tab (requires cookies).
@@ -59,6 +60,14 @@ These variables configure the container runtime.
 | `UMASK` | *None* | Sets the file creation mask (permissions) for downloaded files. |
 | `UPDATEYTDLP` | *None* | Update yt-dlp to the latest nightly release on startup when set to `true`. |
 | `SECRET_KEY` | `dev-key...` | Secret key for Flask sessions. Change for security in production. |
+| `S3_ENABLED` | *None* | Set to `true` to enable S3 uploads (overrides `s3.enabled`). |
+| `S3_BUCKET` | *None* | Destination bucket (overrides `s3.bucket`). |
+| `S3_PREFIX` | *None* | Object key prefix (overrides `s3.prefix`). |
+| `AWS_ACCESS_KEY_ID` | *None* | Access key for S3 / S3-compatible storage. Prefer env vars over putting keys in `config.toml`. |
+| `AWS_SECRET_ACCESS_KEY` | *None* | Secret key for S3 / S3-compatible storage. |
+| `AWS_SESSION_TOKEN` | *None* | Optional session token. |
+| `AWS_REGION` | *None* | Region (use `auto` for Cloudflare R2). |
+| `AWS_ENDPOINT_URL` | *None* | Custom endpoint for R2, MinIO, Wasabi, or other S3-compatible APIs. |
 
 ---
 
@@ -258,4 +267,57 @@ torrentOptions = []              # List of args passed to py3createtorrent
 [webui]
 theme = "dark"                   # "light" or "dark"
 
+```
+
+### 10. S3 Storage
+
+When enabled, finished standard, members-only, unarchived, and community-tab downloads are uploaded after they land in the local output folders. Local files stay on disk unless `delete_local_after_upload` is set.
+
+Credentials should come from environment variables, a shared AWS credentials file, or an IAM role. Do not commit access keys in `config.toml`.
+
+```toml
+[s3]
+enabled = false
+bucket = "my-archive-bucket"
+prefix = "hololive"              # Optional key prefix
+region = "us-east-1"
+# endpoint_url = "https://<accountid>.r2.cloudflarestorage.com"
+# storage_class = "STANDARD"     # STANDARD, STANDARD_IA, GLACIER, DEEP_ARCHIVE, ...
+# skip_existing = true           # Skip objects whose size already matches
+# delete_local_after_upload = false
+# upload_community_posts = true
+# streams_prefix = ""            # Extra prefix per download type
+# members_prefix = "members"
+# unarchived_prefix = "unarchived"
+# community_prefix = "community"
+# addressing_style = "auto"      # auto, path, or virtual (path is useful for some MinIO setups)
+# access_key_id = ""             # Optional; AWS_ACCESS_KEY_ID is preferred
+# secret_access_key = ""         # Optional; AWS_SECRET_ACCESS_KEY is preferred
+```
+
+Object keys preserve the path relative to `done_dir` / `members_dir` / `unarchived_dir` / `community_dir`. For example, a standard download becomes `s3://bucket/hololive/Channel/[date] Title (id)/...`.
+
+To backfill files that are already on disk:
+
+```bash
+python s3_upload.py /app/Done --kind streams --root /app/Done
+python s3_upload.py /app/Done --kind streams --root /app/Done --dry-run
+```
+
+Docker example with S3 environment variables:
+
+```bash
+docker run -d \
+  --name='holo-downloader' \
+  -e AWS_ACCESS_KEY_ID \
+  -e AWS_SECRET_ACCESS_KEY \
+  -e AWS_REGION="us-east-1" \
+  -e S3_ENABLED="true" \
+  -e S3_BUCKET="my-archive-bucket" \
+  -e S3_PREFIX="hololive" \
+  -p '10765:5000/tcp' \
+  -v '/mnt/holo-downloader/config/config.toml':'/app/config.toml':'rw' \
+  -v '/mnt/holo-downloader/temp/':'/app/temp':'rw' \
+  -v '/mnt/holo-downloader/Done/':'/app/Done':'rw' \
+  'canofsocks/holo-downloader:latest'
 ```

@@ -5,6 +5,13 @@ services:
     restart: unless-stopped
     environment:
       - TZ=Etc/UTC
+      # - S3_ENABLED=true
+      # - S3_BUCKET=my-archive-bucket
+      # - S3_PREFIX=hololive
+      # - AWS_REGION=us-east-1
+      # - AWS_ACCESS_KEY_ID
+      # - AWS_SECRET_ACCESS_KEY
+      # - AWS_ENDPOINT_URL=https://<accountid>.r2.cloudflarestorage.com
     volumes:
       - $PWD/config.toml:/app/config.toml
       - $PWD/cookies.txt:/app/cookies.txt

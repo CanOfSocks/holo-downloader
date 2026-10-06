@@ -1,5 +1,6 @@
 from sys import argv
 from pathlib import Path, PurePath
+import os
 import tomlkit
 
 from livestream_dl.YoutubeURL import quality_aliases
@@ -33,6 +34,7 @@ class ConfigHandler:
         self.community_tab_options: dict = config.get("community_tab_options", {})
 
         self.webui_options = config.get("webui", {})
+        self.s3_options: dict = config.get("s3", {}) or {}
 
     def get_cookies_file(self):
         if self.download_options.get("cookies_file", None) is not None:
@@ -297,6 +299,18 @@ class ConfigHandler:
         
     def get_webui_theme(self):
         return self.webui_options.get("theme", "dark")
+
+    def get_s3_options(self):
+        return self.s3_options
+
+    def get_s3_enabled(self):
+        env = os.getenv("S3_ENABLED")
+        if env is not None and str(env).strip() != "":
+            return str(env).strip().lower() in ("1", "true", "yes", "on")
+        value = self.s3_options.get("enabled", False)
+        if isinstance(value, bool):
+            return value
+        return str(value).strip().lower() in ("1", "true", "yes", "on")
     
     def get_livestream_dl_options(self, info_dict, output_template):
         options = {

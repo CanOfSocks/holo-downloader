@@ -6,9 +6,27 @@ import logging
 from typing import Optional, Dict, Any
 from common import initialize_logging, kill_all
 
-# The global instantiation and immediate logging setup are removed:
-# getConfig = ConfigHandler()
-# setup_logging(...)
+def _maybe_upload_s3(config: ConfigHandler, logger: logging.Logger, com_tab_folder: str, channel: str) -> None:
+    if not config.get_s3_enabled():
+        return
+    try:
+        from s3_upload import upload_directory
+
+        channel_dir = os.path.join(com_tab_folder, channel)
+        if not os.path.isdir(channel_dir):
+            return
+        result = upload_directory(
+            channel_dir,
+            config=config,
+            logger=logger,
+            kind="community",
+            root=com_tab_folder,
+        )
+        if result.enabled and not result.ok:
+            logger.error("S3 upload failed for community posts (%s): %s", channel, result.error)
+    except Exception:
+        logger.exception("S3 upload failed for community posts (%s)", channel)
+
 
 def main(config: ConfigHandler = None, logger: logging = None):
     """
@@ -63,6 +81,8 @@ def main(config: ConfigHandler = None, logger: logging = None):
             with open(log_file, 'a', encoding='utf-8') as f:                
                 # Stream directly to file, do not capture in RAM
                 subprocess.run(command_list, stdout=f, stderr=subprocess.STDOUT, text=True)
+
+            _maybe_upload_s3(config, logger, com_tab_folder, channel)
 
 # Example of how you would run this script in your application entry point:
 if __name__ == "__main__":

@@ -266,15 +266,48 @@ class UnarchivedDownloader:
             )
             return
 
-        discord_web.main(video_id, "done", config=self.config)
+        discord_web.main(video_id, "done", config=self.config, message=self._maybe_upload_s3(info_dict, video_id))
 
         # Clean up temp files
         if os.path.exists(info_dict_file):
             os.remove(info_dict_file)
         if thumbnail and os.path.exists(thumbnail):
             os.remove(thumbnail)
-        self.livestream_downloader.stats["status"] = "Finished"
+        if self.livestream_downloader.stats.get("status") != "S3 Error":
+            self.livestream_downloader.stats["status"] = "Finished"
         self.kill_this.set()
+
+    def _maybe_upload_s3(self, info_dict: Dict[str, Any], video_id: str) -> Optional[str]:
+        if not self.config.get_s3_enabled():
+            return None
+        try:
+            from s3_upload import upload_completed_download
+
+            result = upload_completed_download(
+                config=self.config,
+                logger=self.logger,
+                kind="unarchived",
+                info_dict=info_dict,
+                video_id=video_id,
+                stats=self.livestream_downloader.stats,
+            )
+            if not result.enabled:
+                return None
+            if result.ok:
+                uploaded = result.uploaded + result.skipped
+                message = f"Uploaded {uploaded} file(s) to S3"
+                if result.keys:
+                    message += f" ({result.keys[0]})"
+                return message
+            message = f"S3 upload failed: {result.error}"
+            discord_web.main(video_id, "error", message=message[-500:], config=self.config)
+            return message
+        except Exception as e:
+            self.logger.exception("S3 upload failed for {0}".format(video_id))
+            message = f"S3 upload failed: {type(e).__name__}: {e}"
+            self.livestream_downloader.stats["status"] = "S3 Error"
+            discord_web.main(video_id, "error", message=message[-500:], config=self.config)
+            return message
 
     def _scheduled_check(self, use_lock_file: bool):
         """The job function called by the loop."""

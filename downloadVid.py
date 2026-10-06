@@ -62,6 +62,7 @@ class VideoDownloader():
 
         self.info_dict = {}
         self.outputFile = None
+        self.s3_message = None
 
         try:
             response = httpx.get("https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v={0}".format(self.id), timeout=30)
@@ -106,6 +107,7 @@ class VideoDownloader():
                 self.livestream_downloader.stats["status"] = "Cancelled"
             else:
                 self.livestream_downloader.stats["status"] = "Finished"
+                self._maybe_upload_s3(info_dict)
         except KeyboardInterrupt as e:
             self.livestream_downloader.stats["status"] = "Cancelled"
             self.logger.warning("Download of {0} was cancelled".format(self.id))
@@ -120,8 +122,32 @@ class VideoDownloader():
             discord_notify.join(timeout=60.0)
             
         # Final notification using the config object
-        discord_web.main(id=self.id, status="done", config=self.config)
+        discord_web.main(id=self.id, status="done", config=self.config, message=getattr(self, "s3_message", None))
         return
+
+    def _maybe_upload_s3(self, info_dict: Dict[str, Any]) -> None:
+        if not self.config.get_s3_enabled():
+            return
+        try:
+            from s3_upload import maybe_upload_download
+
+            result = maybe_upload_download(self, info_dict=info_dict, kind="streams")
+            if not result.enabled:
+                return
+            if result.ok:
+                uploaded = result.uploaded + result.skipped
+                self.s3_message = f"Uploaded {uploaded} file(s) to S3"
+                if result.keys:
+                    self.s3_message += f" ({result.keys[0]})"
+            else:
+                self.s3_message = f"S3 upload failed: {result.error}"
+                discord_web.main(self.id, "error", message=self.s3_message[-500:], config=self.config)
+        except Exception as e:
+            self.logger.exception("S3 upload failed for {0}".format(self.id))
+            self.s3_message = f"S3 upload failed: {type(e).__name__}: {e}"
+            self.livestream_downloader.stats["status"] = "S3 Error"
+            discord_web.main(self.id, "error", message=self.s3_message[-500:], config=self.config)
+
 
     def download_video_info(self, video_url: str) -> Tuple[str, Dict[str, Any]]:
         """

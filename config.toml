@@ -490,3 +490,18 @@ streams = "*/30 * * * *"
 members_only = "15,45 * * * *"
 unarchived = "45 * * * *"
 community_posts = "0 0 * * *"
+
+# Optional S3 upload of finished archives. Prefer AWS_* / S3_* environment
+# variables for credentials instead of storing keys in this file.
+# [s3]
+# enabled = false
+# bucket = "my-archive-bucket"
+# prefix = "hololive"
+# region = "us-east-1"
+# endpoint_url = "https://<accountid>.r2.cloudflarestorage.com"
+# skip_existing = true
+# delete_local_after_upload = false
+# upload_community_posts = true
+# members_prefix = "members"
+# unarchived_prefix = "unarchived"
+# community_prefix = "community"
