@@ -58,6 +58,7 @@ def send_webhook(url: str, id: str = "Unknown", status: str = "error", message: 
     try:
         response = httpx.get("https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v={0}".format(id), timeout=30)
         response_data: Optional[Dict[str, Any]] = response.json() if response.status_code == 200 else None
+        logger.debug("Received data from oembed: {0}".format(response_data))
     except Exception as e:
         embed_error = str(e)
         response_data = None
@@ -83,7 +84,7 @@ def send_webhook(url: str, id: str = "Unknown", status: str = "error", message: 
 
     # Check if the request was successful
     if embed_error is None and response_data is not None:
-        embed = DiscordEmbed(title, description="[{0}](https://youtu.be/{1})".format(response_data.get('title', "https://youtu.be/{0}".format(id)),id), color=color)
+        embed = DiscordEmbed(title, description="[{0}](https://youtu.be/{1})".format(response_data.get('title', id),id), color=color)
         embed.set_author(name=response_data.get('author_name'), url=response_data.get('author_url'))
         embed.set_thumbnail(url=response_data.get('thumbnail_url'))
         
