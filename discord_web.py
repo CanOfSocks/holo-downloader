@@ -83,7 +83,7 @@ def send_webhook(url: str, id: str = "Unknown", status: str = "error", message: 
 
     # Check if the request was successful
     if embed_error is None and response_data is not None:
-        embed = DiscordEmbed(title, description="[{0}](https://youtu.be/{1})".format(response_data.get('title'),id), color=color)
+        embed = DiscordEmbed(title, description="[{0}](https://youtu.be/{1})".format(response_data.get('title', "https://youtu.be/{0}".format(id)),id), color=color)
         embed.set_author(name=response_data.get('author_name'), url=response_data.get('author_url'))
         embed.set_thumbnail(url=response_data.get('thumbnail_url'))
         
