@@ -43,5 +43,9 @@ RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/reposi
 # --- Verify Tools ---
 # Ensure the "Secret Sauce" Deno wrapper from the base image is still working [cite: 7, 10]
 RUN python --version && deno --version && ffmpeg -version
+
+# Workaround to help curb cache errors.
+RUN mkdir -p /root/.cache ; chmod -R 777 /root/.cache
+
 CMD []
 ENTRYPOINT [ "sh", "-c", "/app/start.sh" ]

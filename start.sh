@@ -40,7 +40,7 @@ if [ -n "$PUID" ] && [ -n "$PGID" ]; then
         adduser -u "$PUID" -G "$GROUPNAME" -s /bin/sh -D "$USERNAME"
     fi
 
-    chown "$PUID:$PGID" /app /app/* ~/.cache
+    chown "$PUID:$PGID" /app /app/* ~/.cache /root/.cache
 fi
 
 # Run pre-start script

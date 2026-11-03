@@ -12,6 +12,8 @@ services:
       - $PWD/downloads/done:/app/Done
       - $PWD/downloads/members:/app/Members
       - $PWD/downloads/CommunityPosts:/app/CommunityPosts
+    tmpfs:
+      - /root/.cache
     ports: # this port mapping is for the included webui. optional if you don't intend to use the webui
       - 5000:5000
     logging:
