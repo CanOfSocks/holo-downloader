@@ -68,7 +68,7 @@ class VideoDownloader():
             self.embed_info: Optional[Dict[str, Any]] = response.json() if response.status_code == 200 else {}
             if self.embed_info.get("title", None) is None:
                 raw_text = response.text
-                title_match = re.search(r'title=\u0022(.*?)\u0022', raw_text)
+                title_match = re.search(r'title=\\u0022(.*?)\\u0022', raw_text)
                 if title_match:
                     self.embed_info["title"] = title_match.group(1)
             if self.embed_info.get("thumbnail_url", None) is None:

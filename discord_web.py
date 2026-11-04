@@ -72,7 +72,7 @@ def send_webhook(url: str, id: str = "Unknown", status: str = "error", message: 
 
             if response_data.get("title", None) is None:
                 raw_text = response.text
-                title_match = re.search(r'title=\u0022(.*?)\u0022', raw_text)
+                title_match = re.search(r'title=\\u0022(.*?)\\u0022', raw_text)
                 if title_match:
                     response_data["title"] = title_match.group(1)
         elif response.status_code in (401, 403, 404):
