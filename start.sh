@@ -41,6 +41,7 @@ if [ -n "$PUID" ] && [ -n "$PGID" ]; then
     fi
 
     chown "$PUID:$PGID" /app /app/* ~/.cache /root/.cache
+    chmod -R 777 ~/.cache /root/.cache
 fi
 
 # Run pre-start script

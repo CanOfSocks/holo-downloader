@@ -70,7 +70,8 @@ class VideoDownloader():
                 raw_text = response.text
                 title_match = re.search(r'title=\\u0022(.*?)\\u0022', raw_text)
                 if title_match:
-                    self.embed_info["title"] = title_match.group(1)
+                    import html
+                    self.embed_info["title"] = html.unescape(title_match.group(1))
             if self.embed_info.get("thumbnail_url", None) is None:
                 self.embed_info["thumbnail_url"] = "https://img.youtube.com/vi/{0}/maxresdefault.jpg".format(id)
             self.embed_info.pop("html", None)
