@@ -16,7 +16,7 @@ from typing import Union, Optional, Tuple, Dict, Any
 
 from livestream_dl import download_Live,getUrls,headers
 import httpx
-
+import re
 import json
 
 '''
@@ -66,6 +66,13 @@ class VideoDownloader():
         try:
             response = httpx.get("https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v={0}".format(self.id), timeout=30, headers=headers.get_httpx_header())
             self.embed_info: Optional[Dict[str, Any]] = response.json() if response.status_code == 200 else {}
+            if self.embed_info.get("title", None) is None:
+                raw_text = response.text
+                title_match = re.search(r'title=\u0022(.*?)\u0022', raw_text)
+                if title_match:
+                    self.embed_info["title"] = title_match.group(1)
+            if self.embed_info.get("thumbnail_url", None) is None:
+                self.embed_info["thumbnail_url"] = "https://img.youtube.com/vi/{0}/maxresdefault.jpg".format(id)
             self.embed_info.pop("html", None)
         except Exception as e:
             self.logger.warning(f"Could not fetch oembed info: {e}")

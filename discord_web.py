@@ -69,6 +69,12 @@ def send_webhook(url: str, id: str = "Unknown", status: str = "error", message: 
             response_data = response.json()
             if logger:
                 logger.debug(f"Received data from oembed: {response_data}")
+
+            if response_data.get("title", None) is None:
+                raw_text = response.text
+                title_match = re.search(r'title=\u0022(.*?)\u0022', raw_text)
+                if title_match:
+                    response_data["title"] = title_match.group(1)
         elif response.status_code in (401, 403, 404):
             # Video is private, deleted, or restricted; leave response_data None to trigger private/inaccessible fallback
             response_data = None
@@ -102,7 +108,7 @@ def send_webhook(url: str, id: str = "Unknown", status: str = "error", message: 
     if embed_error is None and response_data is not None:
         embed = DiscordEmbed(title, description="[{0}](https://youtu.be/{1})".format(response_data.get('title', id), id), color=color)
         embed.set_author(name=response_data.get('author_name'), url=response_data.get('author_url'))
-        embed.set_thumbnail(url=response_data.get('thumbnail_url'))
+        embed.set_thumbnail(url=response_data.get('thumbnail_url', "https://img.youtube.com/vi/{0}/maxresdefault.jpg".format(id)))
     elif embed_error:
         embed = DiscordEmbed(title, description="Video https://youtu.be/{0} is not accessible due to error: {1}".format(id, embed_error[:250]), color=color)
     else:                    
