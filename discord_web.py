@@ -75,7 +75,8 @@ def send_webhook(url: str, id: str = "Unknown", status: str = "error", message: 
                 title_match = re.search(r'title=\\u0022(.*?)\\u0022', raw_text)
                 if title_match:
                     import html
-                    response_data["title"] = html.unescape(title_match.group(1))
+                    import json
+                    response_data["title"] = html.unescape(json.loads(f'"{title_match.group(1)}"'))
         elif response.status_code in (401, 403, 404):
             # Video is private, deleted, or restricted; leave response_data None to trigger private/inaccessible fallback
             response_data = None
