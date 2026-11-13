@@ -59,6 +59,7 @@ These variables configure the container runtime.
 | `UMASK` | *None* | Sets the file creation mask (permissions) for downloaded files. |
 | `UPDATEYTDLP` | *None* | Update yt-dlp to the latest nightly release on startup when set to `true`. |
 | `SECRET_KEY` | `dev-key...` | Secret key for Flask sessions. Change for security in production. |
+| `DNSCACHE` | *None* | Set to `true` to run a local dnsmasq cache inside the container (optional: `DNSCACHE_SIZE`, `DNSCACHE_MIN_TTL`). |
 
 ---
 
