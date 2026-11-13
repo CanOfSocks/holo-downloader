@@ -23,6 +23,9 @@ ADD https://raw.githubusercontent.com/HoloArchivists/youtube-community-tab/maste
 
 # --- System Dependencies ---
 RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/repositories && \
+    # Add some dns caching because it is cheap to do
+    apk add --no-cache dnsmasq && \
+    #
     apk add --no-cache --virtual .build-deps git && \
     #
     # Install Python Dependencies in one go

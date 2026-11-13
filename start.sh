@@ -3,6 +3,28 @@ set -e
 
 echo "Holo-downloader commit: $COMMIT_HASH | Livestream_dl commit: $LIVESTREAM_DL_COMMIT_HASH"
 
+# Optional local DNS cache
+if [ "$DNSCACHE" = "true" ]; then
+    UPSTREAMS=$(awk '/^nameserver/ && $2 != "127.0.0.1" {print $2}' /etc/resolv.conf)
+    if [ -n "$UPSTREAMS" ]; then
+        SERVER_ARGS=""
+        for ns in $UPSTREAMS; do SERVER_ARGS="$SERVER_ARGS --server=$ns"; done
+
+        if dnsmasq --listen-address=127.0.0.1 --bind-interfaces --no-resolv \
+                   --cache-size="${DNSCACHE_SIZE:-1000}" \
+                   --min-cache-ttl="${DNSCACHE_MIN_TTL:-60}" \
+                   $SERVER_ARGS; then
+            # Keep search/options lines, swap nameservers for the local cache
+            grep -v '^nameserver' /etc/resolv.conf > /tmp/resolv.new
+            echo "nameserver 127.0.0.1" >> /tmp/resolv.new
+            cat /tmp/resolv.new > /etc/resolv.conf
+            echo "DNS cache enabled (upstream: $UPSTREAMS)"
+        else
+            echo "dnsmasq failed to start, continuing without DNS cache"
+        fi
+    fi
+fi
+
 USERNAME=holouser
 PUID=${PUID:-}
 PGID=${PGID:-}
@@ -18,7 +40,9 @@ if [ "$UPDATEYTDLP" = "true" ]; then
     python -m pip install --disable-pip-version-check --root-user-action "ignore" --quiet --no-cache-dir --pre -U yt-dlp[default]
 fi
 
-mkdir -p ~/.cache && chmod -R 777 ~/.cache
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-/app/.cache}"
+mkdir -p "$XDG_CACHE_HOME"
+
 # Alpine-specific User/Group logic
 if [ -n "$PUID" ] && [ -n "$PGID" ]; then
     # Check if group GID already exists in /etc/group
@@ -40,8 +64,8 @@ if [ -n "$PUID" ] && [ -n "$PGID" ]; then
         adduser -u "$PUID" -G "$GROUPNAME" -s /bin/sh -D "$USERNAME"
     fi
 
-    chown "$PUID:$PGID" /app /app/* ~/.cache /root/.cache
-    chmod -R 777 ~/.cache /root/.cache
+    chown "$PUID:$PGID" /app /app/*
+    chown -R "$PUID:$PGID" "$XDG_CACHE_HOME"
 fi
 
 # Run pre-start script
