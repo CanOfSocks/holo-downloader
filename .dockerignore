@@ -18,3 +18,12 @@ build/
 target/
 __pycache__/
 *.log
+# Local development only
+.venv/
+venv/
+.pytest_cache/
+tests/
+requirements-dev.txt
+stream_history.db*
+# livestream_dl comes from the base image; a local checkout must not be copied over it
+livestream_dl/

@@ -68,11 +68,7 @@ if [ -n "$PUID" ] && [ -n "$PGID" ]; then
     chown -R "$PUID:$PGID" "$XDG_CACHE_HOME"
 fi
 
-# Run pre-start script
-python /app/discord_web.py '0' 'starting'
-
-
-
+# The "starting" Discord notification is sent by web.py when the app starts
 cd /app
 
 # Define Gunicorn arguments

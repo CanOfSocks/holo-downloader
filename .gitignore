@@ -1,0 +1,9 @@
+.env
+livestream_dl
+__pycache__
+.pytest_cache/
+# Local Python virtual environment (not part of the repo or the Docker image)
+.venv/
+venv/
+# Created by the web app when run locally
+stream_history.db*

@@ -1,0 +1,4 @@
+# Local development and tests only (not installed in the Docker image).
+# livestream_dl's requirements are also needed: pip install -r livestream_dl/requirements.txt
+-r requirements.txt
+pytest>=8.0
