@@ -21,6 +21,7 @@ from typing import Any, Container, Dict, Iterable, List, Optional, Union
 import httpx
 from yt_dlp import YoutubeDL
 
+import lockup_schedule
 from getConfig import ConfigHandler
 from livestream_dl import getUrls, headers
 from livestream_dl.download_Live import create_http_client, setup_logging
@@ -109,6 +110,8 @@ class DiscoveredVideo:
     channel_id: Optional[str] = None
     live_status: Optional[str] = None
     release_timestamp: Optional[float] = None
+    # Added by hand in the web UI: the look-ahead window isn't applied while it waits
+    manual: bool = False
 
 
 class BoundedCache:
@@ -277,6 +280,13 @@ def get_embed_info(video_id: str, proxy: Optional[Union[str, dict]] = None) -> D
 # Results of full per-video extractions done during channel scans. Videos that have finished
 # (was_live / not_live) are never extracted again; see livestream_dl.monitor_channel.
 status_cache = VideoStatusCache()
+# Read scheduled start times from flat playlist listings (see lockup_schedule)
+lockup_schedule.install()
+# Scheduled starts beyond the look-ahead window, seen by downloads that then stopped waiting.
+# Used when a listing shows a video as upcoming without its start time, so the video isn't started
+# (and stopped again) on every scan. Expires so a stream moved earlier is noticed eventually.
+KNOWN_SCHEDULE_SECONDS = 6 * 3600
+known_schedules = BoundedCache(max_entries=500, ttl=KNOWN_SCHEDULE_SECONDS)
 # Descriptions don't change often and are only needed for description filters
 _description_cache = BoundedCache(max_entries=1000, ttl=6 * 3600)
 
@@ -452,7 +462,10 @@ def get_upcoming_or_live_videos(channel_id: str, config: ConfigHandler, tab: str
             video = extracted
             status_cache.record(video_id, video.get('live_status'), video.get('release_timestamp'), config.get_look_ahead())
 
-        this_logger.debug("({1}) live_status = {0}".format(video.get('live_status'), video_id))
+        if video.get('live_status') == 'is_upcoming' and not video.get('release_timestamp'):
+            video['release_timestamp'] = known_schedules.get(video_id)
+        this_logger.debug("({1}) live_status = {0}, scheduled start = {2}".format(
+            video.get('live_status'), video_id, video.get('release_timestamp')))
         # Cheap status/time check before the filters, which may need a full extraction for the description
         if is_wanted_status(video, config) and filtering(video, entry_channel, config, this_logger):
             found[video_id] = DiscoveredVideo(video_id, entry_channel, video.get('live_status'), video.get('release_timestamp'))

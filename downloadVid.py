@@ -5,8 +5,8 @@ import threading
 from typing import Any, Dict, Optional, Union
 
 import discord_web
-from base_downloader import (STATUS_CANCELLED, STATUS_ERROR, STATUS_FINISHED, STATUS_STOPPED_MERGED,
-                             BaseDownloader)
+from base_downloader import (STATUS_BEYOND_LOOK_AHEAD, STATUS_CANCELLED, STATUS_ERROR, STATUS_FINISHED,
+                             STATUS_STOPPED_MERGED, BaseDownloader)
 from common import DiscoveredVideo
 from getConfig import ConfigHandler
 
@@ -51,7 +51,8 @@ class VideoDownloader(BaseDownloader):
         try:
             info_dict = self.wait_for_stream(include_dash=self.config.get_include_dash(), include_m3u8=self.config.get_include_m3u8())
             if info_dict is None:
-                self.set_status(STATUS_CANCELLED)
+                if self.status != STATUS_BEYOND_LOOK_AHEAD:
+                    self.set_status(STATUS_CANCELLED)
                 return
             self.prepare(info_dict)
             self.download(info_dict)

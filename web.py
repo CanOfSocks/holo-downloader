@@ -515,7 +515,7 @@ def manual_add():
     video_id = extract_video_id(raw)
     if not video_id:
         return action_response(f"'{raw.strip()}' is not a YouTube video ID or URL", "warning")
-    if start_download(video_id):
+    if start_download(DiscoveredVideo(video_id, manual=True)):
         return action_response(f"Started download for {video_id}")
     return action_response(f"Video {video_id} is already being downloaded.", "warning")
 

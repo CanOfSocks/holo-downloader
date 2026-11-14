@@ -153,6 +153,8 @@ class UnarchivedDownloader(BaseDownloader):
                 self.set_status(STATUS_PUBLIC)
                 return
 
+            if self.stop_if_beyond_look_ahead():
+                return
             if self._wait_for_next_event() is WaitResult.STOPPED:
                 return
         self.set_status(STATUS_CANCELLED)

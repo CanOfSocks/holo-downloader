@@ -29,6 +29,8 @@ STATUS_CANCELLED = "Cancelled"
 STATUS_ERROR = "Error"
 STATUS_FINISHED = "Finished"
 STATUS_STOPPED_MERGED = "Stopped (merged)"
+# The scheduled start moved beyond `look_ahead`; a later channel scan starts it again once it is within the window
+STATUS_BEYOND_LOOK_AHEAD = "Beyond look-ahead"
 
 
 def next_upcoming_check_delay(scheduled_start: Optional[float], now: float, recheck_max: float, late_max: float) -> float:
@@ -76,6 +78,8 @@ class BaseDownloader:
         # Information from the channel scan (and later from extractions) about an upcoming stream
         self.scheduled_start: Optional[float] = video.release_timestamp
         self.hinted_live_status: Optional[str] = video.live_status
+        # Jobs from channel scans stop waiting if the stream is rescheduled beyond the look-ahead window
+        self.enforce_look_ahead: bool = not video.manual
         # Set when the next check should extract straight away instead of recalculating the wait
         self._force_check: bool = False
         # Epoch time of the next planned check, shown in the web UI while waiting
@@ -155,12 +159,30 @@ class BaseDownloader:
 
     # --- Waiting for an upcoming stream ---
 
+    def beyond_look_ahead(self, now: Optional[float] = None) -> bool:
+        """True if the stream hasn't started and its scheduled start is further away than `look_ahead` hours."""
+        if not self.enforce_look_ahead or not self.scheduled_start or self.hinted_live_status in common.LIVE_STATUSES:
+            return False
+        now = time.time() if now is None else now
+        return self.scheduled_start > now + self.config.get_look_ahead() * 3600.0
+
+    def stop_if_beyond_look_ahead(self) -> bool:
+        """Set the job's status and return True if it should stop waiting because of the look-ahead window."""
+        if not self.beyond_look_ahead():
+            return False
+        self.logger.info("Scheduled start ({0}) is more than {1} hours away, no longer waiting".format(
+            self.scheduled_start, self.config.get_look_ahead()))
+        self.set_status(STATUS_BEYOND_LOOK_AHEAD)
+        common.known_schedules.set(self.id, self.scheduled_start)
+        return True
+
     def wait(self, seconds: float) -> WaitResult:
         return common.interruptible_wait(seconds, stop=self.kill_this, wake=self.wake)
 
     def wait_until_next_check(self) -> bool:
         """
-        Wait until the next check of an upcoming stream is due. Returns False if cancelled.
+        Wait until the next check of an upcoming stream is due. Returns False if cancelled, or if
+        the scheduled start is beyond the look-ahead window (the status is then STATUS_BEYOND_LOOK_AHEAD).
         A wake-up from a schedule change only recalculates the wait; "check now" (or the stream
         being reported live) ends it.
         """
@@ -168,6 +190,9 @@ class BaseDownloader:
         while True:
             if self._force_check:
                 break
+            if self.stop_if_beyond_look_ahead():
+                self.next_check_at = None
+                return False
             delay = next_upcoming_check_delay(self.scheduled_start, time.time(), self.config.get_upcoming_recheck_max(),
                                               self.config.upcoming_video_max_wait())
             self.next_check_at = time.time() + delay
@@ -262,7 +287,8 @@ class BaseDownloader:
     def wait_for_stream(self, include_dash: bool = False, include_m3u8: bool = False) -> Optional[dict]:
         """
         Return the info_dict once the stream is live (or post-live) and has formats, or None if
-        the job was cancelled. Exceptions from yt-dlp (private, removed, rate limited...) propagate.
+        the job was cancelled or the stream is beyond the look-ahead window (see wait_until_next_check).
+        Exceptions from yt-dlp (private, removed, rate limited...) propagate.
         """
         # If the channel scan already says the stream is upcoming, nothing is extracted until it
         # is close to the scheduled start (or the scan reports it live, or "check now" is used).

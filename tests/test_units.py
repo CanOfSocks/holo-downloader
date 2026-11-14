@@ -260,3 +260,82 @@ def test_discovery_hint_wakes_waiting_job():
     downloader = VideoDownloader(DiscoveredVideo("dQw4w9WgXcQ", live_status="is_upcoming", release_timestamp=time.time() + 3600))
     downloader.apply_discovery_hint(DiscoveredVideo("dQw4w9WgXcQ", live_status="is_live"))
     assert downloader.wake.is_set() and downloader._force_check
+
+
+# --- Look-ahead window while waiting ---
+
+def test_waiting_job_stops_when_rescheduled_beyond_look_ahead():
+    from base_downloader import STATUS_BEYOND_LOOK_AHEAD
+    downloader = _downloader(live_status="is_upcoming", release_timestamp=time.time() + 3600)
+    assert not downloader.beyond_look_ahead()
+    # A channel scan reports the stream moved a week out: the wait ends instead of continuing
+    downloader.apply_discovery_hint(DiscoveredVideo("dQw4w9WgXcQ", live_status="is_upcoming",
+                                                    release_timestamp=time.time() + 7 * 24 * 3600))
+    assert downloader.wait_until_next_check() is False
+    assert downloader.status == STATUS_BEYOND_LOOK_AHEAD
+
+
+def test_extraction_beyond_look_ahead_ends_job(monkeypatch):
+    from base_downloader import STATUS_BEYOND_LOOK_AHEAD
+    downloader = _downloader()   # Start time unknown when the job began
+    far = time.time() + 30 * 24 * 3600
+    monkeypatch.setattr(downloader, "load_embed_info", lambda: None)
+    monkeypatch.setattr(downloader, "extract_info", lambda **kw: ({"live_status": "is_upcoming", "release_timestamp": far}, "is_upcoming"))
+    downloader.main()
+    assert downloader.status == STATUS_BEYOND_LOOK_AHEAD
+
+
+def test_manual_add_ignores_look_ahead():
+    downloader = _downloader(release_timestamp=time.time() + 30 * 24 * 3600, manual=True)
+    assert not downloader.beyond_look_ahead()
+
+
+def test_live_stream_never_beyond_look_ahead():
+    downloader = _downloader(live_status="is_live", release_timestamp=time.time() + 30 * 24 * 3600)
+    assert not downloader.beyond_look_ahead()
+
+
+# --- Scheduled start from flat playlist listings ---
+
+def _lockup(texts):
+    return {'contentId': 'VKZZmT7gllw', 'metadata': {'lockupMetadataViewModel': {'metadata': {'contentMetadataViewModel': {
+        'metadataRows': [{'metadataParts': [{'text': {'content': t}} for t in texts]}]}}}}}
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("Scheduled for 11/14/26, 11:00 AM", datetime(2026, 11, 14, 11, 0, tzinfo=timezone.utc)),
+    ("Scheduled for 12/7/26, 9:00\u202fPM", datetime(2026, 12, 7, 21, 0, tzinfo=timezone.utc)),
+    ("Premieres 1/2/2027, 12:30 AM", datetime(2027, 1, 2, 0, 30, tzinfo=timezone.utc)),
+    ("Scheduled for 13/40/26, 9:00 AM", None),
+    ("141 waiting", None),
+])
+def test_parse_scheduled_text(text, expected):
+    from lockup_schedule import parse_scheduled_text
+    assert parse_scheduled_text(text) == (int(expected.timestamp()) if expected else None)
+
+
+def test_scheduled_start_from_lockup_metadata():
+    from lockup_schedule import scheduled_start_from_lockup
+    assert scheduled_start_from_lockup(_lockup(["141 waiting", "Scheduled for 11/14/26, 11:00 AM"])) == 1794654000
+    assert scheduled_start_from_lockup({'contentId': 'x'}) is None
+
+
+def test_flat_listing_entries_get_release_timestamp():
+    import lockup_schedule  # noqa: F401 (installed by common)
+    from yt_dlp import YoutubeDL
+    from yt_dlp.extractor.youtube import YoutubeTabIE
+    ie = YoutubeTabIE(YoutubeDL({'quiet': True}))
+    view_model = _lockup(["Scheduled for 11/14/26, 11:00 AM"])
+    view_model['contentType'] = 'LOCKUP_CONTENT_TYPE_VIDEO'
+    view_model['contentImage'] = {'thumbnailViewModel': {'overlays': [{'thumbnailBottomOverlayViewModel': {
+        'badges': [{'thumbnailBadgeViewModel': {'text': 'Upcoming'}}]}}]}}
+    entry = ie._extract_lockup_view_model(view_model)
+    if entry.get('live_status') != 'is_upcoming':
+        pytest.skip("yt-dlp's lockup format differs from this sample")
+    assert entry['release_timestamp'] == 1794654000
+
+
+def test_far_future_schedule_remembered_for_scans():
+    downloader = _downloader(live_status="is_upcoming", release_timestamp=time.time() + 30 * 24 * 3600)
+    assert downloader.stop_if_beyond_look_ahead()
+    assert common.known_schedules.get(downloader.id) == downloader.scheduled_start
