@@ -304,9 +304,18 @@ def check_stalls() -> None:
             downloader.logger.warning("Download stalled for too long, stopping and merging automatically")
 
 
+# The cron expression from the config for each check, as written there, for display.
+# (APScheduler's own description of a trigger is not in cron syntax.)
+_configured_crons: dict[str, str] = {}
+# Checks whose configured cron expression could not be parsed
+_invalid_crons: set[str] = set()
+
+
 def update_scheduler() -> tuple[bool, str]:
     config = load_config()
     messages = []
+    _configured_crons.clear()
+    _invalid_crons.clear()
     for name in CHECKS:
         job_id = f"{name}-checker"
         if scheduler.get_job(job_id):
@@ -314,6 +323,8 @@ def update_scheduler() -> tuple[bool, str]:
         cron_string = config.get_cron_schedule(name)
         if not cron_string:
             continue
+        cron_string = str(cron_string).strip()
+        _configured_crons[name] = cron_string
         try:
             scheduler.add_job(run_check, trigger=CronTrigger.from_crontab(cron_string), args=[name], id=job_id,
                               max_instances=1,       # Prevent overlapping runs of the scheduled job
@@ -321,6 +332,7 @@ def update_scheduler() -> tuple[bool, str]:
                               replace_existing=True)
         except ValueError as e:
             logger.error(f"Cron Error for {name}: {e}")
+            _invalid_crons.add(name)
             messages.append(f"Invalid cron expression for {name}: {e}")
     scheduler.add_job(check_stalls, trigger='interval', seconds=STALL_CHECK_SECONDS, id="stall-checker",
                       max_instances=1, coalesce=True, replace_existing=True)
@@ -335,12 +347,19 @@ def get_scheduler_jobs() -> list[dict[str, Any]]:
     rows = []
     for name, check in CHECKS.items():
         job = scheduled.get(f"{name}-checker")
+        if job:
+            status = "Scheduled"
+        elif name in _invalid_crons:
+            status = "Invalid"
+        else:
+            status = "Inactive"
         rows.append({
             'id': f"{name}-checker",
             'name': check.display,
+            'cron': _configured_crons.get(name),   # As written in [cron_schedule]
             'trigger': str(job.trigger) if job else "No Schedule Set",
             'next_run': to_utc_iso(job.next_run_time) if job and job.next_run_time else None,
-            'status': "Scheduled" if job else "Inactive",
+            'status': status,
             'running': _check_locks[name].locked(),
         })
     return rows

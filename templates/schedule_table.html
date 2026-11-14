@@ -6,7 +6,6 @@
         <tr>
             <th>Task</th>
             <th>Next Run</th>
-            <th class="d-none d-md-table-cell">Trigger</th>
             <th class="text-end">Action</th>
         </tr>
     </thead>
@@ -17,14 +16,20 @@
                 <div class="fw-bold">{{ job.name }}</div>
                 {% if job.running %}
                     <span class="badge bg-primary" style="font-size: 0.7em;">Running</span>
+                {% elif job.status == 'Invalid' %}
+                    <span class="badge bg-danger" style="font-size: 0.7em;">Invalid schedule</span>
                 {% elif job.status == 'Inactive' %}
                     <span class="badge bg-dark" style="font-size: 0.7em;">Disabled</span>
                 {% else %}
                     <span class="badge bg-success" style="font-size: 0.7em;">Active</span>
                 {% endif %}
             </td>
-            <td><small>{{ local_time(job.next_run, empty="N/A") }}</small></td>
-            <td class="d-none d-md-table-cell"><code style="font-size: 0.75em;">{{ job.trigger }}</code></td>
+            <td>
+                <small>{{ local_time(job.next_run, empty="N/A") }}</small>
+                {# The schedule as written in [cron_schedule] (minute hour day-of-month month day-of-week) #}
+                <div><code class="{{ 'text-danger' if job.status == 'Invalid' }}" style="font-size: 0.75em;"
+                           title="Cron schedule (minute hour day-of-month month day-of-week)">{{ job.cron or "No schedule set" }}</code></div>
+            </td>
             <td class="text-end">
                 <form action="/actions/force_run/{{ job.id }}" method="POST" class="m-0"
                       hx-post="/actions/force_run/{{ job.id }}" hx-swap="none">

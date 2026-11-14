@@ -108,6 +108,27 @@ def test_invalid_config_is_not_saved(client):
         assert f.read() == before
 
 
+def test_scheduler_shows_configured_cron(client, monkeypatch):
+    original = web.config_file_path
+    with open(original, encoding="utf-8") as f:
+        content = f.read()
+    test_config = original + ".cron.toml"
+    with open(test_config, "w", encoding="utf-8") as f:
+        f.write(content.replace("[cron_schedule]", '[cron_schedule]\nstreams = "*/30 * * * *"\nunarchived = "not a cron"'))
+    monkeypatch.setattr(web, "config_file_path", test_config)
+    try:
+        web.update_scheduler()
+        rows = {row["id"]: row for row in client.get("/api/scheduler").get_json()}
+        assert rows["streams-checker"]["cron"] == "*/30 * * * *" and rows["streams-checker"]["status"] == "Scheduled"
+        assert rows["unarchived-checker"]["status"] == "Invalid"
+        assert rows["members_only-checker"]["cron"] is None
+        body = client.get("/data/scheduler").get_data(as_text=True)
+        assert "*/30 * * * *" in body and "Invalid schedule" in body
+    finally:
+        monkeypatch.setattr(web, "config_file_path", original)
+        web.update_scheduler()
+
+
 def test_static_files_are_cacheable(client):
     response = client.get("/favicon.ico")
     assert response.status_code == 200
