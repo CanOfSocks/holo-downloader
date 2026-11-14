@@ -38,10 +38,6 @@ RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/reposi
         -r /app/requirements.txt \
         "git+https://github.com/HoloArchivists/youtube-community-tab.git#egg=youtube-community-tab&subdirectory=youtube-community-tab" && \
     #
-    # Apply the YouTube chat patch
-    sed -i "s/socs.value.startswith('CAA')/str(socs).startswith('CAA')/g" \
-        $(python -c "import chat_downloader; import os; print(os.path.dirname(chat_downloader.__file__))")/sites/youtube.py && \
-    #
     # Cleanup: Remove git and curl to save space
     apk del .build-deps
 
