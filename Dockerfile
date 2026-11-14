@@ -1,6 +1,6 @@
-# Use the existing livestream_dl as the base. The dev workflow builds on the livestream_dl
-# "dev" image instead (--build-arg BASE_IMAGE=ghcr.io/canofsocks/livestream_dl:dev).
-ARG BASE_IMAGE=ghcr.io/canofsocks/livestream_dl:latest
+# Use the existing livestream_dl "dev" image as the base. Override with
+# --build-arg BASE_IMAGE=ghcr.io/canofsocks/livestream_dl:latest for the stable image.
+ARG BASE_IMAGE=ghcr.io/canofsocks/livestream_dl:dev
 FROM ${BASE_IMAGE}
 
 ARG PYTHONDONTWRITEBYTECODE=1
