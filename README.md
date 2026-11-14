@@ -195,6 +195,7 @@ The `output_path` template follows [yt-dlp output template](https://github.com/y
 | **Metadata & Extras** |  |  |  |
 | `video_only` | Bool | `False` | If true, skips chat, thumbnails, and metadata. |
 | `download_chat` | Bool | `False` | Download live chat (archived streams). |
+| `stop_chat_when_done` | Int | `900` | Seconds to keep downloading live chat after the stream has finished before stopping it (the chat downloaded so far is kept). Prevents hanging if the chat doesn't end. `0` waits until the chat ends. |
 | `thumbnail` | Bool | `False` | Download and embed thumbnail. |
 | `info_json` | Bool | `False` | Write `info.json` metadata file. |
 | `description` | Bool | `False` | Write description to a text file. |

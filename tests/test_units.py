@@ -127,6 +127,13 @@ def test_classify_oembed(code, expected):
 
 # --- Config ---
 
+def test_stop_chat_when_done():
+    assert ConfigHandler(config={}).get_stop_chat_when_done() == 900
+    assert ConfigHandler(config={"download_options": {"stop_chat_when_done": 0}}).get_stop_chat_when_done() == 0
+    options = ConfigHandler(config={"download_options": {"stop_chat_when_done": 60}}).get_livestream_dl_options({"id": "x"}, "a/b")
+    assert options["stop_chat_when_done"] == 60
+
+
 def test_wait_limit_prefers_documented_key():
     assert ConfigHandler(config={"download_options": {"new_segment_wait_limit": 1800, "segment_wait_limit": 5}}).get_new_segment_wait_limit() == 1800
     assert ConfigHandler(config={"download_options": {"segment_wait_limit": 5}}).get_new_segment_wait_limit() == 5

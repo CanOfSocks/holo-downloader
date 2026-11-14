@@ -232,6 +232,13 @@ class ConfigHandler:
         """Seconds a download stays stalled before it is automatically stopped and merged. 0 disables it."""
         return max(float(self.download_options.get('stall_auto_merge', 0) or 0), 0.0)
 
+    def get_stop_chat_when_done(self) -> int:
+        """
+        Seconds to keep downloading the live chat after the stream's media has finished, before it is
+        stopped and the chat downloaded so far is kept. 0 waits until the chat ends on its own.
+        """
+        return max(int(self.download_options.get('stop_chat_when_done', 900) or 0), 0)
+
     # --- Unarchived ---
 
     def get_unarchived_chat_dl(self) -> bool:
@@ -326,6 +333,7 @@ class ConfigHandler:
             "keep_temp_files": False,
             "keep_ts_files": self.get_keep_ts_files(),
             "live_chat": self.get_chat(),
+            "stop_chat_when_done": self.get_stop_chat_when_done(),
             "keep_database_file": False,
             "recovery": False,
             "database_in_memory": False,
