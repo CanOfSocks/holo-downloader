@@ -3,10 +3,13 @@ Behaviour shared by the normal downloader (downloadVid.VideoDownloader) and the 
 monitor (unarchived.UnarchivedDownloader): waiting for an upcoming stream, accepting updates
 from channel scans, and the controls used by the web UI (cancel, check now, stop & merge).
 """
+import copy
 import logging
 import threading
 import time
 from typing import Any, Dict, Optional, Union
+
+import yt_dlp
 
 import common
 from common import DiscoveredVideo, WaitResult, kill_all
@@ -178,23 +181,83 @@ class BaseDownloader:
         self.next_check_at = None
         return True
 
+    def probe_status(self) -> dict:
+        """
+        Full yt-dlp extraction WITHOUT format selection (process=False), used for streams that
+        haven't started. Returns the raw info, which includes live_status and release_timestamp.
+
+        livestream_dl's get_Video_Info can't be used for an upcoming stream: it has no formats,
+        so yt-dlp warns "Requested format is not available" during format selection, and
+        livestream_dl's ExtractionLogger turns any warning containing "not available" into an error.
+        Errors are classified the same way as get_Video_Info (private, members only, ...).
+        """
+        options: dict[str, Any] = {
+            'quiet': True,
+            'skip_download': True,
+            'cookiefile': self.config.get_cookies_file(),
+            # Return the info of an upcoming stream instead of raising "This live event will begin in..."
+            'ignore_no_formats_error': True,
+            'logger': getUrls.ExtractionLogger(logger=self.logger, wait=False),
+        }
+        proxy = getUrls.proxy_for_ytdlp(self.config.get_proxy())
+        if proxy:
+            options['proxy'] = proxy
+        # Deep copy so yt-dlp can't modify the config's nested extractor_args
+        options.update(copy.deepcopy(self.config.get_ytdlp_options() or {}))
+
+        with yt_dlp.YoutubeDL(options) as ydl:
+            try:
+                return ydl.extract_info(getUrls.normalize_video_url(self.id), download=False, process=False) or {}
+            except yt_dlp.utils.DownloadError as e:
+                # Same mapping to VideoInaccessibleError etc. as get_Video_Info (a module helper of livestream_dl)
+                classified = getUrls._classify_download_error(e, self.id)
+                if classified is e:
+                    raise
+                raise classified from e
+
     def extract_info(self, include_dash: bool = False, include_m3u8: bool = False) -> tuple[dict, str]:
         """
-        One full yt-dlp extraction without yt-dlp's own wait loop (which can't be interrupted).
-        ignore_no_formats returns the info of an upcoming stream instead of raising an error.
+        One full yt-dlp extraction, without yt-dlp's own wait loop (which can't be interrupted).
+        Returns (info_dict, live_status). Usable formats are only included once the stream is
+        live; for an upcoming stream the info has live_status "is_upcoming" and no formats.
+
+        While the stream is expected to be upcoming, probe_status() is used so each check costs
+        one extraction. Once it reports the stream live, get_Video_Info extracts it again to get
+        the processed formats livestream_dl needs.
         """
-        return getUrls.get_Video_Info(
-            id=self.id,
-            wait=False,
-            cookies=self.config.get_cookies_file(),
-            proxy=self.config.get_proxy(),
-            additional_options=self.config.get_ytdlp_options(),
-            include_dash=include_dash,
-            include_m3u8=include_m3u8,
-            clean_info_dict=self.config.get_clean_info_json(),
-            ignore_no_formats=True,
-            logger=self.logger,
-        )
+        if self.hinted_live_status == "is_upcoming":
+            info_dict = self.probe_status()
+            live_status = info_dict.get('live_status')
+            if live_status not in ("is_upcoming", *common.LIVE_STATUSES):
+                # Same check as get_Video_Info: a processed video can't be downloaded as a stream
+                raise getUrls.VideoProcessedError("Video has been processed, please use yt-dlp directly")
+            if live_status == "is_upcoming" or not info_dict.get('formats'):
+                self.hinted_live_status = live_status
+                return info_dict, live_status
+            self.logger.info("Stream is now {0}, extracting formats".format(live_status))
+
+        try:
+            info_dict, live_status = getUrls.get_Video_Info(
+                id=self.id,
+                wait=False,
+                cookies=self.config.get_cookies_file(),
+                proxy=self.config.get_proxy(),
+                additional_options=self.config.get_ytdlp_options(),
+                include_dash=include_dash,
+                include_m3u8=include_m3u8,
+                clean_info_dict=self.config.get_clean_info_json(),
+                ignore_no_formats=True,
+                logger=self.logger,
+            )
+        except yt_dlp.utils.DownloadError as e:
+            if "requested format is not available" not in str(e).lower():
+                raise
+            # No formats: almost always a stream that hasn't started (e.g. a manually added
+            # video, where the status wasn't known in advance). Get its status and start time.
+            info_dict = self.probe_status()
+            live_status = info_dict.get('live_status')
+        self.hinted_live_status = live_status
+        return info_dict, live_status
 
     def wait_for_stream(self, include_dash: bool = False, include_m3u8: bool = False) -> Optional[dict]:
         """

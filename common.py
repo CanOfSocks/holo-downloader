@@ -332,10 +332,14 @@ def playlist_url(channel_id: str, tab: Optional[str]) -> tuple[str, bool]:
 
 
 def extract_video(video_id_or_url: str, config: ConfigHandler, logger: logging.Logger) -> Optional[dict]:
-    """Full yt-dlp extraction of one video for channel scans. Returns None on error."""
+    """
+    Full yt-dlp extraction of one video for channel scans. Returns None on error.
+    process=False skips format selection: only the status, start time and description are
+    needed, and format selection fails ("Requested format is not available") for an upcoming video.
+    """
     try:
         with YoutubeDL(ytdlp_options(config, logger, flat=False)) as ydl:
-            info = ydl.extract_info(video_id_or_url, download=False)
+            info = ydl.extract_info(video_id_or_url, download=False, process=False)
     except Exception as e:
         logger.error("Unable to extract information for video {0}: {1}".format(video_id_or_url, e))
         return None

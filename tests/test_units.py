@@ -198,6 +198,63 @@ def test_holodev_times_are_utc():
     assert parse_utc("2026-01-01T12:00:00.000Z") == datetime(2026, 1, 1, 12, tzinfo=timezone.utc)
 
 
+def _downloader(**hint):
+    from downloadVid import VideoDownloader
+    return VideoDownloader(DiscoveredVideo("dQw4w9WgXcQ", **hint))
+
+
+def test_upcoming_hint_checks_without_format_selection(monkeypatch):
+    from livestream_dl import getUrls
+    downloader = _downloader(live_status="is_upcoming", release_timestamp=time.time() + 3600)
+    monkeypatch.setattr(getUrls, "get_Video_Info", lambda **kw: pytest.fail("get_Video_Info fails for upcoming streams"))
+    monkeypatch.setattr(downloader, "probe_status", lambda: {"live_status": "is_upcoming", "release_timestamp": 123.0, "formats": []})
+    info, status = downloader.extract_info()
+    assert status == "is_upcoming" and info["release_timestamp"] == 123.0
+
+
+def test_upcoming_stream_that_went_live_gets_formats(monkeypatch):
+    from livestream_dl import getUrls
+    downloader = _downloader(live_status="is_upcoming")
+    monkeypatch.setattr(downloader, "probe_status", lambda: {"live_status": "is_live", "formats": [{"format_id": "1"}]})
+    monkeypatch.setattr(getUrls, "get_Video_Info", lambda **kw: ({"live_status": "is_live", "formats": ["processed"]}, "is_live"))
+    info, status = downloader.extract_info()
+    assert status == "is_live" and info["formats"] == ["processed"]
+    assert downloader.hinted_live_status == "is_live"
+
+
+def test_no_formats_error_falls_back_to_probe(monkeypatch):
+    import yt_dlp
+    from livestream_dl import getUrls
+
+    def no_formats(**kw):
+        raise yt_dlp.utils.DownloadError("requested format is not available")
+    downloader = _downloader()   # Manual add: status unknown
+    monkeypatch.setattr(getUrls, "get_Video_Info", no_formats)
+    monkeypatch.setattr(downloader, "probe_status", lambda: {"live_status": "is_upcoming", "release_timestamp": 5.0})
+    assert downloader.extract_info()[1] == "is_upcoming"
+    assert downloader.hinted_live_status == "is_upcoming"
+
+
+def test_other_extraction_errors_still_raise(monkeypatch):
+    import yt_dlp
+    from livestream_dl import getUrls
+
+    def blocked(**kw):
+        raise yt_dlp.utils.DownloadError("some other failure")
+    downloader = _downloader()
+    monkeypatch.setattr(getUrls, "get_Video_Info", blocked)
+    with pytest.raises(yt_dlp.utils.DownloadError):
+        downloader.extract_info()
+
+
+def test_upcoming_hint_but_processed_video_raises(monkeypatch):
+    from livestream_dl import getUrls
+    downloader = _downloader(live_status="is_upcoming")
+    monkeypatch.setattr(downloader, "probe_status", lambda: {"live_status": "was_live"})
+    with pytest.raises(getUrls.VideoProcessedError):
+        downloader.extract_info()
+
+
 def test_discovery_hint_wakes_waiting_job():
     from downloadVid import VideoDownloader
     downloader = VideoDownloader(DiscoveredVideo("dQw4w9WgXcQ", live_status="is_upcoming", release_timestamp=time.time() + 3600))
