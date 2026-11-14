@@ -1,10 +1,12 @@
+{% from "_macros.html" import local_time %}
 {% if jobs %}
-<table class="table table-sm align-middle">
+<div class="table-responsive">
+<table class="table table-sm align-middle mb-0">
     <thead>
         <tr>
-            <th>Task Name</th>
+            <th>Task</th>
             <th>Next Run</th>
-            <th>Trigger</th>
+            <th class="d-none d-md-table-cell">Trigger</th>
             <th class="text-end">Action</th>
         </tr>
     </thead>
@@ -13,23 +15,26 @@
         <tr>
             <td>
                 <div class="fw-bold">{{ job.name }}</div>
-                {% if job.status == 'Inactive' %}
+                {% if job.running %}
+                    <span class="badge bg-primary" style="font-size: 0.7em;">Running</span>
+                {% elif job.status == 'Inactive' %}
                     <span class="badge bg-dark" style="font-size: 0.7em;">Disabled</span>
                 {% else %}
                     <span class="badge bg-success" style="font-size: 0.7em;">Active</span>
                 {% endif %}
             </td>
-            <td><small>{{ job.next_run }}</small></td>
-            <td><code style="font-size: 0.75em;">{{ job.trigger }}</code></td>
+            <td><small>{{ local_time(job.next_run, empty="N/A") }}</small></td>
+            <td class="d-none d-md-table-cell"><code style="font-size: 0.75em;">{{ job.trigger }}</code></td>
             <td class="text-end">
-                <form action="/actions/force_run/{{ job.id }}" method="POST" style="display:inline;">
-                    <button type="submit" class="btn btn-outline-primary btn-sm" title="Run Now">
-                        ▶️ Run Now
-                    </button>
+                <form action="/actions/force_run/{{ job.id }}" method="POST" class="m-0"
+                      hx-post="/actions/force_run/{{ job.id }}" hx-swap="none">
+                    <button type="submit" class="btn btn-outline-primary btn-sm btn-touch text-nowrap" title="Run Now"
+                            {{ 'disabled' if job.running }}>▶️<span class="d-none d-sm-inline"> Run Now</span></button>
                 </form>
             </td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
+</div>
 {% endif %}

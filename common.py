@@ -1,318 +1,175 @@
-from subprocess import Popen 
-from yt_dlp import YoutubeDL
-from getConfig import ConfigHandler
-from datetime import datetime, timedelta, timezone    
-import os
-from time import sleep
-import re
-import random
-import logging
+"""
+Shared state and helpers used by the web app, the channel scans and the downloaders.
+"""
+import copy
+import enum
+import html
 import json
-from typing import List, Dict, Any, Optional, Union
+import logging
+import os
+import random
+import re
+import signal
+import threading
+import time
+from collections import OrderedDict
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from platform import system
+from typing import Any, Container, Dict, Iterable, List, Optional, Union
 
+import httpx
+from yt_dlp import YoutubeDL
+
+from getConfig import ConfigHandler
+from livestream_dl import getUrls, headers
+from livestream_dl.download_Live import create_http_client, setup_logging
+from livestream_dl.monitor_channel import VideoStatusCache
 from livestream_dl.YoutubeURL import YTDLPLogger
 
-import signal
+# --- Shutdown handling ---
 
-import threading
-
+# Set when the application is shutting down. Every download and wait loop checks it.
 kill_all = threading.Event()
 
 original_sigint = signal.getsignal(signal.SIGINT)
 
-def handle_shutdown(signum, frame):
-    """Signal handler to set the kill_all event."""
+
+def handle_shutdown(signum, frame) -> None:
+    """Signal handler: tell every thread to stop, give them a moment, then run the original handler."""
     kill_all.set()
-    sleep(5)
+    time.sleep(5)
     if callable(original_sigint):
         original_sigint(signum, frame)
 
-# common
-signal.signal(signal.SIGINT, handle_shutdown)
 
-from platform import system
-if system() == "Windows":
-    # SIGTERM won’t fire — but SIGBREAK will on Ctrl-Break
-    signal.signal(signal.SIGBREAK, handle_shutdown)
-else:
-    # normal POSIX termination
-    signal.signal(signal.SIGTERM, handle_shutdown)
+# Signal handlers can only be installed from the main thread. Under gunicorn this module is first
+# imported by gunicorn.conf.py in the master process; gunicorn then installs its own handlers, and
+# the worker uses gunicorn's hooks (see gunicorn.conf.py) to set kill_all.
+if threading.current_thread() is threading.main_thread():
+    signal.signal(signal.SIGINT, handle_shutdown)
+    if system() == "Windows":
+        # SIGTERM won't fire on Windows, but SIGBREAK will on Ctrl-Break
+        signal.signal(signal.SIGBREAK, handle_shutdown)
+    else:
+        signal.signal(signal.SIGTERM, handle_shutdown)
 
-from livestream_dl.download_Live import setup_logging
 
-def initialize_logging(config: ConfigHandler = None, logger_name = None, force = False, video_id: str = None):
+# --- Logging ---
+
+def initialize_logging(config: Optional[ConfigHandler] = None, logger_name: Optional[str] = None,
+                       force: bool = False, video_id: Optional[str] = None):
+    """
+    Return a logger configured from the config file. Loggers are cached by name by the logging
+    module and handlers are only added the first time, so calling this repeatedly is cheap.
+    If the config can't be read (e.g. it doesn't exist yet) console-only INFO logging is used.
+    """
     if config is None:
-        config = ConfigHandler()
-        
-    logger = setup_logging(
-        log_level=config.get_log_level(), 
-        console=True, 
-        file=config.get_log_file(), 
-        file_options=config.get_log_file_options(),
-        logger_name=logger_name,
-        force=force,
-        video_id=video_id
-    )
-    return logger
+        try:
+            config = ConfigHandler()
+        except Exception:
+            return setup_logging(log_level="INFO", console=True, logger_name=logger_name, force=force, video_id=video_id)
+
+    log_file = config.get_log_file()
+    if log_file:
+        try:
+            os.makedirs(os.path.dirname(os.path.abspath(log_file)), exist_ok=True)
+        except OSError:
+            # Unable to create the folder (e.g. read-only mount): log to the console only
+            log_file = None
+
+    try:
+        return setup_logging(log_level=config.get_log_level(), console=True, file=log_file,
+                             file_options=config.get_log_file_options(), logger_name=logger_name,
+                             force=force, video_id=video_id)
+    except OSError:
+        return setup_logging(log_level=config.get_log_level(), console=True, logger_name=logger_name,
+                             force=force, video_id=video_id)
+
 
 logger = initialize_logging()
 
-def vid_executor(streams: List[str], command: str, config: ConfigHandler = None, unarchived: bool = False, frequency: str = None) -> list[str] | str:    
-    if config is None:
-        config = ConfigHandler()
 
-    if config.randomise_lists() is True:
-        streams = random_sample(streams)
-    
-    if(command == "spawn"):
-        if unarchived is True:
-            download_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'unarchived.py')
-        else:
-            download_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloadVid.py')
-        
-        if frequency:
-            frequency_sec = cron_frequency(frequency)
-            sleep_time = frequency_sec / max(len(streams) + 1, 2)
-        else:
-            sleep_time = 60
-        
-        for i, live in enumerate(streams):
-            if kill_all.is_set():
-                break
-            cmd_args = ["python", download_script, '--', live]
-            logging.debug("Executing: {0}".format(' '.join(cmd_args)))
-            Popen(cmd_args, start_new_session=True)
-            if i < len(streams) - 1:
-                logging.debug("Sleeping for {0}".format(sleep_time))
-                sleep(random.uniform(max(sleep_time/2, 1.0), max(sleep_time * 1.25, 1.0)))   
-        
-    elif(command == "bash"):
-        bash_array = ' '.join(streams)
-        logging.info(bash_array)
-        return bash_array            
-    else:
-        logging.info(streams)
-    return streams
-    
-def titleFilter(live: Dict[str, Any], channel_id: str, config: ConfigHandler = None) -> Optional[bool]:
-    if config is None:
-        config = ConfigHandler()
-
-    #print(channel_id, type(channel_id))
-
-    titFilter = config.get_title_filter().get(channel_id, None)
-    if titFilter is None:
-        return None
-    
+def setup_umask() -> None:
     try:
-        search = re.search(titFilter, live.get('title'))
-        if(search):
-            return True
-        else:
-            return False
-    except:
-        logging.exception("Filter failed")
-        return None
-    
-def descriptionFilter(live: Dict[str, Any], channel_id: str, config: ConfigHandler = None) -> Optional[bool]:
-    if config is None:
-        config = ConfigHandler()
-
-    descFilter = config.get_desc_filter().get(channel_id, None)    
-    if descFilter is None:
-        return None
-    
-    desc = live.get('description', None)
-    if desc is None:
-        ydl_opts = {
-            'quiet': True,
-            'force_generic_extractor': True,
-            'sleep_interval': 1,
-            'sleep_interval_requests': 1,
-            'no_warnings': True,
-            'cookiefile': config.get_cookies_file(),
-        }
-        
-        with YoutubeDL(ydl_opts) as ydl:
-            url = "https://www.youtube.com/watch?v={0}".format(live.get('id'))
-            info = ydl.extract_info(url, download=False)
-            logging.debug(info)
-            desc = info.get('description')
-    
-    try:
-        if re.search(descFilter, desc):
-            return True
-        else:
-            return False
-    except:
-        return None
-    
-
-def filtering(live: Dict[str, Any], channel_id: str, config: ConfigHandler = None) -> bool:
-    if config is None:
-        config = ConfigHandler()
-
-    # We pass the valid 'config' instance down so sub-functions don't need to re-instantiate it
-    title = titleFilter(live, channel_id, config)
-    description = descriptionFilter(live, channel_id, config)
-    
-    if(title or description):
-        return True
-    elif(title is None and description is None):
-        return True
-    else:
-        return False
-       
-def withinFuture(config: ConfigHandler = None, releaseTime: Optional[int] = None) -> bool:
-    if config is None:
-        config = ConfigHandler()
-
-    lookahead = config.get_look_ahead()
-    lookbehind = config.get_look_behind()
-    if(not releaseTime):
-        return True
-
-    release = datetime.fromtimestamp(releaseTime, timezone.utc)    
-    ahead_limit = datetime.now(timezone.utc) + timedelta(hours=lookahead)
-    behind_limit = datetime.now(timezone.utc) - timedelta(hours=lookbehind)
-    return behind_limit <= release <= ahead_limit
-    
-def getAvailability(live: Any, config: ConfigHandler = None):
-    if config is None:
-        config = ConfigHandler()
-
-    if live.availability is None:        
-        options = {
-            "cookiefile": config.get_cookies_file(),
-            "quiet": True
-        }
-        with YoutubeDL(options) as ydl: 
-            try:
-                info_dict = ydl.extract_info("https://youtu.be/{0}".format(live.id), download=False)
-                live.description = info_dict.get('description', None)
-                live.availability = info_dict.get('availability', None)
-            except:
-                pass
-    return live.availability
-
-def get_upcoming_or_live_videos(channel_id: str, config: ConfigHandler = None, tab: str = None, passed_logger: logging.Logger = None) -> List[str]:
-    if config is None:
-        config = ConfigHandler()
-    
-    this_logger = passed_logger or logger 
-
-    ydl_opts = {
-        'quiet': True,
-        'extract_flat': True,
-        'sleep_interval': 1,
-        'sleep_interval_requests': 1,
-        'no_warnings': True,
-        'cookiefile': config.get_cookies_file(),
-        "logger": YTDLPLogger(logger=this_logger),
-        'playlist_items': '1:{0}'.format(config.get_ytlp_playlist_limit() or 10),
-    }
-    #if config.get_ytlp_playlist_limit():
-    #    ydl_opts.update({'playlist_items': '1:{0}'.format(config.get_ytlp_playlist_limit() or 3)})
-
-    try:
-        with YoutubeDL(ydl_opts) as ydl:
-            if tab == "membership":
-                if channel_id.startswith("UUMO"):
-                    url = "https://www.youtube.com/playlist?list={0}".format(channel_id)
-                elif channel_id.startswith("UC") or channel_id.startswith("UU"):
-                    url = "https://www.youtube.com/playlist?list={0}".format("UUMO" + channel_id[2:])
-                else:
-                    ydl_opts.update({'playlist_items': '1:10'})
-                    url = "https://www.youtube.com/channel/{0}/{1}".format(channel_id, tab)
-                    
-            elif tab == "streams":
-                if channel_id.startswith("UU"):
-                    url = "https://www.youtube.com/playlist?list={0}".format(channel_id)
-                elif channel_id.startswith("UC"):
-                    url = "https://www.youtube.com/playlist?list={0}".format("UU" + channel_id[2:])
-                elif channel_id.startswith("UUMO"):
-                    url = "https://www.youtube.com/playlist?list={0}".format("UU" + channel_id[4:])
-                else:
-                    ydl_opts.update({'playlist_items': '1:10'})
-                    url = "https://www.youtube.com/channel/{0}/{1}".format(channel_id, tab)
-                    
-            else:
-                ydl_opts.update({'playlist_items': '1:10'})
-                url = "https://www.youtube.com/channel/{0}/{1}".format(channel_id, tab)
-                
-            
-            info = ydl.extract_info(url, download=False)
-            #logging.debug(json.dumps(info))
-            upcoming_or_live_videos = []
-            
-            for video in info['entries']:
-
-                # Fallback if video availability doesn't exist in extracted info
-                if video.get('live_status', None) is None and video.get('duration') is None:
-                    try:
-                        video = ydl.extract_info(video.get('url'), download=False)
-                    except Exception as e:
-                        logger.error("Unable to find availability information for video {0}: {1}".format(video.get('url'), str(e)))
-                        continue
-
-                # Config is passed explicitly here
-                passes_filter = filtering(video, video.get('channel_id') or channel_id, config)
-                is_future = withinFuture(config, video.get('release_timestamp', None))
-                
-                this_logger.debug("({1}) live_status = {0}".format(video.get('live_status'),video.get('id')))
-
-                if (video.get('live_status') == 'is_live' or video.get('live_status') == 'post_live' or (video.get('live_status') == 'is_upcoming' and is_future)) and passes_filter:                    
-                    #logging.debug(json.dumps(video))
-                    upcoming_or_live_videos.append(video.get('id'))
-
-            return list(set(upcoming_or_live_videos))
+        if os.name != 'nt' and os.getenv("UMASK", None) is not None:
+            umask = int(os.getenv("UMASK", "002"), 8)
+            logger.debug("Setting UMASK to {0:o}".format(umask))
+            os.umask(umask)
     except Exception as e:
-        this_logger.exception("An unexpected error occurred when trying to fetch videos")
-        raise
-    
-def combine_unarchived(ids: List[str], config: ConfigHandler = None, passed_logger: logging.Logger = None) -> List[str]:
-    if config is None:
-        config = ConfigHandler()
-    this_logger = passed_logger or logger
-    
-    yta_pattern = r"^([0-9A-Za-z_-]{10}[048AEIMQUYcgkosw])\.info\.json$"
-    directory = config.get_unarchived_temp_folder()
-    if not os.path.exists(directory):
-        os.makedirs(directory, exist_ok=True)
-    files = [
-        f for f in os.listdir(directory)
-        if os.path.isfile(os.path.join(directory, f))
-    ]
-    this_logger.debug("Existing files: {0}".format(files))
-    id_set = set(ids)
+        logger.exception("Unable to setup UMASK: {0}".format(e))
 
-    for file in files:
-        match = re.match(yta_pattern, file)
-        if match:
-            group1 = match.group(1)  
-            this_logger.debug("[Unarchived] Found ID {0} from filename {1}".format(group1, file))          
-            id_set.add(str(group1))
-    
-    return list(id_set)
 
-def cron_frequency(cron_expr: str) -> float:
-    from croniter import croniter
-    now = datetime.now()
-    cron = croniter(cron_expr, now)
-    next_time = cron.get_next(datetime)
-    next_time_after = cron.get_next(datetime)
-    interval_seconds = (next_time_after - next_time).total_seconds()
-    return interval_seconds
+# --- Small utilities ---
 
-def replace_ip_in_json(file_name: str):
-    pattern = re.compile(r'((?:[0-9]{1,3}\.){3}[0-9]{1,3})|((?:[a-f0-9]{1,4}:){7}[a-f0-9]{1,4})')
-    with open(file_name, 'r', encoding="utf8") as file:
-        content = file.read()
-    modified_content = re.sub(pattern, '0.0.0.0', content)
-    with open(file_name, 'w', encoding="utf8") as file:
-        file.write(modified_content)
-        
-def random_sample(data: Union[List, tuple, Dict], k: int = None) -> Union[List, tuple, Dict]:
+@dataclass(frozen=True)
+class DiscoveredVideo:
+    """A video found by a channel scan. live_status / release_timestamp are hints from the scan and may be None."""
+    id: str
+    channel_id: Optional[str] = None
+    live_status: Optional[str] = None
+    release_timestamp: Optional[float] = None
+
+
+class BoundedCache:
+    """
+    Small thread-safe LRU cache with an optional time-to-live. Used for data fetched from YouTube
+    that is requested repeatedly (descriptions, oEmbed info). Bounded so it can't grow forever
+    in a long-running container.
+    """
+    def __init__(self, max_entries: int = 500, ttl: Optional[float] = None):
+        self.max_entries: int = max_entries
+        self.ttl: Optional[float] = ttl
+        self._entries: "OrderedDict[str, tuple[float, Any]]" = OrderedDict()
+        self._lock = threading.Lock()
+
+    def get(self, key: str, default: Any = None) -> Any:
+        with self._lock:
+            entry = self._entries.get(key)
+            if entry is None:
+                return default
+            stored_at, value = entry
+            if self.ttl is not None and time.monotonic() - stored_at > self.ttl:
+                del self._entries[key]
+                return default
+            self._entries.move_to_end(key)
+            return value
+
+    def set(self, key: str, value: Any) -> None:
+        with self._lock:
+            self._entries[key] = (time.monotonic(), value)
+            self._entries.move_to_end(key)
+            while len(self._entries) > self.max_entries:
+                self._entries.popitem(last=False)
+
+
+class WaitResult(enum.Enum):
+    ELAPSED = "elapsed"   # The full time passed
+    WOKEN = "woken"       # The wake event was set (e.g. "check now" or a channel scan update)
+    STOPPED = "stopped"   # kill_all or the job's own stop event was set
+
+
+def interruptible_wait(seconds: float, stop: threading.Event, wake: Optional[threading.Event] = None) -> WaitResult:
+    """
+    Sleep for up to `seconds`, returning early if the application is shutting down, the job is
+    cancelled (`stop`), or `wake` is set. `wake` is cleared when it ends the wait.
+    The events are polled at least once a second so a shutdown is never delayed noticeably.
+    """
+    deadline = time.monotonic() + max(0.0, seconds)
+    while True:
+        if kill_all.is_set() or stop.is_set():
+            return WaitResult.STOPPED
+        if wake is not None and wake.is_set():
+            wake.clear()
+            return WaitResult.WOKEN
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return WaitResult.ELAPSED
+        (wake or stop).wait(min(remaining, 1.0))
+
+
+def random_sample(data: Union[List, tuple, Dict], k: Optional[int] = None) -> Union[List, tuple, Dict]:
+    """Return the items of a list, tuple or dict in a random order (or a random subset of k items)."""
     if k is None:
         k = len(data)
     if isinstance(data, list):
@@ -320,62 +177,304 @@ def random_sample(data: Union[List, tuple, Dict], k: int = None) -> Union[List, 
     elif isinstance(data, tuple):
         return tuple(random.sample(data, k))
     elif isinstance(data, dict):
-        sampled_items = dict(random.sample(list(data.items()), k))
-        return sampled_items
-    else:
-        raise TypeError("Unsupported data type. Only lists, tuples, and dictionaries are allowed.")
-    
-import os
+        return dict(random.sample(list(data.items()), k))
+    raise TypeError("Unsupported data type. Only lists, tuples, and dictionaries are allowed.")
 
-if os.name == 'nt':
-    import msvcrt
-else:
-    import fcntl
 
-class FileLock:
-    def __init__(self, path):
-        self.path = path
-        self.file = None
+def withinFuture(config: Optional[ConfigHandler] = None, releaseTime: Optional[float] = None) -> bool:
+    """True if releaseTime (epoch seconds) is within the configured look-behind/look-ahead window, or unknown."""
+    if not releaseTime:
+        return True
+    config = config or ConfigHandler()
+    now = datetime.now(timezone.utc)
+    release = datetime.fromtimestamp(releaseTime, timezone.utc)
+    return now - timedelta(hours=config.get_look_behind()) <= release <= now + timedelta(hours=config.get_look_ahead())
 
-    def acquire(self, timeout=None):
-        self.file = open(self.path, 'a+')
-        if os.name == 'nt':
-            msvcrt.locking(self.file.fileno(), msvcrt.LK_NBLCK, 1)
-        else:
-            fcntl.flock(self.file, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
-    def release(self):
-        if self.file:
-            if os.name == 'nt':
-                self.file.seek(0)
-                msvcrt.locking(self.file.fileno(), msvcrt.LK_UNLCK, 1)
-            else:
-                fcntl.flock(self.file, fcntl.LOCK_UN)
-            self.file.close()
-            self.file = None
-            # Remove the lock file after releasing the lock
-            try:
-                os.remove(self.path)
-            except FileNotFoundError:
-                pass  # The file was already removed
-            except OSError as e:
-                # Log other file removal errors
-                logging.warning(f"Warning: Could not remove lock file: {e}")
-            except Exception as e:
-                logging.exception("Unexpected exception occurred trying to remove lock file")
+# --- HTTP / YouTube oEmbed ---
 
-    def __enter__(self):
-        self.acquire()
-        return self
+OEMBED_URL = "https://www.youtube.com/oembed"
+OEMBED_TIMEOUT = httpx.Timeout(15.0, connect=10.0)
+# Info shown in the web UI and Discord messages rarely changes, so it is reused for a while
+EMBED_INFO_CACHE_SECONDS = 600
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.release()
+_http_clients: dict[str, httpx.Client] = {}
+_http_clients_lock = threading.Lock()
+_embed_info_cache = BoundedCache(max_entries=500, ttl=EMBED_INFO_CACHE_SECONDS)
 
-def setup_umask():
+
+def get_http_client(proxy: Optional[Union[str, dict]] = None) -> httpx.Client:
+    """
+    One shared httpx client per proxy setting, so connections are reused instead of a new client
+    (and TLS handshake) for every request. httpx clients are safe to share between threads.
+    """
+    key = json.dumps(proxy, sort_keys=True, default=str)
+    with _http_clients_lock:
+        client = _http_clients.get(key)
+        if client is None or client.is_closed:
+            client = create_http_client(proxies=proxy, max_connections=4, timeout=OEMBED_TIMEOUT)
+            _http_clients[key] = client
+        return client
+
+
+@dataclass
+class OembedResult:
+    status_code: Optional[int]      # None if the request failed (timeout, network error)
+    data: Optional[Dict[str, Any]]  # Parsed JSON for a 200 response
+    error: Optional[str] = None
+
+
+def fetch_oembed(video_id: str, proxy: Optional[Union[str, dict]] = None) -> OembedResult:
+    """
+    Request YouTube's oEmbed info for a video. This is a single small request (about 1 KB) that
+    doesn't use yt-dlp or the player API, so it is used as a cheap availability check.
+    Typical responses: 200 public/unlisted, 401 private or embedding disabled, 404 removed/missing.
+    """
     try:
-        if os.name != 'nt' and os.getenv("UMASK", None) is not None:
-            umask = int(os.getenv("UMASK", "002"), 8)
-            logging.debug("Setting UMASK to {0}".format(umask))
-            os.umask(umask)
+        response = get_http_client(proxy).get(
+            OEMBED_URL,
+            params={"format": "json", "url": f"https://www.youtube.com/watch?v={video_id}"},
+            headers=headers.get_httpx_header(),
+        )
+    except httpx.HTTPError as e:
+        return OembedResult(status_code=None, data=None, error=f"{type(e).__name__}: {e}")
+
+    if response.status_code != 200:
+        return OembedResult(status_code=response.status_code, data=None, error=f"HTTP {response.status_code}")
+
+    try:
+        data = response.json()
+    except ValueError:
+        data = {}
+    if data.get("title") is None:
+        # Before a stream starts the oEmbed "title" can be missing while the embed HTML still
+        # contains it as an escaped attribute (title="..."), so take it from there.
+        title_match = re.search(r'title=\\u0022(.*?)\\u0022', response.text)
+        if title_match:
+            data["title"] = html.unescape(json.loads(f'"{title_match.group(1)}"'))
+    # The embed HTML is large and not used
+    data.pop("html", None)
+    return OembedResult(status_code=200, data=data)
+
+
+def get_embed_info(video_id: str, proxy: Optional[Union[str, dict]] = None) -> Dict[str, Any]:
+    """Cached oEmbed info (title, author, thumbnail) for display. Returns {} if unavailable."""
+    cached = _embed_info_cache.get(video_id)
+    if cached is not None:
+        return cached
+    result = fetch_oembed(video_id, proxy=proxy)
+    info: Dict[str, Any] = dict(result.data or {})
+    if info and not info.get("thumbnail_url"):
+        info["thumbnail_url"] = f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
+    # Failed requests are not cached, so the next caller tries again
+    if result.status_code == 200:
+        _embed_info_cache.set(video_id, info)
+    return info
+
+
+# --- yt-dlp channel scanning ---
+
+# Results of full per-video extractions done during channel scans. Videos that have finished
+# (was_live / not_live) are never extracted again; see livestream_dl.monitor_channel.
+status_cache = VideoStatusCache()
+# Descriptions don't change often and are only needed for description filters
+_description_cache = BoundedCache(max_entries=1000, ttl=6 * 3600)
+
+LIVE_STATUSES = ("is_live", "post_live")
+
+
+def ytdlp_options(config: ConfigHandler, logger: logging.Logger, flat: bool) -> dict:
+    """
+    yt-dlp options for channel scans.
+    flat=True:  cheap playlist listing (one request per page); the user's `ytdlp_options` are not
+                applied as they are intended for video extraction.
+    flat=False: full extraction of a single video, with the user's `ytdlp_options` (e.g. a PO token
+                provider). ignore_no_formats_error lets an upcoming video return its info
+                (live_status / release_timestamp) instead of raising "This live event will begin in...".
+    """
+    options: dict[str, Any] = {
+        'quiet': True,
+        'no_warnings': True,
+        'skip_download': True,
+        'sleep_interval_requests': 1,
+        'cookiefile': config.get_cookies_file(),
+        'logger': YTDLPLogger(logger=logger),
+    }
+    proxy = getUrls.proxy_for_ytdlp(config.get_proxy())
+    if proxy:
+        options['proxy'] = proxy
+    if flat:
+        options['extract_flat'] = True
+    else:
+        options['ignore_no_formats_error'] = True
+        # Deep copy so the nested extractor_args of the config are never modified by yt-dlp
+        options.update(copy.deepcopy(config.get_ytdlp_options() or {}))
+    return options
+
+
+def playlist_url(channel_id: str, tab: Optional[str]) -> tuple[str, bool]:
+    """
+    URL to scan for a channel, and whether it is a playlist. Channel (UC) IDs are converted to the
+    uploads (UU) or members-only (UUMO) playlist, which is cheaper to list than a channel tab.
+    """
+    if tab == "membership":
+        if channel_id.startswith("UUMO"):
+            return f"https://www.youtube.com/playlist?list={channel_id}", True
+        if channel_id.startswith("UC") or channel_id.startswith("UU"):
+            return f"https://www.youtube.com/playlist?list=UUMO{channel_id[2:]}", True
+    elif tab == "streams":
+        # Note: a members playlist ID (UUMO...) also starts with "UU", so it is used as-is
+        if channel_id.startswith("UU"):
+            return f"https://www.youtube.com/playlist?list={channel_id}", True
+        if channel_id.startswith("UC"):
+            return f"https://www.youtube.com/playlist?list=UU{channel_id[2:]}", True
+    return f"https://www.youtube.com/channel/{channel_id}/{tab}", False
+
+
+def extract_video(video_id_or_url: str, config: ConfigHandler, logger: logging.Logger) -> Optional[dict]:
+    """Full yt-dlp extraction of one video for channel scans. Returns None on error."""
+    try:
+        with YoutubeDL(ytdlp_options(config, logger, flat=False)) as ydl:
+            info = ydl.extract_info(video_id_or_url, download=False)
     except Exception as e:
-        logging.exception("Unable to setup UMASK: {0}".format(e))
+        logger.error("Unable to extract information for video {0}: {1}".format(video_id_or_url, e))
+        return None
+    if info and info.get("id") and info.get("description") is not None:
+        _description_cache.set(info["id"], info.get("description"))
+    return info
+
+
+def titleFilter(live: Dict[str, Any], channel_id: str, config: ConfigHandler) -> Optional[bool]:
+    """True/False if the channel has a title filter and it matches/doesn't. None if there's no (valid) filter."""
+    title_filter = config.get_title_filter().get(channel_id, None)
+    if title_filter is None:
+        return None
+    try:
+        return re.search(title_filter, live.get('title') or "") is not None
+    except Exception:
+        logger.exception("Title filter failed")
+        return None
+
+
+def descriptionFilter(live: Dict[str, Any], channel_id: str, config: ConfigHandler,
+                      this_logger: Optional[logging.Logger] = None) -> Optional[bool]:
+    """Like titleFilter but for the description, which may need a full extraction (results are cached)."""
+    desc_filter = config.get_desc_filter().get(channel_id, None)
+    if desc_filter is None:
+        return None
+
+    description = live.get('description', None)
+    if description is None and live.get('id'):
+        description = _description_cache.get(live.get('id'))
+    if description is None and live.get('id'):
+        info = extract_video("https://www.youtube.com/watch?v={0}".format(live.get('id')), config, this_logger or logger)
+        description = (info or {}).get('description')
+    try:
+        return re.search(desc_filter, description or "") is not None
+    except Exception:
+        logger.exception("Description filter failed")
+        return None
+
+
+def filtering(live: Dict[str, Any], channel_id: str, config: ConfigHandler,
+              this_logger: Optional[logging.Logger] = None) -> bool:
+    """
+    Title and description filters are an inclusive OR: the video passes if either filter matches,
+    or if the channel has no filters. The title is checked first so a matching title avoids
+    fetching the description.
+    """
+    title = titleFilter(live, channel_id, config)
+    if title:
+        return True
+    description = descriptionFilter(live, channel_id, config, this_logger)
+    if description:
+        return True
+    return title is None and description is None
+
+
+def is_wanted_status(video: Dict[str, Any], config: ConfigHandler) -> bool:
+    """Live or post-live, or upcoming within the look-ahead/look-behind window."""
+    live_status = video.get('live_status')
+    return live_status in LIVE_STATUSES or (live_status == 'is_upcoming' and withinFuture(config, video.get('release_timestamp')))
+
+
+def get_upcoming_or_live_videos(channel_id: str, config: ConfigHandler, tab: str,
+                                passed_logger: Optional[logging.Logger] = None,
+                                active_ids: Optional[Container[str]] = None) -> List[DiscoveredVideo]:
+    """
+    Scan the start of a channel's uploads (or members) playlist for live, post-live and upcoming
+    videos that pass the channel's filters.
+
+    Videos in `active_ids` are already downloading: they are not extracted or filtered again, but
+    are still returned when the listing shows their status, so the running download can be told
+    the stream went live or its schedule changed.
+    """
+    this_logger = passed_logger or logger
+    active_ids = active_ids or ()
+    url, is_playlist = playlist_url(channel_id, tab)
+    flat_options = ytdlp_options(config, this_logger, flat=True)
+    # Channel tabs are slower to list than playlists, so fewer entries are checked
+    playlist_limit = (config.get_ytlp_playlist_limit() or 10) if is_playlist else 10
+    flat_options['playlist_items'] = '1:{0}'.format(playlist_limit)
+
+    try:
+        with YoutubeDL(flat_options) as ydl:
+            info = ydl.extract_info(url, download=False) or {}
+    except Exception:
+        this_logger.exception("An unexpected error occurred when trying to fetch videos")
+        raise
+
+    found: "OrderedDict[str, DiscoveredVideo]" = OrderedDict()
+    for video in info.get('entries') or []:
+        if not video or not video.get('id'):
+            # Unavailable playlist entries can be returned as None
+            continue
+        video_id: str = video['id']
+        entry_channel = video.get('channel_id') or channel_id
+
+        if video_id in active_ids:
+            if video.get('live_status'):
+                found[video_id] = DiscoveredVideo(video_id, entry_channel, video.get('live_status'), video.get('release_timestamp'))
+            continue
+
+        # Fallback if the listing doesn't include the live status (and it isn't a normal video with a duration)
+        if video.get('live_status') is None and video.get('duration') is None:
+            if status_cache.should_skip(video_id):
+                this_logger.debug("({0}) Skipping re-extraction, status cached".format(video_id))
+                continue
+            extracted = extract_video(video.get('url') or video_id, config, this_logger)
+            if extracted is None:
+                continue
+            video = extracted
+            status_cache.record(video_id, video.get('live_status'), video.get('release_timestamp'), config.get_look_ahead())
+
+        this_logger.debug("({1}) live_status = {0}".format(video.get('live_status'), video_id))
+        # Cheap status/time check before the filters, which may need a full extraction for the description
+        if is_wanted_status(video, config) and filtering(video, entry_channel, config, this_logger):
+            found[video_id] = DiscoveredVideo(video_id, entry_channel, video.get('live_status'), video.get('release_timestamp'))
+
+    return list(found.values())
+
+
+# Matches "<video id>.info.json" files saved by the unarchived monitor
+_UNARCHIVED_JSON_PATTERN = re.compile(r"^([0-9A-Za-z_-]{10}[048AEIMQUYcgkosw])\.info\.json$")
+
+
+def saved_unarchived_ids(config: ConfigHandler, this_logger: Optional[logging.Logger] = None) -> List[str]:
+    """IDs that have an info.json saved in the unarchived temp folder (e.g. monitors running before a restart)."""
+    this_logger = this_logger or logger
+    directory = config.get_unarchived_temp_folder()
+    os.makedirs(directory, exist_ok=True)
+    ids = []
+    for entry in os.scandir(directory):
+        match = _UNARCHIVED_JSON_PATTERN.match(entry.name)
+        if match and entry.is_file():
+            this_logger.debug("[Unarchived] Found ID {0} from filename {1}".format(match.group(1), entry.name))
+            ids.append(match.group(1))
+    return ids
+
+
+def put_all(output, videos: Iterable[DiscoveredVideo]) -> None:
+    """Put videos on a queue (or anything with a put() method)."""
+    for video in videos:
+        output.put(video)

@@ -1,0 +1,18 @@
+{# A time shown in the browser's timezone by the script in base.html. `value` is an ISO 8601 UTC string. #}
+{% macro local_time(value, format="datetime", empty="-") -%}
+    {%- if value -%}
+        <time class="local-time" datetime="{{ value }}" data-format="{{ format }}">{{ value }}</time>
+    {%- else -%}
+        {{ empty }}
+    {%- endif -%}
+{%- endmacro %}
+
+{% macro status_color(status) -%}
+    {%- set status_lower = (status or "") | lower -%}
+    {%- if 'error' in status_lower -%}bg-danger
+    {%- elif status_lower in ('finished', 'stopped (merged)') -%}bg-success
+    {%- elif 'recording' in status_lower -%}bg-primary
+    {%- elif status_lower in ('waiting', 'unknown', 'cancelled', 'expired') -%}bg-secondary
+    {%- else -%}bg-info
+    {%- endif -%}
+{%- endmacro %}

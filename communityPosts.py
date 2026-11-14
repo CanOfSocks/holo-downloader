@@ -1,80 +1,69 @@
-#!/usr/local/bin/python
-import subprocess
-from getConfig import ConfigHandler
-import os
+"""Community tab archiving with ytct.py (downloaded into the image by the Dockerfile)."""
 import logging
-from typing import Optional, Dict, Any
+import os
+import subprocess
+import time
+from typing import Optional
+
+import common
 from common import initialize_logging, kill_all
+from getConfig import ConfigHandler
 
-# The global instantiation and immediate logging setup are removed:
-# getConfig = ConfigHandler()
-# setup_logging(...)
+YTCT_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ytct.py")
+# A single channel should never take this long; without a limit a hung ytct.py would block the
+# community tab job forever (the scheduler never starts a second copy of the same job).
+CHANNEL_TIMEOUT_SECONDS = 3600
 
-def main(config: ConfigHandler = None, logger: logging = None):
-    """
-    Main function to process the community tab download.
-    ConfigHandler is instantiated if not passed.
-    """
-    # 1. Instantiate ConfigHandler if it's not provided
-    if config is None:
-        config = ConfigHandler()
 
-    if logger is None:
-        logger = initialize_logging(config, "community_posts")
-    
-    # NOTE: Since this main function is the entry point, 
-    # you might want to call initialize_logging(config) here 
-    # if it hasn't been done elsewhere in your application.
+def run_until_done(command: list[str], log_file, timeout: float, logger: logging.Logger) -> Optional[int]:
+    """Run a command with output to log_file. Stops it on timeout or shutdown. Returns the exit code, or None if stopped."""
+    process = subprocess.Popen(command, stdout=log_file, stderr=subprocess.STDOUT)
+    deadline = time.monotonic() + timeout
+    try:
+        while True:
+            try:
+                return process.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                pass
+            if kill_all.is_set() or time.monotonic() > deadline:
+                logger.warning("Stopping community tab download ({0})".format("shutdown" if kill_all.is_set() else "timed out"))
+                return None
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+
+
+def main(config: Optional[ConfigHandler] = None, logger: Optional[logging.Logger] = None) -> None:
+    config = config or ConfigHandler()
+    logger = logger or initialize_logging(config, "community_posts")
 
     com_tab_folder = config.get_community_tab_directory()
-    community_tab: Dict[str, str] = config.community_tab
-    
-    if config.randomise_lists() is True:
-        # We assume 'common.py' contains the random_sample function from the previous context.
-        # This import is left as-is, assuming 'common' is in the Python path.
-        import common
+    if not com_tab_folder:
+        return
+    community_tab: dict[str, str] = config.community_tab
+    if config.randomise_lists():
         community_tab = common.random_sample(community_tab)
-    
-    if com_tab_folder:
-        com_tab_archive = config.get_community_tab_archive()
-        for channel in community_tab:
-            if kill_all.is_set():
-                break
-            id = community_tab[channel]
-            
-            # Construct the base command
-            command_list = ["python", "/app/ytct.py", "--reverse", "--dates", "-d", "{0}".format(os.path.join(com_tab_folder, channel))]
-            
-            if config.get_community_tab_cookies():
-                command_list += ["--cookies", config.get_community_tab_cookies()]
-            
-            if com_tab_archive:
-                command_list += ["--post-archive", com_tab_archive]
-                
-            command_list.append('"https://www.youtube.com/channel/{0}/posts"'.format(id))
-            
-            logger.debug(f"Executing command: {' '.join(command_list)}")
 
-            # result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            #result = subprocess.run(command_list, capture_output=True, text=True)
-            
-            log_file = os.path.join(com_tab_folder, channel, "log.txt")
-            os.makedirs(os.path.dirname(log_file), exist_ok=True)
-            with open(log_file, 'a', encoding='utf-8') as f:                
-                # Stream directly to file, do not capture in RAM
-                subprocess.run(command_list, stdout=f, stderr=subprocess.STDOUT, text=True)
+    com_tab_archive = config.get_community_tab_archive()
+    for channel, channel_id in community_tab.items():
+        if kill_all.is_set():
+            break
+        command = ["python", YTCT_SCRIPT, "--reverse", "--dates", "-d", os.path.join(com_tab_folder, channel)]
+        if config.get_community_tab_cookies():
+            command += ["--cookies", config.get_community_tab_cookies()]
+        if com_tab_archive:
+            command += ["--post-archive", com_tab_archive]
+        # Passed as a list (no shell), so the URL must not be wrapped in quotes
+        command.append(f"https://www.youtube.com/channel/{channel_id}/posts")
+        logger.debug(f"Executing command: {' '.join(command)}")
 
-# Example of how you would run this script in your application entry point:
-if __name__ == "__main__":
-    try:
-        # 1. Create the Config Handler instance
-        app_config = ConfigHandler()
-        
-        # 2. Initialize logging using the instance
-        logger = initialize_logging(config=app_config, logger_name="community-posts")
-        
-        # 3. Pass the instance to main()
-        main(config=app_config, logger=logger)
-    except Exception as e:
-        logging.exception("An unhandled error occurred when fetching community posts")
-        raise
+        log_path = os.path.join(com_tab_folder, channel, "log.txt")
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        with open(log_path, 'a', encoding='utf-8') as log_file:
+            # Output goes straight to the file instead of being held in memory
+            run_until_done(command, log_file, CHANNEL_TIMEOUT_SECONDS, logger)

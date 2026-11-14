@@ -1,0 +1,100 @@
+{# Table of active jobs, used for both normal downloads (kind "stream") and unarchived monitors. #}
+{% from "_macros.html" import local_time, status_color %}
+{% if jobs %}
+<div class="table-responsive">
+<table class="table table-striped align-middle mb-0">
+    <thead>
+        <tr>
+            <th scope="col" class="d-none d-sm-table-cell">Preview</th>
+            <th scope="col">Title</th>
+            <th scope="col">Status</th>
+            <th scope="col" class="d-none d-md-table-cell">Segments</th>
+            <th scope="col" class="d-none d-lg-table-cell">Size</th>
+            <th scope="col" class="d-none d-lg-table-cell">Started</th>
+            <th scope="col" class="text-end">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for job in jobs %}
+        <tr>
+            <td class="d-none d-sm-table-cell">
+                <img src="https://img.youtube.com/vi/{{ job.id }}/mqdefault.jpg" alt="Thumbnail of {{ job.id }}"
+                     class="img-thumbnail" style="max-height: 60px; width: auto;" loading="lazy">
+            </td>
+
+            <td class="title-cell">
+                <div class="title-clamp" title="{{ job.info.fulltitle or job.info.title or '' }}">
+                    {{ job.info.fulltitle or job.info.title or job.id }}
+                </div>
+                <a class="small" href="https://www.youtube.com/watch?v={{ job.id }}" target="_blank" rel="noopener noreferrer">{{ job.id }}</a>
+            </td>
+
+            <td>
+                <span class="badge {{ status_color(job.status) }}">{{ job.status }}</span>
+                {% if job.stalled %}<span class="badge bg-warning text-dark">Stalled</span>{% endif %}
+                {% if job.merge_requested %}<span class="badge bg-info text-dark">Merge requested</span>{% endif %}
+                <div class="small text-body-secondary">
+                    {% if job.stalled %}
+                        <div class="text-warning-emphasis">{{ job.stall_reason }}</div>
+                    {% endif %}
+                    {% if job.is_waiting %}
+                        {% if job.scheduled_start %}<div>Scheduled: {{ local_time(job.scheduled_start) }}</div>{% endif %}
+                        {% if job.next_check_at %}<div>Next check: {{ local_time(job.next_check_at, "relative") }}</div>{% endif %}
+                    {% elif job.last_progress %}
+                        <div>Last segment: {{ local_time(job.last_progress, "relative") }}</div>
+                    {% endif %}
+                    {% if kind == "unarchived" and job.urls_saved_at %}
+                        <div>URLs saved: {{ local_time(job.urls_saved_at, "relative") }}</div>
+                        {% if job.next_url_refresh %}<div>Next URL refresh: {{ local_time(job.next_url_refresh, "relative") }}</div>{% endif %}
+                        {% if job.cheap_checks_active and job.last_cheap_check %}<div>Last checked: {{ local_time(job.last_cheap_check, "relative") }}</div>{% endif %}
+                    {% endif %}
+                </div>
+                {# Segment counts on small screens, where the Segments column is hidden #}
+                {% if job.streams %}
+                <div class="small text-body-secondary d-md-none">
+                    {% for name, counts in job.streams.items() %}{{ name[0] | upper }} {{ counts.downloaded }}/{{ counts.latest }} {% endfor %}
+                    · {{ job.total_size | convert_bytes }}
+                </div>
+                {% endif %}
+            </td>
+
+            <td class="d-none d-md-table-cell small">
+                {% for name, counts in job.streams.items() %}
+                    <div>{{ name | capitalize }}: {{ counts.downloaded }} / {{ counts.latest }}</div>
+                {% else %}-{% endfor %}
+            </td>
+            <td class="d-none d-lg-table-cell">{{ job.total_size | convert_bytes }}</td>
+            <td class="d-none d-lg-table-cell">{{ local_time(job.start_time) }}</td>
+
+            <td class="text-end">
+                <div class="d-flex flex-column flex-sm-row gap-1 justify-content-end">
+                    {% if job.is_waiting %}
+                    <form action="/actions/check/{{ kind }}/{{ job.id }}" method="POST" class="m-0"
+                          hx-post="/actions/check/{{ kind }}/{{ job.id }}" hx-swap="none">
+                        <button type="submit" class="btn btn-outline-secondary btn-sm btn-touch" title="Check now">🔄</button>
+                    </form>
+                    {% endif %}
+                    {% if job.can_merge %}
+                    <form action="/actions/merge/{{ kind }}/{{ job.id }}" method="POST" class="m-0"
+                          hx-post="/actions/merge/{{ kind }}/{{ job.id }}" hx-swap="none"
+                          hx-confirm="Stop recording {{ job.id }} and merge what has been downloaded?">
+                        <button type="submit" class="btn {{ 'btn-warning' if job.stalled else 'btn-outline-warning' }} btn-sm btn-touch" title="Stop & merge">⏹️</button>
+                    </form>
+                    {% endif %}
+                    <form action="/actions/cancel/{{ kind }}/{{ job.id }}" method="POST" class="m-0"
+                          hx-post="/actions/cancel/{{ kind }}/{{ job.id }}" hx-swap="none"
+                          hx-confirm="Cancel {{ job.id }}? Downloaded segments will not be merged.">
+                        <button type="submit" class="btn btn-outline-danger btn-sm btn-touch" title="Cancel">🗑️</button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% else %}
+<div class="text-center p-3">
+    <p class="text-muted mb-0">{{ "No unarchived monitors." if kind == "unarchived" else "No active downloads." }}</p>
+</div>
+{% endif %}

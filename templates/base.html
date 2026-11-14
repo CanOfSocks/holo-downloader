@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="{{ theme }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Stream Archiver{% endblock %}</title>
+    <link rel="icon" href="{{ url_for('favicon') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        /* Comfortable touch targets for action buttons on phones */
+        .btn-touch { min-width: 2.5rem; min-height: 2.25rem; }
+        .navbar-logo { width: 40px; height: 40px; }
+        @media (min-width: 768px) { .navbar-logo { width: 56px; height: 56px; } }
+        #messages { position: fixed; top: 1rem; right: 1rem; left: 1rem; z-index: 1080; pointer-events: none; }
+        #messages .alert { pointer-events: auto; max-width: 32rem; margin-left: auto; }
+        .title-cell { max-width: 28rem; }
+        .title-clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    <nav class="navbar navbar-expand-md navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
+                <img src="{{ url_for('favicon') }}" alt="Logo" class="navbar-logo d-inline-block me-2">
+                Stream Archiver
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
+                    aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="mainNav">
+                <div class="navbar-nav ms-auto align-items-md-center gap-md-3">
+                    <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}">Dashboard</a>
+                    <a class="nav-link {% if request.endpoint == 'config_page' %}active{% endif %}" href="{{ url_for('config_page') }}">Configuration</a>
+                    <form action="{{ url_for('toggle_theme') }}" method="POST" class="py-2 py-md-0 m-0">
+                        <button type="submit" class="btn btn-sm btn-outline-light btn-touch" title="Toggle Dark/Light Mode">
+                            {% if theme == 'light' %}🌙{% else %}☀️{% endif %}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div id="messages" aria-live="polite"></div>
+
+    {% block content %}{% endblock %}
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Times are sent as UTC (ISO 8601) in <time class="local-time"> elements and shown here in the
+        // browser's own timezone. data-format: "datetime" (default), "time" or "relative".
+        function formatDuration(seconds) {
+            seconds = Math.round(Math.abs(seconds));
+            if (seconds < 60) return seconds + "s";
+            if (seconds < 3600) return Math.floor(seconds / 60) + "m";
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            return hours >= 24 ? Math.floor(hours / 24) + "d " + (hours % 24) + "h" : hours + "h " + minutes + "m";
+        }
+
+        function formatLocalTimes(root) {
+            root.querySelectorAll("time.local-time").forEach(function (el) {
+                const date = new Date(el.getAttribute("datetime"));
+                if (isNaN(date)) return;
+                const format = el.dataset.format || "datetime";
+                if (format === "time") {
+                    el.textContent = date.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit"});
+                } else if (format === "relative") {
+                    const diff = (date.getTime() - Date.now()) / 1000;
+                    el.textContent = diff >= 0 ? "in " + formatDuration(diff) : formatDuration(diff) + " ago";
+                } else {
+                    el.textContent = date.toLocaleString([], {month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"});
+                }
+                el.title = date.toLocaleString();
+            });
+        }
+
+        // Messages sent by action responses through the HX-Trigger header
+        function showMessage(text, level) {
+            const alert = document.createElement("div");
+            alert.className = "alert alert-" + (level || "info") + " alert-dismissible fade show shadow";
+            alert.setAttribute("role", "alert");
+            alert.textContent = text;
+            const close = document.createElement("button");
+            close.type = "button";
+            close.className = "btn-close";
+            close.setAttribute("data-bs-dismiss", "alert");
+            close.setAttribute("aria-label", "Close");
+            alert.appendChild(close);
+            document.getElementById("messages").appendChild(alert);
+            setTimeout(function () { alert.remove(); }, 6000);
+        }
+
+        document.addEventListener("DOMContentLoaded", function () { formatLocalTimes(document); });
+        document.body.addEventListener("htmx:afterSwap", function (event) { formatLocalTimes(event.target); });
+        document.body.addEventListener("showMessage", function (event) { showMessage(event.detail.text, event.detail.level); });
+        document.body.addEventListener("htmx:responseError", function () { showMessage("Request failed, please try again.", "danger"); });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

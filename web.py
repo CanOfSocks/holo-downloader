@@ -1,69 +1,111 @@
-import common
+"""
+Flask web app and scheduler. This is the application entry point (gunicorn loads `web:app`;
+`python web.py` runs a development server).
+
+Downloads run in background threads. Each one is tracked as an ActiveJob in `jobs` until its
+thread finishes, when the result is written to the history database.
+"""
+import json
 import os
+import queue
+import random
+import sqlite3
 import threading
 import time
-import sqlite3
-import random
-import sys
-from datetime import datetime
-from flask import Flask, abort, render_template, request, redirect, send_from_directory, url_for, flash, make_response, jsonify
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.job import Job
-from apscheduler.triggers.cron import CronTrigger
+from contextlib import closing
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any, Callable, Optional, Union
+
 import tomlkit
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
+from flask import (Flask, abort, flash, jsonify, make_response, redirect, render_template, request,
+                   send_from_directory, url_for)
 
-from getConfig import ConfigHandler, config_file_path
-import downloadVid
-import getMembers
+import common
 import communityPosts
-import unarchived
+import discord_web
+import getMembers
 import getVids
+from base_downloader import STATUS_ERROR, STATUS_WAITING, BaseDownloader
+from common import DiscoveredVideo, kill_all
+from downloadVid import VideoDownloader
+from getConfig import ConfigHandler, default_config_path
+from livestream_dl.getUrls import extract_video_id
+from monitor import StallTracker, segment_totals
+from unarchived import UnarchivedDownloader
 
-from flask_caching import Cache
-
-import re
-
-import queue
-
-# Set stack size to 1MB (1024*1024 bytes)
-# Note: This applies to all new threads created subsequently.
+# Smaller thread stacks (default is often 8 MB) as there is a thread per download.
+# This applies to all threads created after this point.
 try:
-    threading.stack_size(1024 * 1024) 
+    threading.stack_size(1024 * 1024)
 except ValueError:
-    pass # Some platforms have strict page size requirements
+    pass  # Some platforms have strict page size requirements
 
 # --- Configuration & Constants ---
-config_file_path = 'config.toml'
-DB_FILE = 'stream_history.db'
-LOCK = threading.Lock()
+DB_FILE = os.environ.get('HISTORY_DB', 'stream_history.db')
+HISTORY_LIMIT = 50
+# Browser cache time for static files (favicon etc.)
+STATIC_CACHE_SECONDS = 3600
+# How often active downloads are sampled for stall detection
+STALL_CHECK_SECONDS = 30
+# A finished download makes the active table response tell browsers to reload the history for
+# this many seconds. Longer than the 3s active table poll, so every open browser sees it.
+HISTORY_SIGNAL_SECONDS = 10
 
+config_file_path: str = default_config_path()
+LOCK = threading.Lock()   # Protects `jobs`
 scheduler = BackgroundScheduler(daemon=True)
-
-# Global State for Active Downloads
-active_downloads = {}
-active_unarchived_downloads = {}
-other_threads = {}
-
-# NEW: Global State for signaling history update from a background thread
-recently_finished = [] 
+logger = common.initialize_logging(logger_name="web")
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-key-placeholder')
-
-# Configure SimpleCache (stores in RAM)
-app.config['CACHE_TYPE'] = 'SimpleCache' 
-app.config['CACHE_DEFAULT_TIMEOUT'] = 300 # Default 5 minutes
-
-cache = Cache(app)
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = STATIC_CACHE_SECONDS
 
 GLOBAL_THEME = "dark"
+_history_changed_at: float = 0.0
 
-history_update_event = threading.Event()
+
+# --- Active jobs ---
+
+@dataclass
+class ActiveJob:
+    video_id: str
+    kind: str                       # "stream" or "unarchived"
+    downloader: BaseDownloader
+    started_at: datetime            # UTC
+    thread: Optional[threading.Thread] = None   # Set by start_job (the thread needs the job as its argument)
+    stall: StallTracker = field(default_factory=StallTracker)
+
+
+DOWNLOADER_CLASSES: dict[str, type[BaseDownloader]] = {
+    "stream": VideoDownloader,
+    "unarchived": UnarchivedDownloader,
+}
+jobs: dict[str, dict[str, ActiveJob]] = {kind: {} for kind in DOWNLOADER_CLASSES}
+
+
+def snapshot_jobs(kind: Optional[str] = None) -> list[ActiveJob]:
+    with LOCK:
+        kinds = [kind] if kind else list(jobs)
+        return [job for k in kinds for job in jobs[k].values()]
+
+
+def get_job(kind: str, video_id: str) -> Optional[ActiveJob]:
+    with LOCK:
+        return jobs.get(kind, {}).get(video_id)
+
 
 # --- Database Management ---
 
-def init_db():
-    with sqlite3.connect(DB_FILE) as conn:
+def db_connect() -> sqlite3.Connection:
+    return sqlite3.connect(DB_FILE, timeout=10)
+
+
+def init_db() -> None:
+    # closing() closes the connection; "with conn" on its own only commits
+    with closing(db_connect()) as conn, conn:
         conn.execute('PRAGMA journal_mode=WAL;')
         conn.execute('''
             CREATE TABLE IF NOT EXISTS history (
@@ -76,653 +118,497 @@ def init_db():
             )
         ''')
 
-def save_to_history(video_id, stats, download_type="Unknown"):
-    """Saves finished stream to DB and ensures only last 50 exist."""
-    # Use context manager for auto-closing
-    with sqlite3.connect(DB_FILE) as conn:
-        c = conn.cursor()
-        
-        # Safe access to nested dicts using .get with defaults
-        vid_size = stats.get('video', {}).get("current_filesize", 0) or 0
-        aud_size = stats.get('audio', {}).get("current_filesize", 0) or 0
-        download_size = vid_size + aud_size
 
-        c.execute('INSERT INTO history (video_id, type, total_size, status) VALUES (?, ?, ?, ?)',
-                  (video_id, download_type, download_size, stats.get("status", None)))
-        
-        # Cleanup old history
-        c.execute('''
-            DELETE FROM history WHERE id NOT IN (
-                SELECT id FROM history ORDER BY id DESC LIMIT 50
-            )
-        ''')
-        conn.commit()
+def save_to_history(job: ActiveJob) -> None:
+    """Save a finished job and keep only the last HISTORY_LIMIT entries."""
+    stats = job.downloader.stats
+    total_size = sum(int(stats.get(kind, {}).get("current_filesize") or 0) for kind in ("video", "audio"))
+    with closing(db_connect()) as conn, conn:
+        conn.execute('INSERT INTO history (video_id, type, total_size, status) VALUES (?, ?, ?, ?)',
+                     (job.video_id, job.kind, total_size, job.downloader.status))
+        conn.execute('DELETE FROM history WHERE id NOT IN (SELECT id FROM history ORDER BY id DESC LIMIT ?)', (HISTORY_LIMIT,))
 
-def get_history():
-    with sqlite3.connect(DB_FILE) as conn:
+
+def get_history() -> list[sqlite3.Row]:
+    with closing(db_connect()) as conn:
         conn.row_factory = sqlite3.Row
-        # We execute directly on the connection for brevity
-        rows = conn.execute('SELECT * FROM history ORDER BY id DESC').fetchall()
-        return rows
+        return conn.execute('SELECT * FROM history ORDER BY id DESC').fetchall()
 
-# --- Config Management (Unchanged from previous update) ---
 
-def load_config():
+def mark_history_changed() -> None:
+    global _history_changed_at
+    _history_changed_at = time.time()
+
+
+# --- Config Management ---
+
+def load_config() -> ConfigHandler:
     if not os.path.exists(config_file_path):
         doc = tomlkit.document()
-        doc.add("app_name", "StreamArchiver")
-        
-        doc.add(tomlkit.comment("Format: Minute Hour Day_of_Month Month Day_of_Week (standard 5 fields)"))
-        doc.add("cron_schedule", "*/30 * * * *") 
-        
-        with open(config_file_path, "w") as f:
+        schedule = tomlkit.table()
+        schedule.add(tomlkit.comment("Format: Minute Hour Day_of_Month Month Day_of_Week (standard 5 fields)"))
+        schedule.add("streams", "*/30 * * * *")
+        doc.add("cron_schedule", schedule)
+        with open(config_file_path, "w", encoding="utf-8") as f:
             f.write(tomlkit.dumps(doc))
-            
     return ConfigHandler(config_file=config_file_path)
 
-def save_config(content):
+
+def save_config(content: str) -> tuple[bool, str]:
     try:
         tomlkit.parse(content)
-        with open(config_file_path, "w", encoding="utf-8", newline="") as f:
-            f.write(content)
-        return True, "Config saved"
     except Exception as e:
-        return False, str(e)
+        return False, f"Invalid TOML, configuration not saved: {e}"
+    with open(config_file_path, "w", encoding="utf-8", newline="") as f:
+        f.write(content)
+    return True, "Config saved"
 
-# --- Core Logic & Threading ---
 
-def thread_worker(video_id, downloader, thread_tracker: dict = active_downloads):
-    global recently_finished
+# --- Starting and running downloads ---
+
+def run_job(job: ActiveJob) -> None:
+    """Thread target for a download. Always records the result in history and removes the job."""
     try:
-        downloader.main()
-        save_to_history(video_id, downloader.livestream_downloader.stats, download_type=thread_tracker.get(video_id, {}).get("type", "Unknown"))
-        
-        with app.app_context():
-            cache.delete_memoized(data_history)
-        
-        history_update_event.set()
-            
-    except Exception as e:
-        common.logger.error(f"Error downloading {video_id}: {e}", file=sys.stderr)
-        e = None
+        job.downloader.main()
+    except Exception:
+        logger.exception(f"Error downloading {job.video_id}")
+        job.downloader.set_status(STATUS_ERROR)
     finally:
+        try:
+            save_to_history(job)
+        except Exception:
+            logger.exception("Unable to save {0} to history".format(job.video_id))
+        mark_history_changed()
         with LOCK:
-            # Explicitly clear the downloader reference BEFORE popping
-            if video_id in thread_tracker:
-                thread_tracker[video_id]['downloader'] = None # Help GC
-                thread_tracker[video_id]['thread'] = None     # Help GC
-                thread_tracker.pop(video_id, None)
-        
-        # REMOVED: gc.collect() 
-        # (Let Python manage this. Only run manual GC on a schedule if absolutely necessary)
+            jobs[job.kind].pop(job.video_id, None)
 
-def start_download(video_id):
-    if isinstance(video_id, dict):
-        id = video_id.get('id', None) or video_id.get('video_id', None) # added option in case additional fields are included in future
-    else:
-        id = video_id
-    with LOCK:
-        if id in active_downloads:
-            return False 
 
-        downloader = downloadVid.VideoDownloader(id=video_id)
-        thread = threading.Thread(target=thread_worker, args=(id, downloader, active_downloads), daemon=True)
-        
-        active_downloads[id] = {
-            'downloader': downloader,
-            'thread': thread,
-            'type': "stream",
-            'start_time': datetime.now()
-        }
-        
-        thread.start()
-        return True
-    
-def start_unarchived_download(video_id):
-    with LOCK:
-        if video_id in active_unarchived_downloads:
-            return False 
-
-        downloader = unarchived.UnarchivedDownloader(id=video_id)
-        thread = threading.Thread(target=thread_worker, args=(video_id, downloader, active_unarchived_downloads), daemon=True)
-        
-        active_unarchived_downloads[video_id] = {
-            'downloader': downloader,
-            'thread': thread,
-            'type': "unarchived",
-            'start_time': datetime.now()
-        }
-        
-        thread.start()
-        return True
-"""
-def get_streams():
-    common.logger.info("Running scheduled stream check...")
-    streams = getVids.main(unarchived=False)
-    for stream in streams:
-        start_download(stream)
-        # Have slightly randomised stream to help prevent rate limiting
-        if len(streams) > 1:
-            time.sleep(random.uniform(5.0, 10.0))
-
-def get_unarchived():
-    common.logger.info("Running scheduled stream check...")
-    streams = getVids.main(unarchived=True)
-    for stream in streams:
-        start_unarchived_download(stream)
-        # Have slightly randomised stream to help prevent rate limiting
-        if len(streams) > 1:
-            time.sleep(random.uniform(5.0, 10.0))
-
-def get_members():
-    common.logger.info("Running scheduled stream check...")
-    streams = getMembers.main()
-    for stream in streams:
-        start_download(stream)
-        # Have slightly randomised stream to help prevent rate limiting
-        if len(streams) > 1:
-            time.sleep(random.uniform(5.0, 10.0))
-"""
-def get_videos_with_queue(discovery_func, download_func, *args, **kwargs):
+def start_job(video: Union[DiscoveredVideo, str], kind: str) -> bool:
     """
-    Helper to run discovery in a thread and process items from a queue.
+    Start a download thread for the video unless one is already running. If it is, the channel
+    scan's information is passed to it instead (e.g. so a waiting job starts when the stream goes live).
+    Returns True if a new download was started.
     """
-    stream_queue = queue.Queue()
-    common.logger.info("Running scheduled stream check...")
+    if isinstance(video, str):
+        video = DiscoveredVideo(video)
+    with LOCK:
+        existing = jobs[kind].get(video.id)
+        if existing is not None:
+            existing.downloader.apply_discovery_hint(video)
+            return False
+        # The constructor doesn't make network requests, so holding the lock here is quick
+        downloader = DOWNLOADER_CLASSES[kind](video)
+        job = ActiveJob(video_id=video.id, kind=kind, downloader=downloader, started_at=datetime.now(timezone.utc))
+        job.thread = threading.Thread(target=run_job, args=(job,), name=f"{kind}-{video.id}", daemon=True)
+        jobs[kind][video.id] = job
+    job.thread.start()
+    return True
 
-    # 1. Start discovery in a background thread
-    # Note: discovery_func (like getVids.main) must be updated to accept 'q'
-    discovery_thread = threading.Thread(
-        target=discovery_func, 
-        args=args, 
-        kwargs={'queue': stream_queue, **kwargs},
-        daemon=True
-    )
-    discovery_thread.start()
 
-    # 2. Process items as they arrive
+def start_download(video: Union[DiscoveredVideo, str]) -> bool:
+    return start_job(video, "stream")
+
+
+def start_unarchived_download(video: Union[DiscoveredVideo, str]) -> bool:
+    return start_job(video, "unarchived")
+
+
+# --- Scheduled checks ---
+
+def get_videos_with_queue(discovery_func: Callable, kind: str, **kwargs) -> None:
+    """
+    Run a channel scan in a background thread and start downloads as videos are found, rather
+    than waiting for every channel to be scanned. New downloads are spread out by 5-10 seconds.
+    """
+    found: "queue.Queue[DiscoveredVideo]" = queue.Queue()
+    active_ids = {job.video_id for job in snapshot_jobs(kind)}
+
+    def scan() -> None:
+        try:
+            discovery_func(found, active_ids=active_ids, **kwargs)
+        except Exception:
+            logger.exception("Channel scan failed")
+
+    scan_thread = threading.Thread(target=scan, name=f"scan-{kind}", daemon=True)
+    scan_thread.start()
     while True:
         try:
-            # Wait for an item (timeout ensures we check if thread is still alive)
-            stream = stream_queue.get(timeout=1)
-            
-            download_func(stream)            
-            
-            stream_queue.task_done()
-
-            # Spread out download starts
-            time.sleep(random.uniform(5.0, 10.0))
+            video = found.get(timeout=1)
         except queue.Empty:
-            # If queue is empty and discovery is done, we are finished
-            if not discovery_thread.is_alive():
+            if not scan_thread.is_alive() and found.empty():
                 break
+            continue
+        try:
+            started = start_job(video, kind)
+        except Exception:
+            logger.exception("Unable to start download of {0}".format(video.id))
+            continue
+        # Only new downloads are spread out (existing ones were just updated). kill_all.wait()
+        # returns True if the application is shutting down.
+        if started and kill_all.wait(random.uniform(5.0, 10.0)):
+            break
 
-def get_streams():
-    get_videos_with_queue(getVids.main, start_download, unarchived=False, return_dict=True)
 
-def get_unarchived():
-    get_videos_with_queue(getVids.main, start_unarchived_download, unarchived=True, return_dict=False)
+@dataclass(frozen=True)
+class Check:
+    display: str
+    func: Callable[[], None]
 
-def get_members():
-    get_videos_with_queue(getMembers.main, start_download, return_dict=True)
 
-def get_community_tab():
-    common.logger.info("Running scheduled stream check...")
-    communityPosts.main()
+CHECKS: dict[str, Check] = {
+    "streams": Check("Stream Checker", lambda: get_videos_with_queue(getVids.main, "stream", unarchived=False)),
+    "unarchived": Check("Unarchived Checker", lambda: get_videos_with_queue(getVids.main, "unarchived", unarchived=True)),
+    "members_only": Check("Members Only Checker", lambda: get_videos_with_queue(getMembers.main, "stream")),
+    "community_posts": Check("Community Tab Checker", lambda: communityPosts.main()),
+}
+# One lock per check so a manual "Run now" and the scheduled run never overlap (which would
+# double the requests to YouTube)
+_check_locks: dict[str, threading.Lock] = {name: threading.Lock() for name in CHECKS}
 
-def update_scheduler():
+
+def run_check(name: str) -> None:
+    lock = _check_locks[name]
+    if not lock.acquire(blocking=False):
+        logger.warning(f"{CHECKS[name].display} is already running, skipping this run")
+        return
+    try:
+        logger.info(f"Running {CHECKS[name].display}...")
+        CHECKS[name].func()
+    except Exception:
+        logger.exception(f"{CHECKS[name].display} failed")
+    finally:
+        lock.release()
+
+
+def check_stalls() -> None:
+    """Sample every active download, notify about new stalls and auto stop & merge if configured."""
+    try:
+        config = ConfigHandler(config_file=config_file_path)
+    except Exception:
+        logger.exception("Unable to read config for stall check")
+        return
+    stall_timeout = config.get_stall_timeout()
+    auto_merge = config.get_stall_auto_merge()
+
+    for job in snapshot_jobs():
+        downloader = job.downloader
+        became_stalled = job.stall.update(downloader.status, downloader.stats,
+                                          downloader.livestream_downloader.minimum_refresh_time, stall_timeout)
+        if became_stalled:
+            message = f"No new segments for {stall_timeout / 60:.0f} minutes. {job.stall.reason}."
+            if auto_merge > 0:
+                message += f" It will be stopped and merged automatically in {auto_merge / 60:.0f} minutes if it doesn't recover."
+            downloader.logger.warning(f"Download stalled: {message}")
+            discord_web.notify(job.video_id, "stalled", message=message, config=config, embed_info=downloader.embed_info or None)
+        if job.stall.should_auto_merge(auto_merge) and downloader.stop_and_merge():
+            downloader.logger.warning("Download stalled for too long, stopping and merging automatically")
+
+
+def update_scheduler() -> tuple[bool, str]:
     config = load_config()
-    
-    def create_schedule(name: str, method):
-        schedule_name = f"{name}-checker"
-        if scheduler.get_job(schedule_name):
-            scheduler.remove_job(schedule_name)
-
+    messages = []
+    for name in CHECKS:
+        job_id = f"{name}-checker"
+        if scheduler.get_job(job_id):
+            scheduler.remove_job(job_id)
         cron_string = config.get_cron_schedule(name)
         if not cron_string:
-            return False, f"No schedule for {name}"
-        
+            continue
         try:
-            trigger = CronTrigger.from_crontab(cron_string)
-            
-            scheduler.add_job(
-                method, 
-                trigger=trigger,
-                id=schedule_name,
-                max_instances=1,      # <-- Prevent overlapping checks
-                coalesce=True,        # <-- If missed run, run once only
-                replace_existing=True # <-- Ensure old job is overwritten
-            )
-            return True, f"Scheduler updated with: {cron_string}"
+            scheduler.add_job(run_check, trigger=CronTrigger.from_crontab(cron_string), args=[name], id=job_id,
+                              max_instances=1,       # Prevent overlapping runs of the scheduled job
+                              coalesce=True,         # If runs were missed, run once only
+                              replace_existing=True)
         except ValueError as e:
-            common.logger.error(f"Cron Error: {e}")
-            return False, f"Invalid Cron expression: {e}"
-
-    schedules = {
-        "streams": get_streams,
-        "unarchived": get_unarchived,
-        "members_only": get_members,
-        "community_posts": get_community_tab,
-    }
-
-    for schedule_type, method in schedules.items():
-        created, message = create_schedule(name=schedule_type, method=method)
-        if created is False:
-            common.logger.debug("Error creating schedule for {0}: {1}".format(schedule_type, message))
+            logger.error(f"Cron Error for {name}: {e}")
+            messages.append(f"Invalid cron expression for {name}: {e}")
+    scheduler.add_job(check_stalls, trigger='interval', seconds=STALL_CHECK_SECONDS, id="stall-checker",
+                      max_instances=1, coalesce=True, replace_existing=True)
+    if messages:
+        return False, "; ".join(messages)
     return True, "All valid schedules loaded"
 
 
-# --- Helper for HTMX Data Routes ---
+def get_scheduler_jobs() -> list[dict[str, Any]]:
+    """Every check with its schedule status."""
+    scheduled = {job.id: job for job in scheduler.get_jobs()}
+    rows = []
+    for name, check in CHECKS.items():
+        job = scheduled.get(f"{name}-checker")
+        rows.append({
+            'id': f"{name}-checker",
+            'name': check.display,
+            'trigger': str(job.trigger) if job else "No Schedule Set",
+            'next_run': to_utc_iso(job.next_run_time) if job and job.next_run_time else None,
+            'status': "Scheduled" if job else "Inactive",
+            'running': _check_locks[name].locked(),
+        })
+    return rows
 
-def get_active_jobs_data():
-    """Prepares active download data for display."""
-    with LOCK:
-        current_jobs = []
-        for vid, job in active_downloads.copy().items():
-            downloader: downloadVid.VideoDownloader = job['downloader']
 
-            downloader: downloadVid.VideoDownloader = job['downloader']
-            display_info = {
-                'fulltitle': downloader.info_dict.get('fulltitle'),
-                'title': downloader.embed_info.get('title')
-            }
+# --- Formatting helpers ---
 
-            current_jobs.append({
-                'id': vid,
-                'stats': downloader.livestream_downloader.stats,
-                'info': display_info, # Pass the small dict, not the huge one
-                'start_time': job['start_time'].strftime('%H:%M:%S')
-            })
-    return current_jobs
-
-def get_active_unarchived_jobs_data():
-    """Prepares active download data for display."""
-    with LOCK:
-        current_jobs = []
-        for vid, job in active_unarchived_downloads.copy().items():
-            downloader: downloadVid.VideoDownloader = job['downloader']
-            display_info = {
-                'fulltitle': downloader.info_dict.get('fulltitle'),
-                'title': downloader.embed_info.get('title')
-            }
-
-            current_jobs.append({
-                'id': vid,
-                'stats': downloader.livestream_downloader.stats,
-                'info': display_info, # Pass the small dict, not the huge one
-                'start_time': job['start_time'].strftime('%H:%M:%S')
-            })
-    return current_jobs
-
-# --- Helper to format byte strings ---
-def convert_bytes(bytes):
+def to_utc_iso(value: Any) -> Optional[str]:
+    """
+    Convert a time to an ISO 8601 UTC string for the browser to show in its own timezone.
+    Accepts epoch seconds, datetimes (naive ones are assumed to be UTC) and SQLite
+    CURRENT_TIMESTAMP strings ("YYYY-MM-DD HH:MM:SS", which are UTC).
+    """
+    if value is None or value == "" or value == float('inf'):
+        return None
+    if isinstance(value, (int, float)):
+        moment = datetime.fromtimestamp(value, timezone.utc)
+    elif isinstance(value, datetime):
+        moment = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    else:
         try:
-            int(float(bytes))
-        except Exception:
-            common.logger.exception("Error converting {0} to number".format(bytes))
-            return "Invalid Value"
-        # List of units in order
-        units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB']
-        
-        # Start with bytes and convert to larger units
-        unit_index = 0
-        while bytes >= 1024 and unit_index < len(units) - 1:
-            bytes /= 1024
-            unit_index += 1
-        
-        # Format and return the result
-        return f"{bytes:.2f} {units[unit_index]}"
+            moment = datetime.fromisoformat(str(value))
+        except ValueError:
+            return None
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z')
+
+
+def convert_bytes(size: Any) -> str:
+    try:
+        size = float(size or 0)
+    except (TypeError, ValueError):
+        return "Invalid Value"
+    units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB']
+    unit_index = 0
+    while size >= 1024 and unit_index < len(units) - 1:
+        size /= 1024
+        unit_index += 1
+    return f"{size:.2f} {units[unit_index]}"
+
 
 app.jinja_env.filters['convert_bytes'] = convert_bytes
+app.jinja_env.filters['utc_iso'] = to_utc_iso
+
+
+def job_view(job: ActiveJob) -> dict[str, Any]:
+    """Data shown for an active job in the web UI and the JSON API (plain, JSON serialisable)."""
+    downloader = job.downloader
+    stats = downloader.stats
+    downloaded, _ = segment_totals(stats)
+    streams = {
+        kind: {
+            'downloaded': int(stats.get(kind, {}).get('downloaded_segments') or 0),
+            'latest': max(int(stats.get(kind, {}).get('latest_sequence') or 0), 0),
+        }
+        for kind in ("video", "audio") if kind in stats
+    }
+    view = {
+        'id': job.video_id,
+        'kind': job.kind,
+        'info': downloader.display_info(),
+        'status': downloader.status,
+        'stats': {key: (dict(value) if isinstance(value, dict) else value) for key, value in stats.items()},
+        'streams': streams,
+        'total_size': sum(int(stats.get(kind, {}).get('current_filesize') or 0) for kind in ("video", "audio")),
+        'start_time': to_utc_iso(job.started_at),
+        'scheduled_start': to_utc_iso(downloader.scheduled_start),
+        'next_check_at': to_utc_iso(downloader.next_check_at),
+        'is_waiting': downloader.status == STATUS_WAITING,
+        'can_merge': downloader.is_recording() and not downloader.merge_requested,
+        'merge_requested': downloader.merge_requested,
+        'stalled': job.stall.stalled,
+        'stall_reason': job.stall.reason,
+        'last_progress': to_utc_iso(job.stall.last_progress_time) if downloaded else None,
+    }
+    if isinstance(downloader, UnarchivedDownloader):
+        view.update({
+            'urls_saved_at': to_utc_iso(downloader.json_saved_at),
+            'next_url_refresh': to_utc_iso(downloader.next_url_refresh) if downloader.next_url_refresh else None,
+            'last_cheap_check': to_utc_iso(downloader.last_cheap_check),
+            'cheap_checks_active': downloader.next_cheap_check is not None,
+        })
+    return view
+
+
+def jobs_data(kind: str) -> list[dict[str, Any]]:
+    return [job_view(job) for job in sorted(snapshot_jobs(kind), key=lambda j: j.started_at)]
+
+
+def action_response(message: str, level: str = "success"):
+    """
+    Response for an action button. htmx requests get an empty response with an HX-Trigger header
+    (shows the message and refreshes the tables without reloading the page); plain form posts
+    (no JavaScript) get the usual flash message and redirect.
+    """
+    if request.headers.get("HX-Request"):
+        response = make_response("", 204)
+        response.headers["HX-Trigger"] = json.dumps({"showMessage": {"text": message, "level": level}, "refreshTables": True})
+        return response
+    flash(message, level)
+    return redirect(url_for('index'))
+
+
+@app.after_request
+def set_cache_headers(response):
+    # Polled data and actions must never come from a cache. Static files use SEND_FILE_MAX_AGE_DEFAULT.
+    if request.path.startswith(('/data/', '/api/', '/actions/')):
+        response.headers['Cache-Control'] = 'no-store'
+    return response
+
 
 # --- HTMX Data Routes ---
 
+def _render_jobs_table(kind: str):
+    response = make_response(render_template('downloads_table.html', jobs=jobs_data(kind), kind=kind))
+    if time.time() - _history_changed_at < HISTORY_SIGNAL_SECONDS:
+        # Tells htmx to fire the 'historyUpdated' event, which reloads the history table
+        response.headers['HX-Trigger'] = 'historyUpdated'
+    return response
+
+
 @app.route('/data/active')
 def data_active():
-    """Endpoint for HTMX to poll active downloads table AND signal history update."""
-    current_jobs = get_active_jobs_data()
-    # 1. Render the active table
-    rendered_table = render_template('active_table.html', active_downloads=current_jobs)
-    response = make_response(rendered_table)
-    
-    # 2. Check the signal list set by the background thread
-    with LOCK:
-        if history_update_event.is_set():
-            # Send HTMX trigger header, instructing the client to fire 'historyUpdated' event
-            response.headers['HX-Trigger'] = 'historyUpdated' 
-            history_update_event.clear() # Reset the flag
-            
-    return response
+    return _render_jobs_table("stream")
+
 
 @app.route('/data/unarchived')
 def data_unarchived():
-    """Endpoint for HTMX to poll active downloads table AND signal history update."""
-    current_jobs = get_active_unarchived_jobs_data()
-    # 1. Render the active table
-    rendered_table = render_template('unarchived_active_table.html', active_downloads=current_jobs)
-    response = make_response(rendered_table)
-    
-    # 2. Check the signal list set by the background thread
-    with LOCK:
-        if history_update_event.is_set():
-            # Send HTMX trigger header, instructing the client to fire 'historyUpdated' event
-            response.headers['HX-Trigger'] = 'historyUpdated' 
-            history_update_event.clear() # Reset the flag
-            
-    return response
+    return _render_jobs_table("unarchived")
+
 
 @app.route('/data/history')
-@cache.cached(timeout=600) # Cache this result for 10 minutes (or until cleared)
 def data_history():
-    """Endpoint for HTMX to poll history table."""
-    history = get_history()
-    return render_template('history_table.html', history=history)
+    return render_template('history_table.html', history=get_history())
 
 
-# --- Web Routes (Unchanged) ---
+@app.route('/data/scheduler')
+def data_scheduler():
+    return render_template('schedule_table.html', jobs=get_scheduler_jobs())
+
+
+# --- Web Routes ---
 
 @app.route('/')
 def index():
-    history = get_history()
-    active_jobs = get_active_jobs_data()
-    
-    return render_template('index.html', 
-                                  history=history,
-                                  active_downloads=active_jobs,
-                                  theme=GLOBAL_THEME,
-                                  ) 
+    return render_template('index.html', theme=GLOBAL_THEME)
 
-@app.route('/actions/check', methods=['POST'])
-def manual_check():
-    """Triggers an existing job's function to run immediately."""
-
-    manual_check_id = "manual-stream-check"
-
-    # 1. Get the existing job object
-    job = scheduler.get_job(manual_check_id)
-
-    if job:
-        common.logger.warning("Manual stream check already running")
-        flash("Manual stream check already triggered, please wait for existing check to finish", "warning")
-        return redirect(url_for('index'))
-
-    # 2. Schedule a new one-off job with the same function/parameters
-    scheduler.add_job(
-        get_streams, 
-        trigger='date',
-        run_date=datetime.now(),
-        id=manual_check_id,
-        max_instances=1,
-        coalesce=True,
-        replace_existing=True
-        # Copying job stores, executor, etc. is often unnecessary
-        # but you might want to specify executor if you need a different one.
-    )
-    common.logger.debug(f"Successfully triggered immediate run for job ID: {manual_check_id}")
-    flash("Manual check triggered! Tables will update shortly.", "success")
-    return redirect(url_for('index'))
-
-
-
-def extract_youtube_id(url: str):
-    """
-    Extracts the YouTube video ID from various URL formats.
-    Returns the ID string if found, otherwise None.
-    """
-
-    url = url.strip()
-
-    # Check if the input is ALREADY a valid 11-character ID
-    # ^ and $ ensure the entire string matches, not just a part of it
-    if re.match(r'^[a-zA-Z0-9_-]{11}$', url):
-        return url
-    # Regex pattern to capture the 11-character ID
-    # Handles: youtube.com/watch?v=, youtu.be/, youtube.com/embed/, 
-    # youtube.com/shorts/, and youtube.com/live/
-    pattern = r'(?:https?:\/\/)?(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})'
-    
-    match = re.search(pattern, url)
-    
-    return match.group(1) if match else None
 
 @app.route('/actions/add', methods=['POST'])
 def manual_add():
-    video_id = request.form.get('video_id')
-    if video_id:
-        video_id = extract_youtube_id(str(video_id)) or video_id
-        if start_download(video_id):
-            flash(f"Started download for {video_id}", "success")
-        else:
-            flash(f"Video {video_id} is already being downloaded.", "warning")
-    return redirect(url_for('index'))
+    raw = str(request.form.get('video_id') or "")
+    video_id = extract_video_id(raw)
+    if not video_id:
+        return action_response(f"'{raw.strip()}' is not a YouTube video ID or URL", "warning")
+    if start_download(video_id):
+        return action_response(f"Started download for {video_id}")
+    return action_response(f"Video {video_id} is already being downloaded.", "warning")
+
+
+@app.route('/actions/<action>/<kind>/<video_id>', methods=['POST'])
+def job_action(action: str, kind: str, video_id: str):
+    """cancel, merge (stop & merge) or check (check now) for an active job."""
+    if kind not in DOWNLOADER_CLASSES or action not in ("cancel", "merge", "check"):
+        abort(404)
+    job = get_job(kind, video_id)
+    if job is None:
+        return action_response(f"{video_id} is not currently active.", "secondary")
+    if action == "cancel":
+        job.downloader.cancel()
+        return action_response(f"Cancelling {video_id}")
+    if action == "merge":
+        if job.downloader.stop_and_merge():
+            return action_response(f"Stopping {video_id} and merging the downloaded segments")
+        return action_response(f"{video_id} is not recording, nothing to merge", "warning")
+    job.downloader.check_now()
+    return action_response(f"Checking {video_id} now")
+
+
+@app.route('/actions/force_run/<job_name>', methods=['POST'])
+def force_run_job(job_name: str):
+    """Run a check now, in the background."""
+    name = job_name.removesuffix("-checker")
+    if name not in CHECKS:
+        return action_response(f"Unknown job: {job_name}", "danger")
+    if _check_locks[name].locked():
+        return action_response(f"{CHECKS[name].display} is already running, please wait for it to finish", "warning")
+    scheduler.add_job(run_check, trigger='date', run_date=datetime.now(timezone.utc), args=[name],
+                      id=f"manual-{name}", replace_existing=True)
+    return action_response(f"{CHECKS[name].display} started", "info")
+
+
+@app.route('/actions/check', methods=['POST'])
+def manual_check():
+    """Older endpoint: run the stream check now."""
+    return force_run_job("streams-checker")
+
+
+@app.route('/actions/toggle_theme', methods=['POST'])
+def toggle_theme():
+    global GLOBAL_THEME
+    GLOBAL_THEME = "dark" if GLOBAL_THEME == "light" else "light"
+    return redirect(request.referrer or url_for('index'))
+
 
 @app.route('/config', methods=['GET', 'POST'])
 def config_page():
     if request.method == 'POST':
-        new_toml = request.form.get('toml_content')
-        if save_config(new_toml):
-            success, message = update_scheduler()
-            if success:
-                load_config()
-                flash(message, "success")                
-            else:
-                flash(message, "danger") 
+        saved, message = save_config(request.form.get('toml_content') or "")
+        if not saved:
+            flash(message, "danger")
         else:
-            flash("Invalid TOML format. Configuration not saved.", "danger")
+            success, schedule_message = update_scheduler()
+            flash(f"{message}. {schedule_message}", "success" if success else "warning")
         return redirect(url_for('config_page'))
 
     with open(config_file_path, 'r', encoding="utf-8") as f:
         content = f.read()
     return render_template('config.html', config_content=content, theme=GLOBAL_THEME)
 
-@app.route('/actions/cancel/<video_id>', methods=['POST'])
-def cancel_download(video_id):
-    """Sets the kill flag to True for a specific downloader."""
-    with LOCK:
-        if video_id in active_downloads:
-            job_entry = active_downloads[video_id]
-            downloader_instance: downloadVid.VideoDownloader = job_entry.get('downloader')
-            
-            # Navigate to the inner downloader object that holds the flag
-            # Based on your existing code: downloader -> livestream_downloader
-            try:
-                downloader_instance.kill_this.set()
-            except Exception as e:
-                common.logger.error(f"Failed to cancel {video_id}: {e}")
-                flash(f"Error cancelling {video_id}", "danger")
-                e = None
-        else:
-            flash(f"Stream {video_id} is not currently active.", "secondary")
-            
-    return redirect(url_for('index'))
-
-@app.route('/actions/cancel_unarchived/<video_id>', methods=['POST'])
-def cancel_unarchived(video_id):
-    """Sets the kill flag to True for a specific downloader."""
-    with LOCK:
-        if video_id in active_unarchived_downloads:
-            job_entry = active_unarchived_downloads[video_id]
-            downloader_instance: downloadVid.VideoDownloader = job_entry.get('downloader')
-            
-            # Navigate to the inner downloader object that holds the flag
-            # Based on your existing code: downloader -> livestream_downloader
-            try:
-                downloader_instance.kill_this.set()
-            except Exception as e:
-                common.logger.error(f"Failed to cancel {video_id}: {e}")
-                flash(f"Error cancelling {video_id}", "danger")
-                e = None
-        else:
-            flash(f"Stream {video_id} is not currently active.", "secondary")
-            
-    return redirect(url_for('index'))
-
-@app.route('/actions/toggle_theme', methods=['POST'])
-def toggle_theme():
-    global GLOBAL_THEME
-    with LOCK:
-        GLOBAL_THEME = "dark" if GLOBAL_THEME == "light" else "light"
-    # Redirect to the page that made the request (config or index)
-    return redirect(request.referrer or url_for('index'))
-
-# --- Helper for Scheduler Data ---
-
-def get_scheduler_jobs():
-    """Extracts all possible jobs and their current status."""
-    # Define the 'Master List' of jobs your app supports
-    possible_jobs = [
-        {"id": "streams-checker", "display": "Stream Checker"},
-        {"id": "unarchived-checker", "display": "Unarchived Checker"},
-        {"id": "members_only-checker", "display": "Members Only Checker"},
-        {"id": "community_posts-checker", "display": "Community Tab Checker"},
-    ]
-    active_jobs = {job.id: job for job in scheduler.get_jobs()}
-    final_data = []
-
-    for item in possible_jobs:
-        job_id = item["id"]
-        job_obj: Job = active_jobs.get(job_id)
-        
-        if job_obj:
-            next_run = job_obj.next_run_time.strftime('%H:%M:%S (%d-%b)') if job_obj.next_run_time else "Paused"
-            trigger = str(job_obj.trigger)
-            status = "Scheduled"
-        else:
-            next_run = "N/A"
-            trigger = "No Schedule Set"
-            status = "Inactive"
-            
-        final_data.append({
-            'id': job_id,
-            'name': item["display"],
-            'trigger': trigger,
-            'next_run': next_run,
-            'status': status
-        })
-    return final_data
-
-@app.route('/actions/force_run/<job_name>', methods=['POST'])
-def force_run_job(job_name):
-    """Executes a job function immediately in the background."""
-    # Mapping job IDs back to their functions
-    mapping = {
-        "streams-checker": get_streams,
-        "unarchived-checker": get_unarchived,
-        "members_only-checker": get_members,
-        "community_posts-checker": get_community_tab,
-    }
-    manual_check_id = f"manual-{job_name}"
-    func = mapping.get(job_name)
-    if func:
-        job = scheduler.get_job(manual_check_id)
-        if job:
-            common.logger.warning("Manual stream check already running")
-            flash("Manual stream check already triggered, please wait for existing check to finish", "warning")
-        else:    
-            # Run it immediately as a one-off job
-            scheduler.add_job(func, 
-                              trigger='date', 
-                              run_date=datetime.now(), 
-                              id=manual_check_id, name=manual_check_id, 
-                              max_instances=1,      # <-- Prevent overlapping checks
-                              coalesce=True,        # <-- If missed run, run once only
-                              replace_existing=True # <-- Ensure old job is overwritten
-                            )
-            common.logger.debug(f"Successfully triggered immediate run for job ID: {manual_check_id}")
-            flash(f"Force-run triggered for {job_name}", "info")
-    else:
-        flash(f"Unknown job: {job_name}", "danger")
-        
-    return redirect(url_for('index'))
-
-# --- HTMX Route for Scheduler ---
-
-@app.route('/data/scheduler')
-def data_scheduler():
-    """Endpoint for HTMX to poll scheduler status."""
-    jobs = get_scheduler_jobs()
-    # Note: If you moved templates to files, use render_template('scheduler_table.html', ...)
-    return render_template('schedule_table.html', jobs=jobs)
 
 # --- JSON API Endpoints ---
 
 @app.route('/api/active')
 def api_active():
-    """JSON equivalent of the active stream downloads."""
-    # get_active_jobs_data returns the raw 'stats' dict containing bytes
-    # It does format the start_time to HH:MM:SS string, but keeps stats raw.
-    data = get_active_jobs_data()
-    return jsonify(data)
+    return jsonify(jobs_data("stream"))
+
 
 @app.route('/api/unarchived')
 def api_unarchived():
-    """JSON equivalent of the active unarchived downloads."""
-    data = get_active_unarchived_jobs_data()
-    return jsonify(data)
+    return jsonify(jobs_data("unarchived"))
+
 
 @app.route('/api/history')
 def api_history():
-    """JSON equivalent of the download history."""
-    rows = get_history()
-    
-    # SQLite Rows are not directly JSON serializable, convert to dict.
-    # The 'total_size' field in DB is INTEGER (bytes), so no conversion needed.
-    history_data = [dict(row) for row in rows]
-    
-    return jsonify(history_data)
+    return jsonify([{**dict(row), 'timestamp': to_utc_iso(row['timestamp'])} for row in get_history()])
+
 
 @app.route('/api/scheduler')
 def api_scheduler():
-    """JSON equivalent of the scheduler status."""
-    # Returns the list of jobs with their next run times and status
-    data = get_scheduler_jobs()
-    return jsonify(data)
+    return jsonify(get_scheduler_jobs())
 
 
 @app.route('/favicon.ico')
 def favicon():
-    try:
-        return make_response(send_from_directory('static', 'favicon.ico'))
-    except FileNotFoundError:
-        abort(404)
+    return send_from_directory(app.static_folder, 'favicon.ico')
 
 
 # ---------------------------------------------------------
-# 1. Determine Config Path
+# Startup (runs under gunicorn and with `python web.py`)
 # ---------------------------------------------------------
 if __name__ == '__main__':
     import argparse
-    # CASE A: Local Development (python web.py)
-    # We use argparse so you can use flags like --config
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default="config.toml")
+    parser = argparse.ArgumentParser(description="Run the holo-downloader web app (development server)")
+    parser.add_argument('--config', type=str, default=config_file_path)
     args = parser.parse_args()
     config_file_path = args.config
+    # Every ConfigHandler() created later reads this path
+    os.environ["CONFIG_FILE"] = config_file_path
     print("Running in Developer Mode")
 
-else:
-    # CASE B: Production (Waitress / Docker)
-    # We use Environment Variables because we can't pass args to an import
-    config_file_path = os.environ.get('CONFIG_FILE', 'config.toml')
-
-# ---------------------------------------------------------
-# 2. Common Initialization (Runs in BOTH cases)
-# ---------------------------------------------------------
-# Now that we know where the config is, we load it and start the app
-# regardless of how it was launched.
-
 common.setup_umask()
-config: ConfigHandler = load_config() # Use the path we determined above
-GLOBAL_THEME = config.get_webui_theme()
-
+_startup_config = load_config()
+GLOBAL_THEME = _startup_config.get_webui_theme()
 init_db()
-
 update_scheduler()
 scheduler.start()
+discord_web.notify("0", "starting", config=_startup_config)
 
-# ---------------------------------------------------------
-# 3. Start Local Server
-# ---------------------------------------------------------
 if __name__ == '__main__':
-    # This only runs if called directly. Waitress ignores this.
     app.run(host='0.0.0.0', port=5000, load_dotenv=True)
