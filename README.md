@@ -17,7 +17,7 @@ The program supports standard streams, members-only content, unarchived (private
 
 
 * **Resiliency**: Uses `livestream_dl` (a custom wrapper around `yt-dlp` and `ffmpeg`) to handle stream interruptions and segment merging.
-* **Web UI**: A Flask-based interface (port 5000) to view active downloads, history, and active schedules.
+* **Web UI**: A Flask-based interface (port 5000) for desktop and mobile to view active downloads, history, and schedules. Downloads that stop receiving segments are flagged as **stalled** and can be stopped and merged from the UI. Times are shown in the browser's timezone.
 * **Notifications**: Integrates with Discord Webhooks for status updates (Recording, Done, Error).
 * **Flexible Filtering**: Filter downloads by regex matching on video titles or descriptions.
 
@@ -59,6 +59,8 @@ These variables configure the container runtime.
 | `UMASK` | *None* | Sets the file creation mask (permissions) for downloaded files. |
 | `UPDATEYTDLP` | *None* | Update yt-dlp to the latest nightly release on startup when set to `true`. |
 | `SECRET_KEY` | `dev-key...` | Secret key for Flask sessions. Change for security in production. |
+| `CONFIG_FILE` | `config.toml` | Path of the config file (relative to `/app`). |
+| `HISTORY_DB` | `stream_history.db` | Path of the download history database. |
 | `DNSCACHE` | *None* | Set to `true` to run a local dnsmasq cache inside the container (optional: `DNSCACHE_SIZE`, `DNSCACHE_MIN_TTL`). |
 
 ---
@@ -109,7 +111,8 @@ Channels are defined by their display name and Channel ID (found in the URL of t
 
 #### Unarchived (Privated) Streams
 *Monitors for streams that become unavailable/private immediately after ending.*   
-The "unarchived channels" option saves the video stream urls (info.json file) to the temporary directory and refreshes it periodically (hourly). If a stream becomes inaccessible before the stream URLs expire (about 6 hours after extraction), an attempt to download the stream via livesteam_dl's `--recovery` option is triggered using the saved info.json file.  
+The "unarchived channels" option saves the video stream urls (info.json file) to the temporary directory while the stream is live (or post-live) and refreshes them with yt-dlp every 1 hour 50 minutes. Every 10 minutes a cheap check (one small request to YouTube's oEmbed endpoint, no yt-dlp) looks for the video becoming inaccessible; a suspicious result is confirmed with a full yt-dlp extraction. If a stream becomes inaccessible before the stream URLs expire (about 6 hours after extraction), an attempt to download the stream via livestream_dl's `--recovery` option is triggered using the saved info.json file. Monitoring continues until the saved info.json is 6 hours old.  
+> **Note:** oEmbed also reports an error for videos with embedding disabled. For those videos the cheap check is turned off and only the URL refreshes detect the video being privated.  
 
 > **Warning:** This option should be treated as a last resort option as it is currently unreliable. Streams that are important to you should always be recorded live.
 
@@ -175,12 +178,15 @@ The `output_path` template follows [yt-dlp output template](https://github.com/y
 | `download_threads` | Int | `4` | Threads used by livestream_dl for downloading. |
 | `video_fetch_method` | String | `ytdlp` | `ytdlp` (scans channel page) or `json` (uses holo.dev API, Hololive only). |
 | `look_ahead` | Int | `48` | Hours into the future to schedule downloads for. |
-| `upcoming_wait_for_video_max` | Float | `900` | Seconds to set yt-dlp's maximum time for `--wait-for-video` (Minimum: 60). Increasing helps reduce extraction attempts while waiting for a stream to start, but can increase time until recording starts if a livestream starts late. Value is doubled for unarchived checker function. |
+| `upcoming_wait_for_video_max` | Float | `900` | Maximum seconds between checks of a stream that is past its scheduled start but not live yet (Minimum: 60). Checks start every 60 seconds and slow down the later the stream is (a quarter of the time it is late). Increasing reduces yt-dlp extractions, but can increase the time until recording starts if a livestream starts late. |
+| `upcoming_recheck_max` | Float | `10800` | Maximum seconds between yt-dlp extractions of a stream waiting for its scheduled start (Minimum: 60). The downloader waits until the scheduled start without extracting, but re-checks at least this often in case the schedule moved. Independent of the channel scan, which also starts the download straight away if it sees the stream live. |
 | `proxies` | String | *None* | Proxy URL (e.g., `"http://10.0.1.2:3128"`). |
 | `randomise_lists` | Bool | `False` | Randomize channel check order to reduce bot detection patterns. |
 | `ytdlp_options` | String| *None* | A JSON string that will be added to the yt-dlp options for stream URL extraction. E.g `'{"extractor_args":{"youtubepot-bgutilhttp":{"base_url":["http://bgutil-provider:4416"]}}}'` |
-| `new_segment_wait_limit` | Int | 1800 | Maximum wait cycles for new segments before stopping download (if end is not detected first). Each cycle is approximately 10 second. E.g. 1800 is 18000 seconds (5 hours) |
-| `yt_dlp_playlist_limit` | Int | 3 | Number of playlist items to check for a live video |
+| `new_segment_wait_limit` | Int | 0 | Maximum wait cycles for new segments before stopping download (if end is not detected first). Each cycle is approximately 10 seconds, e.g. 1800 is 18000 seconds (5 hours). 0 waits until the end of the stream is detected. |
+| `stall_timeout` | Int | `900` | Seconds without a new downloaded segment (while recording) before a download is marked as stalled in the web UI and a Discord message is sent. |
+| `stall_auto_merge` | Int | `0` | Seconds a download can stay stalled before it is automatically stopped and the downloaded segments merged. `0` disables this. |
+| `yt_dlp_playlist_limit` | Int | 20 | Number of playlist items to check for a live video |
 | **Processing** |  |  |  |
 | `mux_file` | Bool | `True` | Merge video/audio into a single file after download. |
 | `remux_extension` | String | *None* | Extension to remux final file to (e.g., `mp4`, `mkv`). |
@@ -260,3 +266,31 @@ torrentOptions = []              # List of args passed to py3createtorrent
 theme = "dark"                   # "light" or "dark"
 
 ```
+
+#### Stalled downloads and "Stop & merge"
+
+A download is marked **stalled** when it is recording but no new segments have been downloaded for `stall_timeout` seconds. The web UI shows why:
+
+* *No new segments from YouTube*: the stream is paused, or it ended without the end being detected.
+* *Segments are failing to download*: YouTube has newer segments, but they can't be downloaded.
+* *yt-dlp is backing off after rate limiting*: URL refreshes are being delayed after rate limiting.
+
+**Stop & merge** (⏹️) ends a recording download and merges/moves what has been downloaded so far, as if the stream had ended. It is available for every recording download and highlighted for stalled ones. **Cancel** (🗑️) stops without merging. Waiting downloads also have **Check now** (🔄).
+
+The same data is available as JSON from `/api/active`, `/api/unarchived`, `/api/history` and `/api/scheduler`. Times in the API are ISO 8601 UTC strings.
+
+---
+
+## Development
+
+A dev image is built from the `dev` branch on every push: `ghcr.io/canofsocks/holo-downloader:dev` (also tagged `dev-<commit>`), for amd64 and arm64. It is built on the `livestream_dl:dev` image.
+
+To run locally (Python 3.13, the version used by the Docker image), with `livestream_dl` cloned into the project folder:
+
+```bash
+python -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt -r livestream_dl/requirements.txt   # .venv\Scripts\pip on Windows
+.venv/bin/python web.py --config config.toml
+```
+
+Run the offline tests with `.venv/bin/python -m pytest`.
