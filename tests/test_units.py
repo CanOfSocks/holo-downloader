@@ -180,33 +180,52 @@ def test_no_filters_passes():
     assert common.filtering({"id": "x", "title": "anything"}, "UCnofilter", ConfigHandler()) is True
 
 
-def test_members_scan_ignores_filters(monkeypatch):
+# Channel ID body (the 22 characters after "UC") used by the members tests
+MEMBERS_SUFFIX = "xsZ6NCzjU_t4YSxQLBcM5A"
+
+
+class FakeYoutubeDL:
+    """Stands in for yt-dlp: returns `FakeYoutubeDL.results[url]` and records the URLs requested."""
+    results: dict = {}
+    requested: list = []
+
+    def __init__(self, options):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+    def extract_info(self, url, download=False):
+        FakeYoutubeDL.requested.append(url)
+        return FakeYoutubeDL.results[url]
+
+
+@pytest.fixture
+def fake_ytdlp(monkeypatch):
+    monkeypatch.setattr(common, "YoutubeDL", FakeYoutubeDL)
+    monkeypatch.setattr(FakeYoutubeDL, "results", {})
+    monkeypatch.setattr(FakeYoutubeDL, "requested", [])
+    return FakeYoutubeDL
+
+
+def test_members_scan_ignores_filters(monkeypatch, fake_ytdlp):
     """The [members_only] scan downloads every members stream, even if the channel has filters."""
     import getMembers
 
-    class FakeYoutubeDL:
-        def __init__(self, options):
-            pass
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
-            return False
-
-        def extract_info(self, url, download=False):
-            assert url == "https://www.youtube.com/playlist?list=UUMOtitle"
-            return {"entries": [{"id": "members0001", "title": "Members chat", "live_status": "is_upcoming",
-                                 "release_timestamp": None, "channel_id": "UCtitle"}]}
-
-    monkeypatch.setattr(common, "YoutubeDL", FakeYoutubeDL)
+    channel = "UC" + MEMBERS_SUFFIX
+    fake_ytdlp.results["https://www.youtube.com/playlist?list=UUMO" + MEMBERS_SUFFIX] = {
+        "entries": [{"id": "members0001", "title": "Members chat", "live_status": "is_upcoming",
+                     "release_timestamp": None, "channel_id": channel}]}
     monkeypatch.setattr(common, "extract_video", lambda *a, **k: {"description": "Gaming"})
     monkeypatch.setattr(getMembers.kill_all, "wait", lambda *a, **k: False)
-    config = ConfigHandler(config={"members_only": {"filtered": "UCtitle"},
-                                   "title_filter": {"UCtitle": "(?i)karaoke"}})
+    config = ConfigHandler(config={"members_only": {"filtered": channel},
+                                   "title_filter": {channel: "(?i)karaoke"}})
 
     # The same video is filtered out of a normal scan...
-    assert common.get_upcoming_or_live_videos("UCtitle", config, tab="membership") == []
+    assert common.get_upcoming_or_live_videos(channel, config, tab="membership") == []
 
     class Output(list):
         put = list.append
@@ -216,10 +235,62 @@ def test_members_scan_ignores_filters(monkeypatch):
     assert [video.id for video in found] == ["members0001"]
 
 
+def test_members_playlist_id_from_ids():
+    config = ConfigHandler(config={})
+    for value in ("UC", "UU", "UUMO", "UULF", "UUSH"):
+        assert common.members_playlist_id(value + MEMBERS_SUFFIX, config) == "UUMO" + MEMBERS_SUFFIX
+
+
+def test_members_playlist_id_resolves_handle_once(fake_ytdlp):
+    config = ConfigHandler(config={})
+    fake_ytdlp.results["https://www.youtube.com/@testhandle"] = {"channel_id": "UC" + MEMBERS_SUFFIX, "entries": []}
+    assert common.members_playlist_id("@testhandle", config) == "UUMO" + MEMBERS_SUFFIX
+    assert common.members_playlist_id("@testhandle", config) == "UUMO" + MEMBERS_SUFFIX
+    assert fake_ytdlp.requested == ["https://www.youtube.com/@testhandle"]
+
+
+def test_members_playlist_id_unknown_channel(fake_ytdlp):
+    fake_ytdlp.results["https://www.youtube.com/@missing"] = {"entries": []}
+    with pytest.raises(ValueError):
+        common.members_playlist_id("@missing", ConfigHandler(config={}))
+
+
+def test_members_scan_uses_uumo_for_handles(fake_ytdlp):
+    config = ConfigHandler(config={})
+    fake_ytdlp.results["https://www.youtube.com/@scanhandle"] = {"channel_id": "UC" + MEMBERS_SUFFIX}
+    fake_ytdlp.results["https://www.youtube.com/playlist?list=UUMO" + MEMBERS_SUFFIX] = {"entries": []}
+    assert common.get_upcoming_or_live_videos("@scanhandle", config, tab="membership", apply_filters=False) == []
+    assert fake_ytdlp.requested[-1] == "https://www.youtube.com/playlist?list=UUMO" + MEMBERS_SUFFIX
+
+
+def test_community_tab_uses_only_its_own_list(monkeypatch, tmp_path):
+    """Only [community_tab] channels are fetched, and filters are never involved."""
+    import communityPosts
+
+    commands = []
+    monkeypatch.setattr(communityPosts, "run_until_done", lambda command, *a, **k: commands.append(command))
+    # Independent of any other test (or shutdown) having set the global stop flag
+    monkeypatch.setattr(communityPosts.kill_all, "is_set", lambda: False)
+    for name in ("filtering", "titleFilter", "descriptionFilter", "extract_video"):
+        monkeypatch.setattr(common, name, lambda *a, **k: pytest.fail("community tab must not use filters"))
+    config = ConfigHandler(config={
+        "channel_ids_to_match": {"normal": "UCnormal"},
+        "members_only": {"members": "UCmembers"},
+        "community_tab": {"posts": "UCposts"},
+        "title_filter": {"UCposts": "(?i)karaoke"},
+        "description_filter": {"UCposts": "(?i)singing"},
+        "community_tab_options": {"community_dir": str(tmp_path)},
+    })
+    communityPosts.main(config=config)
+    assert [command[-1] for command in commands] == ["https://www.youtube.com/channel/UCposts/posts"]
+
+
 def test_playlist_url():
-    assert common.playlist_url("UCabc", "streams") == ("https://www.youtube.com/playlist?list=UUabc", True)
-    assert common.playlist_url("UCabc", "membership") == ("https://www.youtube.com/playlist?list=UUMOabc", True)
-    assert common.playlist_url("UUMOabc", "streams") == ("https://www.youtube.com/playlist?list=UUMOabc", True)
+    channel = "UC" + MEMBERS_SUFFIX
+    assert common.playlist_url(channel, "streams") == ("https://www.youtube.com/playlist?list=UU" + MEMBERS_SUFFIX, True)
+    assert common.playlist_url(channel, "membership") == ("https://www.youtube.com/playlist?list=UUMO" + MEMBERS_SUFFIX, True)
+    assert common.playlist_url("UULF" + MEMBERS_SUFFIX, "membership") == ("https://www.youtube.com/playlist?list=UUMO" + MEMBERS_SUFFIX, True)
+    assert common.playlist_url("UUMO" + MEMBERS_SUFFIX, "streams") == ("https://www.youtube.com/playlist?list=UUMO" + MEMBERS_SUFFIX, True)
     assert common.playlist_url("@handle", "streams") == ("https://www.youtube.com/channel/@handle/streams", False)
 
 

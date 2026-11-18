@@ -322,16 +322,56 @@ def ytdlp_options(config: ConfigHandler, logger: logging.Logger, flat: bool) -> 
     return options
 
 
+# A channel ID (UC...), its uploads playlist (UU...) or one of its other channel playlists
+# (UUMO members-only, UULF videos, UUSH shorts, ...). The 22 characters after the prefix are the same.
+_CHANNEL_ID_PATTERN = re.compile(r"^(?:UC|UU)([0-9A-Za-z_-]{22})$|^UU[A-Z]{2}([0-9A-Za-z_-]{22})$")
+# Channel IDs looked up from handles/URLs in [members_only] (they don't change)
+_resolved_channel_ids = BoundedCache(max_entries=500, ttl=None)
+
+
+def channel_id_suffix(value: str) -> Optional[str]:
+    """The 22 character part shared by a channel's ID and playlists, or None if `value` isn't one of them."""
+    match = _CHANNEL_ID_PATTERN.match(value or "")
+    return (match.group(1) or match.group(2)) if match else None
+
+
+def members_playlist_id(value: str, config: ConfigHandler, this_logger: Optional[logging.Logger] = None) -> str:
+    """
+    The members-only (UUMO) playlist of a [members_only] entry. Channel and playlist IDs are
+    converted directly; anything else (a handle such as "@name" or a channel URL) is looked up
+    once with yt-dlp. Raises ValueError if the channel can't be found.
+    """
+    suffix = channel_id_suffix(value)
+    if suffix is None:
+        suffix = _resolved_channel_ids.get(value)
+    if suffix is None:
+        if value.startswith("http"):
+            url = value
+        elif value.startswith("@"):
+            url = f"https://www.youtube.com/{value}"
+        else:
+            url = f"https://www.youtube.com/channel/{value}"
+        options = ytdlp_options(config, this_logger or logger, flat=True)
+        options['playlist_items'] = '1:1'
+        with YoutubeDL(options) as ydl:
+            info = ydl.extract_info(url, download=False) or {}
+        suffix = channel_id_suffix(info.get('channel_id') or "")
+        if suffix is None:
+            raise ValueError(f"Unable to find the channel ID of {value!r}")
+        _resolved_channel_ids.set(value, suffix)
+    return "UUMO" + suffix
+
+
 def playlist_url(channel_id: str, tab: Optional[str]) -> tuple[str, bool]:
     """
     URL to scan for a channel, and whether it is a playlist. Channel (UC) IDs are converted to the
     uploads (UU) or members-only (UUMO) playlist, which is cheaper to list than a channel tab.
+    The membership scan resolves other values to an ID first (see members_playlist_id).
     """
     if tab == "membership":
-        if channel_id.startswith("UUMO"):
-            return f"https://www.youtube.com/playlist?list={channel_id}", True
-        if channel_id.startswith("UC") or channel_id.startswith("UU"):
-            return f"https://www.youtube.com/playlist?list=UUMO{channel_id[2:]}", True
+        suffix = channel_id_suffix(channel_id)
+        if suffix is not None:
+            return f"https://www.youtube.com/playlist?list=UUMO{suffix}", True
     elif tab == "streams":
         # Note: a members playlist ID (UUMO...) also starts with "UU", so it is used as-is
         if channel_id.startswith("UU"):
@@ -426,7 +466,13 @@ def get_upcoming_or_live_videos(channel_id: str, config: ConfigHandler, tab: str
     """
     this_logger = passed_logger or logger
     active_ids = active_ids or ()
-    url, is_playlist = playlist_url(channel_id, tab)
+    if tab == "membership":
+        # Always the channel's members-only playlist, whatever form the [members_only] entry has
+        playlist_id = members_playlist_id(channel_id, config, this_logger)
+        channel_id = "UC" + playlist_id[4:]
+        url, is_playlist = playlist_url(playlist_id, tab)
+    else:
+        url, is_playlist = playlist_url(channel_id, tab)
     flat_options = ytdlp_options(config, this_logger, flat=True)
     # Channel tabs are slower to list than playlists, so fewer entries are checked
     playlist_limit = (config.get_ytlp_playlist_limit() or 10) if is_playlist else 10

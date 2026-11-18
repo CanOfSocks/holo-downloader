@@ -100,7 +100,10 @@ Channels are defined by their display name and Channel ID (found in the URL of t
 ```
 
 #### Members Only
-*Channels here have their "Membership" tab scanned. Requires `cookies.txt`.*
+*Each channel's members-only playlist (`UUMO...`) is scanned. Requires `cookies.txt` from an account with the channel's membership.*
+The value can be a channel ID (`UC...`), one of the channel's playlist IDs (`UU...`, `UUMO...`) or a handle (`@name`), which is looked up once. This list is independent of `[channel_ids_to_match]`; a channel doesn't need to be in both.
+
+> **Note:** `[channel_ids_to_match]` scans the public uploads playlist, which never lists members-only videos. It only picks up a members stream that is still public when it is scanned (e.g. scheduled as public and switched to members-only when it starts); the download then needs cookies with that membership. Add the channel to `[members_only]` to catch every members stream.
 
 ```toml
 [members_only]
@@ -127,7 +130,7 @@ The "unarchived channels" option saves the video stream urls (info.json file) to
 Filters allow you to restrict downloads based on REGEX strings.
 
 * **Logic:** If a filter is present, it **will** be used. Filters are **inclusive OR**; if either the title OR description matches the regex, the video is downloaded.
-* **Members only:** Filters are not applied to the `[members_only]` scan; every upcoming or live members stream of those channels is downloaded.
+* **Scope:** Filters are never applied to `[members_only]` (every upcoming or live members stream of those channels is downloaded) or to `[community_tab]`.
 * **Syntax:** Python `re` library syntax.
 
 ```toml
@@ -222,7 +225,7 @@ These apply to the "Unarchived" recorder module.
 
 ### 7. Community Tab Options
 
-Downloads community posts (text and images).
+Downloads community posts (text and images). The `[community_tab]` list is independent of `[channel_ids_to_match]` and `[members_only]`.
 
 #### Channel Config
 
