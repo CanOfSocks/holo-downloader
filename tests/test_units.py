@@ -180,6 +180,42 @@ def test_no_filters_passes():
     assert common.filtering({"id": "x", "title": "anything"}, "UCnofilter", ConfigHandler()) is True
 
 
+def test_members_scan_ignores_filters(monkeypatch):
+    """The [members_only] scan downloads every members stream, even if the channel has filters."""
+    import getMembers
+
+    class FakeYoutubeDL:
+        def __init__(self, options):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def extract_info(self, url, download=False):
+            assert url == "https://www.youtube.com/playlist?list=UUMOtitle"
+            return {"entries": [{"id": "members0001", "title": "Members chat", "live_status": "is_upcoming",
+                                 "release_timestamp": None, "channel_id": "UCtitle"}]}
+
+    monkeypatch.setattr(common, "YoutubeDL", FakeYoutubeDL)
+    monkeypatch.setattr(common, "extract_video", lambda *a, **k: {"description": "Gaming"})
+    monkeypatch.setattr(getMembers.kill_all, "wait", lambda *a, **k: False)
+    config = ConfigHandler(config={"members_only": {"filtered": "UCtitle"},
+                                   "title_filter": {"UCtitle": "(?i)karaoke"}})
+
+    # The same video is filtered out of a normal scan...
+    assert common.get_upcoming_or_live_videos("UCtitle", config, tab="membership") == []
+
+    class Output(list):
+        put = list.append
+
+    found = Output()
+    getMembers.main(found, config=config)
+    assert [video.id for video in found] == ["members0001"]
+
+
 def test_playlist_url():
     assert common.playlist_url("UCabc", "streams") == ("https://www.youtube.com/playlist?list=UUabc", True)
     assert common.playlist_url("UCabc", "membership") == ("https://www.youtube.com/playlist?list=UUMOabc", True)

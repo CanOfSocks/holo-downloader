@@ -127,6 +127,7 @@ The "unarchived channels" option saves the video stream urls (info.json file) to
 Filters allow you to restrict downloads based on REGEX strings.
 
 * **Logic:** If a filter is present, it **will** be used. Filters are **inclusive OR**; if either the title OR description matches the regex, the video is downloaded.
+* **Members only:** Filters are not applied to the `[members_only]` scan; every upcoming or live members stream of those channels is downloaded.
 * **Syntax:** Python `re` library syntax.
 
 ```toml

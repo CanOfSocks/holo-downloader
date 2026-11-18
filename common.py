@@ -414,10 +414,11 @@ def is_wanted_status(video: Dict[str, Any], config: ConfigHandler) -> bool:
 
 def get_upcoming_or_live_videos(channel_id: str, config: ConfigHandler, tab: str,
                                 passed_logger: Optional[logging.Logger] = None,
-                                active_ids: Optional[Container[str]] = None) -> List[DiscoveredVideo]:
+                                active_ids: Optional[Container[str]] = None,
+                                apply_filters: bool = True) -> List[DiscoveredVideo]:
     """
     Scan the start of a channel's uploads (or members) playlist for live, post-live and upcoming
-    videos that pass the channel's filters.
+    videos that pass the channel's filters (all of them if apply_filters is False).
 
     Videos in `active_ids` are already downloading: they are not extracted or filtered again, but
     are still returned when the listing shows their status, so the running download can be told
@@ -467,7 +468,7 @@ def get_upcoming_or_live_videos(channel_id: str, config: ConfigHandler, tab: str
         this_logger.debug("({1}) live_status = {0}, scheduled start = {2}".format(
             video.get('live_status'), video_id, video.get('release_timestamp')))
         # Cheap status/time check before the filters, which may need a full extraction for the description
-        if is_wanted_status(video, config) and filtering(video, entry_channel, config, this_logger):
+        if is_wanted_status(video, config) and (not apply_filters or filtering(video, entry_channel, config, this_logger)):
             found[video_id] = DiscoveredVideo(video_id, entry_channel, video.get('live_status'), video.get('release_timestamp'))
 
     return list(found.values())
