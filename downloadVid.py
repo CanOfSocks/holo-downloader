@@ -5,7 +5,7 @@ import threading
 from typing import Any, Dict, Optional, Union
 
 import discord_web
-from base_downloader import (STATUS_BEYOND_LOOK_AHEAD, STATUS_CANCELLED, STATUS_ERROR, STATUS_FINISHED,
+from base_downloader import (STATUS_BEYOND_LOOK_AHEAD, STATUS_CANCELLED, STATUS_FINISHED,
                              STATUS_STOPPED_MERGED, BaseDownloader)
 from common import DiscoveredVideo
 from getConfig import ConfigHandler
@@ -61,6 +61,6 @@ class VideoDownloader(BaseDownloader):
             self.set_status(STATUS_CANCELLED)
             self.logger.warning("Download of {0} was cancelled".format(self.id))
         except Exception as e:
-            self.set_status(STATUS_ERROR)
+            self.set_error(e)
             self.logger.exception("Error downloading video")
             self.notify("error", message=f"{type(e).__name__}: {e}"[-500:])

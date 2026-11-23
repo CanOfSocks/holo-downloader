@@ -114,18 +114,26 @@ def init_db() -> None:
                 type VARCHAR(20),
                 status VARCHAR(20),
                 total_size INTEGER,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                reason TEXT
             )
         ''')
+        # Databases created before the reason column was added
+        columns = {row[1] for row in conn.execute('PRAGMA table_info(history)')}
+        if 'reason' not in columns:
+            conn.execute('ALTER TABLE history ADD COLUMN reason TEXT')
 
 
 def save_to_history(job: ActiveJob) -> None:
     """Save a finished job and keep only the last HISTORY_LIMIT entries."""
-    stats = job.downloader.stats
+    downloader = job.downloader
+    stats = downloader.stats
     total_size = sum(int(stats.get(kind, {}).get("current_filesize") or 0) for kind in ("video", "audio"))
+    # Brief reason for an error (e.g. "Membership", "Private", "Processed")
+    reason = downloader.error_reason if downloader.status == STATUS_ERROR else None
     with closing(db_connect()) as conn, conn:
-        conn.execute('INSERT INTO history (video_id, type, total_size, status) VALUES (?, ?, ?, ?)',
-                     (job.video_id, job.kind, total_size, job.downloader.status))
+        conn.execute('INSERT INTO history (video_id, type, total_size, status, reason) VALUES (?, ?, ?, ?, ?)',
+                     (job.video_id, job.kind, total_size, downloader.status, reason))
         conn.execute('DELETE FROM history WHERE id NOT IN (SELECT id FROM history ORDER BY id DESC LIMIT ?)', (HISTORY_LIMIT,))
 
 
@@ -170,9 +178,9 @@ def run_job(job: ActiveJob) -> None:
     """Thread target for a download. Always records the result in history and removes the job."""
     try:
         job.downloader.main()
-    except Exception:
+    except Exception as e:
         logger.exception(f"Error downloading {job.video_id}")
-        job.downloader.set_status(STATUS_ERROR)
+        job.downloader.set_error(e)
     finally:
         try:
             save_to_history(job)
@@ -292,8 +300,11 @@ def check_stalls() -> None:
 
     for job in snapshot_jobs():
         downloader = job.downloader
+        was_stalled = job.stall.stalled
         became_stalled = job.stall.update(downloader.status, downloader.stats,
                                           downloader.livestream_downloader.minimum_refresh_time, stall_timeout)
+        if was_stalled and not job.stall.stalled:
+            downloader.logger.info("Download is no longer stalled")
         if became_stalled:
             message = f"No new segments for {stall_timeout / 60:.0f} minutes. {job.stall.reason}."
             if auto_merge > 0:

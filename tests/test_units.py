@@ -5,10 +5,13 @@ from datetime import datetime, timezone
 import pytest
 
 import common
-from base_downloader import LATE_BACKOFF_DIVISOR, next_upcoming_check_delay
+import yt_dlp
+
+from base_downloader import LATE_BACKOFF_DIVISOR, describe_error, next_upcoming_check_delay
 from common import DiscoveredVideo, WaitResult
 from getConfig import MINIMUM_RECHECK_SECONDS, ConfigHandler
 from getJson import parse_utc
+from livestream_dl import getUrls
 from monitor import REASON_FAILING, REASON_NO_NEW_SEGMENTS, REASON_RATE_LIMITED, StallTracker
 from unarchived import CheapCheck, classify_oembed
 
@@ -105,6 +108,32 @@ def test_progress_clears_stall_and_other_statuses_never_stall():
     assert not tracker.stalled
 
 
+def test_stall_clears_when_segments_resume_after_stats_reset():
+    # livestream_dl resets a stream's stats when handing it over to recovery: the count starts
+    # again below the previous value, and the first new segment must clear the stall
+    tracker = StallTracker()
+    tracker.update("Recording", _stats(500, 500), 30.0, 900, now_monotonic=0)
+    assert tracker.update("Recording", _stats(500, 500), 30.0, 900, now_monotonic=1000) is True
+    tracker.update("Recording", {"status": "Recording", "video": {}, "audio": {}}, 30.0, 900, now_monotonic=1030)
+    assert tracker.stalled
+    tracker.update("Recording", _stats(450, 520), 30.0, 900, now_monotonic=1060)
+    assert tracker.stalled
+    tracker.update("Recording", _stats(451, 520), 30.0, 900, now_monotonic=1090)
+    assert not tracker.stalled and tracker.reason is None
+    # And it can stall (and auto merge) again later
+    assert tracker.update("Recording", _stats(451, 520), 30.0, 900, now_monotonic=2000) is True
+
+
+def test_stall_clears_when_only_one_stream_resumes():
+    tracker = StallTracker()
+    tracker.update("Recording", _stats(10, 10), 30.0, 900, now_monotonic=0)
+    tracker.update("Recording", _stats(10, 10), 30.0, 900, now_monotonic=1000)
+    stats = _stats(10, 10)
+    stats["audio"]["downloaded_segments"] = 11
+    tracker.update("Recording", stats, 30.0, 900, now_monotonic=1030)
+    assert not tracker.stalled
+
+
 def test_auto_merge_only_once_and_only_when_enabled():
     tracker = StallTracker()
     tracker.update("Recording", _stats(1, 1), 30.0, 900, now_monotonic=0)
@@ -113,6 +142,27 @@ def test_auto_merge_only_once_and_only_when_enabled():
     assert tracker.should_auto_merge(600, now_monotonic=1500) is False
     assert tracker.should_auto_merge(600, now_monotonic=1700) is True
     assert tracker.should_auto_merge(600, now_monotonic=1800) is False
+
+
+# --- Error reasons ---
+
+@pytest.mark.parametrize("error, expected", [
+    (getUrls.VideoInaccessibleError("Video abc is a membership or premium video"), "Membership"),
+    (getUrls.VideoInaccessibleError("Video abc is private"), "Private"),
+    (getUrls.VideoInaccessibleError("Video is age-restricted and requires valid cookies"), "Age restricted"),
+    (getUrls.VideoInaccessibleError("This live stream recording is not available."), "Recording unavailable"),
+    (getUrls.VideoInaccessibleError("Something else"), "Inaccessible"),
+    (getUrls.VideoProcessedError("Video has been processed, please use yt-dlp directly"), "Processed"),
+    (getUrls.VideoUnavailableError("Video abc is unavailable"), "Unavailable"),
+    (getUrls.RateLimitException("Rate limited"), "Rate limited"),
+    (getUrls.VideoDownloadError("outstanding segments"), "Missing segments"),
+    (TimeoutError("Current time exceeds latest URL expiry time of x"), "URLs expired"),
+    (yt_dlp.utils.DownloadError("ERROR: Join this channel to get access to members-only content"), "Membership"),
+    (yt_dlp.utils.DownloadError("ERROR: something odd"), "yt-dlp error"),
+    (ValueError("boom"), "ValueError"),
+])
+def test_describe_error(error, expected):
+    assert describe_error(error) == expected
 
 
 # --- Cheap check classification ---

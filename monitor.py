@@ -39,7 +39,10 @@ class StallTracker:
     # time.monotonic() is used for durations (unaffected by clock changes), time.time() for display
     last_progress_monotonic: float = field(default_factory=time.monotonic)
     last_progress_time: float = field(default_factory=time.time)
-    last_downloaded: int = -1
+    # Downloaded segments per stream type at the last sample. Tracked per stream (not as a total)
+    # because livestream_dl resets a stream's stats when it restarts it, e.g. when handing a
+    # privated stream over to recovery: the count then drops and starts again from a lower value.
+    last_downloaded: dict[str, int] = field(default_factory=dict)
     # Latest sequence when progress was last seen, to tell "YouTube has no new segments" apart
     # from "new segments exist but aren't downloading"
     latest_at_last_progress: int = -1
@@ -57,6 +60,28 @@ class StallTracker:
         self.stalled_since = None
         self.reason = None
 
+    def _sample_segments(self, stats: dict) -> tuple[bool, bool]:
+        """
+        Compare each stream's downloaded segments with the previous sample.
+        Returns (progressed, new_stream): a count went up / a stream was seen for the first time.
+        A count that went down (the stream was restarted) becomes the new baseline, so the next
+        downloaded segment counts as progress instead of having to catch up with the old count.
+        """
+        progressed = new_stream = False
+        for kind in STREAM_TYPES:
+            stream = stats.get(kind)
+            if not isinstance(stream, dict) or stream.get("downloaded_segments") is None:
+                # Not started, or just reset and not reported yet: keep the previous baseline
+                continue
+            count = int(stream.get("downloaded_segments") or 0)
+            previous = self.last_downloaded.get(kind)
+            if previous is None:
+                new_stream = True
+            elif count > previous:
+                progressed = True
+            self.last_downloaded[kind] = count
+        return progressed, new_stream
+
     def update(self, status: str, stats: dict, refresh_backoff: float, stall_timeout: float,
                now_monotonic: Optional[float] = None) -> bool:
         """
@@ -64,21 +89,24 @@ class StallTracker:
         `refresh_backoff` is LiveStreamDownloader.minimum_refresh_time.
         """
         now = time.monotonic() if now_monotonic is None else now_monotonic
-        downloaded, latest = segment_totals(stats)
+        _, latest = segment_totals(stats)
         self.last_latest = latest
+        progressed, new_stream = self._sample_segments(stats)
+        # The latest sequence total also drops when a stream's stats are reset
+        self.latest_at_last_progress = min(self.latest_at_last_progress, latest)
 
         if str(status).lower() != "recording":
             # Waiting, muxing etc. are not stalls; the timer starts again when recording (re)starts
             self._reset(now)
-            self.last_downloaded = downloaded
             self.latest_at_last_progress = latest
             return False
 
-        if downloaded > self.last_downloaded:
-            self.last_downloaded = downloaded
+        if progressed or new_stream:
+            # Segments are downloading (again): no longer stalled
             self.latest_at_last_progress = latest
             self._reset(now)
             self.notified = False
+            self.auto_merge_triggered = False
             return False
 
         if now - self.last_progress_monotonic < stall_timeout:

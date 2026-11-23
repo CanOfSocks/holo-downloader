@@ -4,6 +4,7 @@ monitor (unarchived.UnarchivedDownloader): waiting for an upcoming stream, accep
 from channel scans, and the controls used by the web UI (cancel, check now, stop & merge).
 """
 import copy
+import errno
 import logging
 import threading
 import time
@@ -31,6 +32,52 @@ STATUS_FINISHED = "Finished"
 STATUS_STOPPED_MERGED = "Stopped (merged)"
 # The scheduled start moved beyond `look_ahead`; a later channel scan starts it again once it is within the window
 STATUS_BEYOND_LOOK_AHEAD = "Beyond look-ahead"
+
+
+# Short reasons for an error, shown next to the status in the web UI's history. Checked in order
+# against the message of a VideoInaccessibleError (see getUrls._classify_download_error).
+_INACCESSIBLE_REASONS = (
+    ("member", "Membership"),
+    ("premium", "Membership"),
+    ("private", "Private"),
+    ("age-restricted", "Age restricted"),
+    ("region-locked", "Region locked"),
+    ("copyright", "Copyright claim"),
+    ("terminated", "Terminated"),
+    ("recording is not available", "Recording unavailable"),
+    ("removed", "Removed"),
+    ("not available on this player", "Player unsupported"),
+)
+
+
+def describe_error(error: BaseException) -> str:
+    """A brief reason for a failed download (e.g. "Membership", "Private", "Processed")."""
+    if isinstance(error, yt_dlp.utils.DownloadError):
+        # Unclassified yt-dlp errors: classify them the same way as livestream_dl does
+        classified = getUrls._classify_download_error(error, "")
+        if classified is error:
+            return "yt-dlp error"
+        error = classified
+    if isinstance(error, getUrls.VideoInaccessibleError):
+        message = str(error).lower()
+        return next((reason for text, reason in _INACCESSIBLE_REASONS if text in message), "Inaccessible")
+    if isinstance(error, getUrls.VideoProcessedError):
+        return "Processed"
+    if isinstance(error, getUrls.VideoUnavailableError):
+        return "Unavailable"
+    if isinstance(error, getUrls.RateLimitException):
+        return "Rate limited"
+    if isinstance(error, getUrls.LivestreamError):
+        return "Stream ended"
+    if isinstance(error, getUrls.VideoDownloadError):
+        return "Missing segments"
+    if isinstance(error, getUrls.MaxRetryExceededError):
+        return "Retries exceeded"
+    if isinstance(error, TimeoutError):
+        return "URLs expired" if "expir" in str(error).lower() else "Timed out"
+    if isinstance(error, OSError) and error.errno == errno.ENOSPC:
+        return "Disk full"
+    return type(error).__name__
 
 
 def next_upcoming_check_delay(scheduled_start: Optional[float], now: float, recheck_max: float, late_max: float) -> float:
@@ -85,6 +132,9 @@ class BaseDownloader:
         # Epoch time of the next planned check, shown in the web UI while waiting
         self.next_check_at: Optional[float] = None
 
+        # Brief reason for the last error (see describe_error), saved in history with STATUS_ERROR
+        self.error_reason: Optional[str] = None
+
         # Small dicts used for display (the full info_dict is not kept)
         self.embed_info: Dict[str, Any] = {}
         self.info_dict: Dict[str, Any] = {}
@@ -101,6 +151,11 @@ class BaseDownloader:
 
     def set_status(self, status: str) -> None:
         self.stats["status"] = status
+
+    def set_error(self, error: BaseException) -> None:
+        """Set STATUS_ERROR and remember a brief reason for it."""
+        self.error_reason = describe_error(error)
+        self.set_status(STATUS_ERROR)
 
     def is_recording(self) -> bool:
         return str(self.status).lower() == "recording"

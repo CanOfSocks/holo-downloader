@@ -6,6 +6,7 @@ import pytest
 
 import web
 from common import DiscoveredVideo
+from livestream_dl import getUrls
 from downloadVid import VideoDownloader
 from unarchived import UnarchivedDownloader
 
@@ -62,6 +63,22 @@ def test_stalled_job_highlights_merge(client):
     job.stall.update("Recording", job.downloader.stats, 30.0, 60, now_monotonic=time.monotonic() + 120)
     body = client.get("/data/active").get_data(as_text=True)
     assert "Stalled" in body and "btn-warning" in body
+
+
+def test_history_shows_error_reason(client):
+    web.init_db()
+    job = add_fake_job("stream", "M7lc1UVf-VE", "Recording", VideoDownloader)
+    job.downloader.set_error(getUrls.VideoInaccessibleError("Video M7lc1UVf-VE is a membership or premium video"))
+    web.save_to_history(job)
+    finished = add_fake_job("stream", "dQw4w9WgXcQ", "Finished", VideoDownloader)
+    finished.downloader.error_reason = "Private"    # From an earlier attempt: not shown for a finished download
+    web.save_to_history(finished)
+
+    body = client.get("/data/history").get_data(as_text=True)
+    assert "Membership" in body and "Private" not in body
+    rows = {row["video_id"]: row for row in client.get("/api/history").get_json()}
+    assert rows["M7lc1UVf-VE"]["status"] == "Error" and rows["M7lc1UVf-VE"]["reason"] == "Membership"
+    assert rows["dQw4w9WgXcQ"]["reason"] is None
 
 
 def test_api_active_includes_stall_fields(client):

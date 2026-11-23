@@ -17,7 +17,7 @@ The program supports standard streams, members-only content, unarchived (private
 
 
 * **Resiliency**: Uses `livestream_dl` (a custom wrapper around `yt-dlp` and `ffmpeg`) to handle stream interruptions and segment merging.
-* **Web UI**: A Flask-based interface (port 5000) for desktop and mobile to view active downloads, history, and schedules. Downloads that stop receiving segments are flagged as **stalled** and can be stopped and merged from the UI. Times are shown in the browser's timezone.
+* **Web UI**: A Flask-based interface (port 5000) for desktop and mobile to view active downloads, history, and schedules. Downloads that stop receiving segments are flagged as **stalled** and can be stopped and merged from the UI. Failed downloads show a brief reason in the history (e.g. *Membership*, *Private*, *Processed*). Times are shown in the browser's timezone.
 * **Notifications**: Integrates with Discord Webhooks for status updates (Recording, Done, Error).
 * **Flexible Filtering**: Filter downloads by regex matching on video titles or descriptions.
 
@@ -279,6 +279,8 @@ A download is marked **stalled** when it is recording but no new segments have b
 * *No new segments from YouTube*: the stream is paused, or it ended without the end being detected.
 * *Segments are failing to download*: YouTube has newer segments, but they can't be downloaded.
 * *yt-dlp is backing off after rate limiting*: URL refreshes are being delayed after rate limiting.
+
+The stalled flag is cleared as soon as a new segment is downloaded again, including after `livestream_dl` restarts a stream (for example when handing a privated stream over to recovery).
 
 **Stop & merge** (⏹️) ends a recording download and merges/moves what has been downloaded so far, as if the stream had ended. It is available for every recording download and highlighted for stalled ones. **Cancel** (🗑️) stops without merging. Waiting downloads also have **Check now** (🔄).
 

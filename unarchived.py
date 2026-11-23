@@ -371,7 +371,7 @@ class UnarchivedDownloader(BaseDownloader):
             raise
         except Exception as e:
             self.logger.exception(e)
-            self.set_status(STATUS_ERROR)
+            self.set_error(e)
             self.notify("error", message=f"{e}\n{traceback.format_exc()}"[-1000:])
             return False
 
