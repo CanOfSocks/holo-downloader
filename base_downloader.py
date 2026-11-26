@@ -23,6 +23,14 @@ from livestream_dl.download_Live import LiveStreamDownloader
 # minutes late is picked up quickly; one that is hours late (or never starts) is checked rarely.
 LATE_BACKOFF_DIVISOR = 4
 
+# An extraction reporting the video private is only believed when the next one, this many seconds
+# later, reports it again. One degraded extraction ("No title found in player responses") has been
+# seen reporting a working stream as private, and livestream_dl confirms such reports the same way.
+PRIVATE_CONFIRM_DELAY = 60
+
+# yt-dlp live statuses of a stream that is over and has been (or is being) processed
+ENDED_LIVE_STATUSES = ("was_live", "not_live")
+
 # Status shown in the web UI and stored in history. livestream_dl sets its own statuses
 # ("Starting", "Recording", "Muxing", "Moving", "Finished", "Cancelled") in the same place.
 STATUS_WAITING = "Waiting"
@@ -134,6 +142,8 @@ class BaseDownloader:
 
         # Brief reason for the last error (see describe_error), saved in history with STATUS_ERROR
         self.error_reason: Optional[str] = None
+        # Consecutive extractions reporting the video private (see private_needs_confirmation)
+        self._private_reports: int = 0
 
         # Small dicts used for display (the full info_dict is not kept)
         self.embed_info: Dict[str, Any] = {}
@@ -159,6 +169,25 @@ class BaseDownloader:
 
     def is_recording(self) -> bool:
         return str(self.status).lower() == "recording"
+
+    def missing_segments(self) -> int:
+        """
+        Segments livestream_dl could not download, for the format missing the most. livestream_dl
+        records the count when a format finishes (not after "Stop & merge").
+        """
+        return max((int((self.stats.get(kind) or {}).get("missing_segments") or 0) for kind in ("video", "audio")), default=0)
+
+    def history_reason(self) -> Optional[str]:
+        """Note saved in history: the error reason, or how many segments a finished download is missing."""
+        if self.status == STATUS_ERROR:
+            return self.error_reason
+        if self.status != STATUS_FINISHED:
+            # A cancelled or stopped download may have counts from a format that finished first
+            return None
+        missing = self.missing_segments()
+        if missing:
+            return "{0} segment{1} missing".format(missing, "" if missing == 1 else "s")
+        return None
 
     def display_info(self) -> Dict[str, Any]:
         return {
@@ -234,6 +263,20 @@ class BaseDownloader:
     def wait(self, seconds: float) -> WaitResult:
         return common.interruptible_wait(seconds, stop=self.kill_this, wake=self.wake)
 
+    def wait_at_least(self, seconds: float) -> bool:
+        """
+        Wait `seconds` without being cut short by channel scan updates (which only set wake).
+        "Check now" still ends the wait. Returns False if the job was cancelled.
+        """
+        deadline = time.monotonic() + seconds
+        while True:
+            result = self.wait(max(deadline - time.monotonic(), 0.0))
+            if result is WaitResult.STOPPED:
+                return False
+            if result is WaitResult.ELAPSED or self._force_check or time.monotonic() >= deadline:
+                self._force_check = False
+                return True
+
     def wait_until_next_check(self) -> bool:
         """
         Wait until the next check of an upcoming stream is due. Returns False if cancelled, or if
@@ -295,12 +338,34 @@ class BaseDownloader:
                     raise
                 raise classified from e
 
+    def private_needs_confirmation(self, error: BaseException) -> bool:
+        """
+        True (and logged) for the first of consecutive extractions reporting the video private: the
+        caller checks again after PRIVATE_CONFIRM_DELAY instead of giving up or starting recovery.
+        Later reports return False until an extraction succeeds again.
+        """
+        if not isinstance(error, getUrls.VideoInaccessibleError) or "private" not in str(error).lower():
+            return False
+        self._private_reports += 1
+        if self._private_reports > 1:
+            return False
+        self.logger.warning("Extraction reported the video private ({0}), checking again in {1}s before treating it as private".format(
+            error, PRIVATE_CONFIRM_DELAY))
+        return True
+
     def extract_info(self, include_dash: bool = False, include_m3u8: bool = False) -> tuple[dict, str]:
         """
         One full yt-dlp extraction, without yt-dlp's own wait loop (which can't be interrupted).
         Returns (info_dict, live_status). Usable formats are only included once the stream is
         live; for an upcoming stream the info has live_status "is_upcoming" and no formats.
+        """
+        info_dict, live_status = self._extract_info(include_dash=include_dash, include_m3u8=include_m3u8)
+        # The video is accessible, so a later "private" report needs confirming again
+        self._private_reports = 0
+        return info_dict, live_status
 
+    def _extract_info(self, include_dash: bool, include_m3u8: bool) -> tuple[dict, str]:
+        """
         While the stream is expected to be upcoming, probe_status() is used so each check costs
         one extraction. Once it reports the stream live, get_Video_Info extracts it again to get
         the processed formats livestream_dl needs.
@@ -308,13 +373,18 @@ class BaseDownloader:
         if self.hinted_live_status == "is_upcoming":
             info_dict = self.probe_status()
             live_status = info_dict.get('live_status')
-            if live_status not in ("is_upcoming", *common.LIVE_STATUSES):
+            if live_status == "was_live":
+                # Ended since the last check. get_Video_Info decides whether it is processed by its
+                # URLs: while live stream URLs are still listed it is downloaded like post_live.
+                self.logger.info("Stream has ended, checking whether it can still be downloaded")
+            elif live_status not in ("is_upcoming", *common.LIVE_STATUSES):
                 # Same check as get_Video_Info: a processed video can't be downloaded as a stream
                 raise getUrls.VideoProcessedError("Video has been processed, please use yt-dlp directly")
-            if live_status == "is_upcoming" or not info_dict.get('formats'):
+            elif live_status == "is_upcoming" or not info_dict.get('formats'):
                 self.hinted_live_status = live_status
                 return info_dict, live_status
-            self.logger.info("Stream is now {0}, extracting formats".format(live_status))
+            else:
+                self.logger.info("Stream is now {0}, extracting formats".format(live_status))
 
         try:
             info_dict, live_status = getUrls.get_Video_Info(
@@ -336,6 +406,10 @@ class BaseDownloader:
             # video, where the status wasn't known in advance). Get its status and start time.
             info_dict = self.probe_status()
             live_status = info_dict.get('live_status')
+            if live_status in ENDED_LIVE_STATUSES:
+                # Ended, and get_Video_Info found nothing to download: callers would otherwise
+                # keep checking it as a live stream whose formats haven't appeared yet
+                raise getUrls.VideoProcessedError("Video has been processed, please use yt-dlp directly")
         self.hinted_live_status = live_status
         return info_dict, live_status
 
@@ -352,7 +426,15 @@ class BaseDownloader:
                 return None
 
         while True:
-            info_dict, live_status = self.extract_info(include_dash=include_dash, include_m3u8=include_m3u8)
+            try:
+                info_dict, live_status = self.extract_info(include_dash=include_dash, include_m3u8=include_m3u8)
+            except getUrls.VideoInaccessibleError as e:
+                if not self.private_needs_confirmation(e):
+                    raise
+                self.set_status(STATUS_WAITING)
+                if not self.wait_at_least(PRIVATE_CONFIRM_DELAY):
+                    return None
+                continue
             if live_status in common.LIVE_STATUSES and info_dict.get('formats'):
                 # Later channel scans reporting it live then don't trigger another check
                 self.hinted_live_status = live_status

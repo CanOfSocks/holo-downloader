@@ -414,9 +414,182 @@ def test_other_extraction_errors_still_raise(monkeypatch):
 def test_upcoming_hint_but_processed_video_raises(monkeypatch):
     from livestream_dl import getUrls
     downloader = _downloader(live_status="is_upcoming")
+    monkeypatch.setattr(downloader, "probe_status", lambda: {"live_status": "not_live"})
+    monkeypatch.setattr(getUrls, "get_Video_Info", lambda **kw: pytest.fail("not_live is processed, no second extraction"))
+    with pytest.raises(getUrls.VideoProcessedError):
+        downloader.extract_info()
+
+
+def test_upcoming_hint_was_live_is_decided_by_get_video_info(monkeypatch):
+    from livestream_dl import getUrls
+    downloader = _downloader(live_status="is_upcoming")
+    monkeypatch.setattr(downloader, "probe_status", lambda: {"live_status": "was_live", "formats": [{"format_id": "1"}]})
+    # livestream_dl reports post_live while the formats still have live stream URLs
+    monkeypatch.setattr(getUrls, "get_Video_Info", lambda **kw: ({"live_status": "was_live", "formats": ["live"]}, "post_live"))
+    info, status = downloader.extract_info()
+    assert status == "post_live" and downloader.hinted_live_status == "post_live"
+
+    downloader = _downloader(live_status="is_upcoming")
+    monkeypatch.setattr(downloader, "probe_status", lambda: {"live_status": "was_live"})
+
+    def processed(**kw):
+        raise getUrls.VideoProcessedError("Video has been processed, please use yt-dlp directly")
+    monkeypatch.setattr(getUrls, "get_Video_Info", processed)
+    with pytest.raises(getUrls.VideoProcessedError):
+        downloader.extract_info()
+
+
+@pytest.mark.parametrize("hint", ["is_upcoming", None])
+def test_ended_video_without_formats_raises_processed(monkeypatch, hint):
+    from livestream_dl import getUrls
+
+    def no_formats(**kw):
+        raise yt_dlp.utils.DownloadError("requested format is not available")
+    downloader = _downloader(live_status=hint)
+    monkeypatch.setattr(getUrls, "get_Video_Info", no_formats)
     monkeypatch.setattr(downloader, "probe_status", lambda: {"live_status": "was_live"})
     with pytest.raises(getUrls.VideoProcessedError):
         downloader.extract_info()
+
+
+def test_wait_at_least_ignores_wake_but_not_check_now():
+    downloader = _downloader()
+    downloader.wake.set()    # A channel scan update
+    started = time.monotonic()
+    assert downloader.wait_at_least(0.3) is True
+    assert time.monotonic() - started >= 0.29
+
+    downloader.check_now()
+    started = time.monotonic()
+    assert downloader.wait_at_least(30) is True
+    assert time.monotonic() - started < 5 and downloader._force_check is False
+
+    downloader.kill_this.set()
+    assert downloader.wait_at_least(30) is False
+
+
+def test_private_report_is_confirmed_before_giving_up(monkeypatch):
+    from livestream_dl import getUrls
+    downloader = _downloader()
+    calls = []
+
+    def extract(**kw):
+        calls.append(1)
+        if len(calls) == 1:
+            raise getUrls.VideoInaccessibleError("Video dQw4w9WgXcQ is private")
+        return {"live_status": "is_live", "formats": ["f"]}, "is_live"
+    monkeypatch.setattr(getUrls, "get_Video_Info", extract)
+    waits = []
+    monkeypatch.setattr(downloader, "wait", lambda seconds: waits.append(seconds) or WaitResult.ELAPSED)
+    assert downloader.wait_for_stream() == {"live_status": "is_live", "formats": ["f"]}
+    assert len(calls) == 2 and len(waits) == 1 and waits[0] == pytest.approx(60, abs=1)
+
+
+def test_repeated_private_report_raises(monkeypatch):
+    from livestream_dl import getUrls
+    downloader = _downloader()
+
+    def private(**kw):
+        raise getUrls.VideoInaccessibleError("Video dQw4w9WgXcQ is private")
+    monkeypatch.setattr(getUrls, "get_Video_Info", private)
+    monkeypatch.setattr(downloader, "wait", lambda seconds: WaitResult.ELAPSED)
+    with pytest.raises(getUrls.VideoInaccessibleError):
+        downloader.wait_for_stream()
+
+
+def test_other_inaccessible_errors_are_not_retried(monkeypatch):
+    from livestream_dl import getUrls
+    downloader = _downloader()
+
+    def members(**kw):
+        raise getUrls.VideoInaccessibleError("Video dQw4w9WgXcQ is a membership or premium video")
+    monkeypatch.setattr(getUrls, "get_Video_Info", members)
+    monkeypatch.setattr(downloader, "wait", lambda seconds: pytest.fail("membership errors are not confirmed"))
+    with pytest.raises(getUrls.VideoInaccessibleError):
+        downloader.wait_for_stream()
+
+
+def test_unarchived_private_report_is_confirmed_before_recovery(monkeypatch):
+    from livestream_dl import getUrls
+    from unarchived import Refresh, UnarchivedDownloader
+    downloader = UnarchivedDownloader(DiscoveredVideo("dQw4w9WgXcQ"))
+
+    def private(**kw):
+        raise getUrls.VideoInaccessibleError("Video dQw4w9WgXcQ is private")
+    monkeypatch.setattr(getUrls, "get_Video_Info", private)
+    before = time.time()
+    assert downloader.refresh_urls() is Refresh.UNCONFIRMED
+    assert before + 59 <= downloader.next_url_refresh <= time.time() + 61
+    assert downloader.refresh_urls() is Refresh.PRIVATE
+    # Still private after a failed recovery: no further confirmation
+    assert downloader.refresh_urls() is Refresh.PRIVATE
+
+
+def test_history_reason_reports_missing_segments():
+    downloader = _downloader()
+    assert downloader.history_reason() is None
+    downloader.stats["video"] = {"missing_segments": 3}
+    downloader.stats["audio"] = {"missing_segments": 1}
+    downloader.set_status("Finished")
+    assert downloader.history_reason() == "3 segments missing"
+    downloader.stats["video"] = {"missing_segments": 1}
+    assert downloader.history_reason() == "1 segment missing"
+    downloader.set_status("Cancelled")
+    assert downloader.history_reason() is None
+    downloader.set_error(getUrls.VideoInaccessibleError("Video abc is private"))
+    assert downloader.history_reason() == "Private"
+
+
+def _unarchived_with_saved_json(age: float):
+    """An unarchived monitor whose saved info.json was extracted `age` seconds ago."""
+    import json
+    import os
+    from unarchived import UnarchivedDownloader
+    downloader = UnarchivedDownloader(DiscoveredVideo("dQw4w9WgXcQ"))
+    os.makedirs(os.path.dirname(downloader.json_path), exist_ok=True)
+    with open(downloader.json_path, "w", encoding="utf-8") as f:
+        json.dump({"id": "dQw4w9WgXcQ", "epoch": time.time() - age}, f)
+    downloader.json_saved_at = downloader._saved_json_time()
+    return downloader
+
+
+def _bot_check(**kw):
+    raise getUrls.RateLimitException("Rate limited or blocked by YouTube anti-bot measures")
+
+
+def test_unarchived_rate_limit_retries_without_error_notification(monkeypatch):
+    from unarchived import INFO_JSON_MAX_AGE, RECOVER_BEFORE_EXPIRY, URL_REFRESH_RETRY, Refresh
+    downloader = _unarchived_with_saved_json(age=INFO_JSON_MAX_AGE - RECOVER_BEFORE_EXPIRY - 300)
+    monkeypatch.setattr(getUrls, "get_Video_Info", _bot_check)
+    monkeypatch.setattr(downloader, "notify", lambda *a, **kw: pytest.fail("no error notification for a rate limit"))
+    assert downloader.refresh_urls() is Refresh.RATE_LIMITED
+    # Retried at the recovery deadline (5 minutes away), not URL_REFRESH_RETRY later
+    assert downloader.next_url_refresh == pytest.approx(downloader._recovery_deadline(), abs=1)
+    assert downloader.next_url_refresh < time.time() + URL_REFRESH_RETRY
+
+
+def test_unarchived_recovers_before_saved_urls_expire(monkeypatch):
+    from unarchived import INFO_JSON_MAX_AGE, RECOVER_BEFORE_EXPIRY
+    downloader = _unarchived_with_saved_json(age=INFO_JSON_MAX_AGE - RECOVER_BEFORE_EXPIRY + 60)
+    monkeypatch.setattr(getUrls, "get_Video_Info", _bot_check)
+    recovered = []
+    monkeypatch.setattr(downloader, "recover", lambda: recovered.append(1) or True)
+    downloader.next_url_refresh = 0.0
+    downloader._monitor()
+    assert recovered == [1]
+
+
+def test_unarchived_expiry_recovery_conditions():
+    from unarchived import INFO_JSON_MAX_AGE, RECOVER_BEFORE_EXPIRY
+    early = _unarchived_with_saved_json(age=3600)
+    assert early._recover_before_expiry(suspicious=False) is False
+    late = _unarchived_with_saved_json(age=INFO_JSON_MAX_AGE - RECOVER_BEFORE_EXPIRY + 60)
+    late.processed = True
+    # Public archive: only if the cheap check has since reported the video inaccessible
+    assert late._recover_before_expiry(suspicious=False) is False
+    assert late._recover_before_expiry(suspicious=True) is True
+    # Only tried once
+    assert late._recover_before_expiry(suspicious=True) is False
 
 
 def test_discovery_hint_wakes_waiting_job():

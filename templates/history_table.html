@@ -21,7 +21,7 @@
             <td class="d-none d-sm-table-cell">{{ row.type }}</td>
             <td>
                 <span class="badge {{ status_color(row.status) }}">{{ row.status }}</span>
-                {% if row.reason %}<span class="text-danger-emphasis ms-1">{{ row.reason }}</span>{% endif %}
+                {% if row.reason %}<span class="{{ 'text-danger-emphasis' if (row.status or '') | lower == 'error' else 'text-warning-emphasis' }} ms-1">{{ row.reason }}</span>{% endif %}
             </td>
             <td class="text-nowrap d-none d-sm-table-cell">{{ row.total_size | convert_bytes }}</td>
             <td class="text-nowrap">{{ local_time(row.timestamp | utc_iso) }}</td>

@@ -24,8 +24,8 @@ from typing import Optional, Union
 
 import common
 import discord_web
-from base_downloader import (STATUS_CANCELLED, STATUS_ERROR, STATUS_FINISHED, STATUS_STOPPED_MERGED,
-                             STATUS_WAITING, BaseDownloader, next_upcoming_check_delay)
+from base_downloader import (PRIVATE_CONFIRM_DELAY, STATUS_CANCELLED, STATUS_ERROR, STATUS_FINISHED,
+                             STATUS_STOPPED_MERGED, STATUS_WAITING, BaseDownloader, next_upcoming_check_delay)
 from common import DiscoveredVideo, WaitResult
 from getChatOnly import ChatOnlyDownloader
 from getConfig import ConfigHandler, MINIMUM_RECHECK_SECONDS
@@ -41,6 +41,10 @@ URL_REFRESH_EARLY_JITTER = 300        # Refreshes happen up to this much earlier
 URL_REFRESH_RETRY = 1200              # Retry delay after a failed extraction
 RECOVERY_RETRY_DELAY = 3600           # Wait before retrying a failed recovery (while the URLs are still valid)
 INFO_JSON_MAX_AGE = 6 * 3600          # Saved URLs expire after about 6 hours, so the monitor stops then
+# While URL refreshes fail (rate limiting, YouTube's bot check), whether the video turned private
+# can't be confirmed. So the saved URLs aren't wasted, recovery is started with them this long before
+# they expire if the refreshes are still failing then.
+RECOVER_BEFORE_EXPIRY = 1800
 CHAT_THREAD_JOIN_TIMEOUT = 15
 
 STATUS_MONITORING = "Monitoring"
@@ -71,8 +75,10 @@ class Refresh(enum.Enum):
     UPCOMING = "upcoming"      # Not started yet
     NOT_READY = "not_ready"    # Live but no formats yet
     PRIVATE = "private"        # Inaccessible (private, members-only, removed...)
+    UNCONFIRMED = "unconfirmed"  # Reported private once: checked again before recovery (see private_needs_confirmation)
     PROCESSED = "processed"    # Archive is public, so there is nothing to recover
-    FAILED = "failed"          # Any other error (network, rate limit...)
+    RATE_LIMITED = "rate_limited"  # Rate limited or stopped by YouTube's bot check
+    FAILED = "failed"          # Any other error (network, ...)
 
 
 class UnarchivedDownloader(BaseDownloader):
@@ -99,6 +105,8 @@ class UnarchivedDownloader(BaseDownloader):
         self._cheap_check_unusable_logged: bool = False
         # Set once the archive is public; URL refreshes are then no longer useful
         self.processed: bool = False
+        # Recovery was started because refreshes failed with the saved URLs close to expiry (see _recover_before_expiry)
+        self._expiry_recovery_tried: bool = False
 
     def notify(self, status: str, message: Optional[str] = None) -> None:
         discord_web.notify(self.id, status, message=message, config=self.config, embed_info=self.embed_info or None)
@@ -128,13 +136,21 @@ class UnarchivedDownloader(BaseDownloader):
 
             now = time.time()
             outcome: Optional[Refresh] = None
+            suspicious = False
             if self._force_check or now >= self.next_url_refresh:
                 self._force_check = False
                 outcome = self.refresh_urls()
             elif self.next_cheap_check is not None and now >= self.next_cheap_check:
                 if self.cheap_check() is CheapCheck.SUSPICIOUS:
                     self.logger.info("oEmbed check suggests the video is no longer accessible, confirming with a full extraction")
+                    suspicious = True
                     outcome = self.refresh_urls()
+
+            if outcome in (Refresh.RATE_LIMITED, Refresh.FAILED) and self._recover_before_expiry(suspicious):
+                if self.recover():
+                    return
+                self.logger.info("Recovery with the expiring stream URLs failed, monitoring until they expire")
+                continue
 
             if outcome is Refresh.PRIVATE:
                 if not os.path.exists(self.json_path):
@@ -174,6 +190,37 @@ class UnarchivedDownloader(BaseDownloader):
             self.next_url_refresh = time.time() + self._upcoming_delay()
         return result
 
+    def _recovery_deadline(self) -> Optional[float]:
+        """When recovery is started if URL refreshes are still failing (see RECOVER_BEFORE_EXPIRY)."""
+        if self.json_saved_at is None:
+            return None
+        return self.json_saved_at + INFO_JSON_MAX_AGE - RECOVER_BEFORE_EXPIRY
+
+    def _retry_after_failure(self, now: float) -> float:
+        """Next refresh after a failed one: URL_REFRESH_RETRY later, but not after the recovery deadline."""
+        retry = now + URL_REFRESH_RETRY
+        deadline = self._recovery_deadline()
+        if deadline is not None and now < deadline and not self._expiry_recovery_tried:
+            retry = min(retry, deadline)
+        return retry
+
+    def _recover_before_expiry(self, suspicious: bool) -> bool:
+        """
+        True (once) if recovery should start because refreshes failed and the saved URLs expire
+        within RECOVER_BEFORE_EXPIRY. Skipped once the archive is known to be public, unless the
+        cheap check has since reported the video inaccessible.
+        """
+        deadline = self._recovery_deadline()
+        if self._expiry_recovery_tried or deadline is None or time.time() < deadline or not os.path.exists(self.json_path):
+            return False
+        if self.processed and not suspicious:
+            return False
+        self._expiry_recovery_tried = True
+        self.logger.warning("URL refreshes are failing and the saved stream URLs expire in {0:.0f} minutes. "
+                            "Starting stream recovery with them, as it can't be confirmed whether the video was privated".format(
+                                max(0.0, self.json_saved_at + INFO_JSON_MAX_AGE - time.time()) / 60))
+        return True
+
     def _upcoming_delay(self) -> float:
         return next_upcoming_check_delay(self.scheduled_start, time.time(), self.config.get_upcoming_recheck_max(),
                                          self.config.upcoming_video_max_wait())
@@ -186,6 +233,9 @@ class UnarchivedDownloader(BaseDownloader):
         try:
             info_dict, live_status = self.extract_info(include_dash=False, include_m3u8=False)
         except getUrls.VideoInaccessibleError as e:
+            if self.private_needs_confirmation(e):
+                self.next_url_refresh = now + PRIVATE_CONFIRM_DELAY
+                return Refresh.UNCONFIRMED
             self.logger.info(f"Video is inaccessible: {e}")
             return Refresh.PRIVATE
         except getUrls.VideoProcessedError as e:
@@ -197,10 +247,15 @@ class UnarchivedDownloader(BaseDownloader):
                 self._record_baseline()
             self.next_url_refresh = float('inf') if self.next_cheap_check is not None else now + URL_REFRESH_INTERVAL
             return Refresh.PROCESSED
+        except getUrls.RateLimitException as e:
+            # Expected now and then: retried without an error notification each time
+            self.logger.warning(f"URL refresh was rate limited or stopped by YouTube's bot check: {e}")
+            self.next_url_refresh = self._retry_after_failure(now)
+            return Refresh.RATE_LIMITED
         except Exception as e:
             self.logger.exception(f"Unexpected exception: {e}")
             self.notify("error", message=f"{e}\n{traceback.format_exc()}"[-1000:])
-            self.next_url_refresh = now + URL_REFRESH_RETRY
+            self.next_url_refresh = self._retry_after_failure(now)
             return Refresh.FAILED
 
         self.hinted_live_status = live_status

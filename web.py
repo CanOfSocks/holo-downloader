@@ -28,7 +28,7 @@ import communityPosts
 import discord_web
 import getMembers
 import getVids
-from base_downloader import STATUS_ERROR, STATUS_WAITING, BaseDownloader
+from base_downloader import STATUS_WAITING, BaseDownloader
 from common import DiscoveredVideo, kill_all
 from downloadVid import VideoDownloader
 from getConfig import ConfigHandler, default_config_path
@@ -129,8 +129,8 @@ def save_to_history(job: ActiveJob) -> None:
     downloader = job.downloader
     stats = downloader.stats
     total_size = sum(int(stats.get(kind, {}).get("current_filesize") or 0) for kind in ("video", "audio"))
-    # Brief reason for an error (e.g. "Membership", "Private", "Processed")
-    reason = downloader.error_reason if downloader.status == STATUS_ERROR else None
+    # Brief reason for an error (e.g. "Membership", "Private", "Processed"), or missing segments of a finished download
+    reason = downloader.history_reason()
     with closing(db_connect()) as conn, conn:
         conn.execute('INSERT INTO history (video_id, type, total_size, status, reason) VALUES (?, ?, ?, ?, ?)',
                      (job.video_id, job.kind, total_size, downloader.status, reason))
