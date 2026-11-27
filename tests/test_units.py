@@ -7,7 +7,7 @@ import pytest
 import common
 import yt_dlp
 
-from base_downloader import LATE_BACKOFF_DIVISOR, describe_error, next_upcoming_check_delay
+from base_downloader import LATE_BACKOFF_DIVISOR, MAX_DELAY_JITTER_FRACTION, describe_error, next_upcoming_check_delay
 from common import DiscoveredVideo, WaitResult
 from getConfig import MINIMUM_RECHECK_SECONDS, ConfigHandler
 from getJson import parse_utc
@@ -25,8 +25,22 @@ def test_upcoming_delay_waits_until_start_when_close():
     assert next_upcoming_check_delay(1000.0 + 600, 1000.0, RECHECK_MAX, LATE_MAX) == 600
 
 
+def _assert_jittered(delay, cap):
+    assert cap * (1 - MAX_DELAY_JITTER_FRACTION) <= delay <= cap
+
+
 def test_upcoming_delay_capped_by_recheck_max():
-    assert next_upcoming_check_delay(1000.0 + 48 * 3600, 1000.0, RECHECK_MAX, LATE_MAX) == RECHECK_MAX
+    _assert_jittered(next_upcoming_check_delay(1000.0 + 48 * 3600, 1000.0, RECHECK_MAX, LATE_MAX), RECHECK_MAX)
+
+
+def test_capped_delays_are_spread_out():
+    delays = {next_upcoming_check_delay(1000.0 + 48 * 3600, 1000.0, RECHECK_MAX, LATE_MAX) for _ in range(20)}
+    assert len(delays) > 1
+
+
+def test_uncapped_delay_has_no_jitter():
+    # Just under the cap: wait exactly until the scheduled start
+    assert next_upcoming_check_delay(1000.0 + RECHECK_MAX - 1, 1000.0, RECHECK_MAX, LATE_MAX) == RECHECK_MAX - 1
 
 
 def test_upcoming_delay_never_below_minimum():
@@ -37,11 +51,11 @@ def test_upcoming_delay_never_below_minimum():
 def test_late_stream_backs_off_up_to_late_max():
     start = 0.0
     assert next_upcoming_check_delay(start, start + 20 * 60, RECHECK_MAX, LATE_MAX) == 20 * 60 / LATE_BACKOFF_DIVISOR
-    assert next_upcoming_check_delay(start, start + 10 * 3600, RECHECK_MAX, LATE_MAX) == LATE_MAX
+    _assert_jittered(next_upcoming_check_delay(start, start + 10 * 3600, RECHECK_MAX, LATE_MAX), LATE_MAX)
 
 
 def test_unknown_start_uses_late_max():
-    assert next_upcoming_check_delay(None, 1000.0, RECHECK_MAX, LATE_MAX) == LATE_MAX
+    _assert_jittered(next_upcoming_check_delay(None, 1000.0, RECHECK_MAX, LATE_MAX), LATE_MAX)
 
 
 # --- Interruptible wait ---

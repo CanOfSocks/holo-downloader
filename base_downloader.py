@@ -6,6 +6,7 @@ from channel scans, and the controls used by the web UI (cancel, check now, stop
 import copy
 import errno
 import logging
+import random
 import threading
 import time
 from typing import Any, Dict, Optional, Union
@@ -22,6 +23,12 @@ from livestream_dl.download_Live import LiveStreamDownloader
 # between MINIMUM_RECHECK_SECONDS and `upcoming_wait_for_video_max`. A stream that starts a few
 # minutes late is picked up quickly; one that is hours late (or never starts) is checked rarely.
 LATE_BACKOFF_DIVISOR = 4
+
+# A check delay that is capped at `upcoming_recheck_max` or `upcoming_wait_for_video_max` is
+# shortened by a random amount of up to this fraction of it. Streams found in the same channel scan
+# (or late at the same time) would otherwise all be checked in the same instant every cycle, and
+# bursts of extractions are what trigger rate limiting.
+MAX_DELAY_JITTER_FRACTION = 0.1
 
 # An extraction reporting the video private is only believed when the next one, this many seconds
 # later, reports it again. One degraded extraction ("No title found in player responses") has been
@@ -95,14 +102,18 @@ def next_upcoming_check_delay(scheduled_start: Optional[float], now: float, rech
     - Start time unknown:         late_max.
     - Before the scheduled start: until the scheduled start, but never longer than recheck_max.
     - After the scheduled start:  (seconds late / LATE_BACKOFF_DIVISOR), capped at late_max.
+    A delay capped at recheck_max or late_max is shortened by up to MAX_DELAY_JITTER_FRACTION
+    (never lengthened, so a check is never later than the maximum or the scheduled start).
     The result is never below MINIMUM_RECHECK_SECONDS.
     """
     if scheduled_start is None:
-        delay = late_max
+        delay, cap = late_max, late_max
     elif scheduled_start > now:
-        delay = min(scheduled_start - now, recheck_max)
+        delay, cap = scheduled_start - now, recheck_max
     else:
-        delay = min((now - scheduled_start) / LATE_BACKOFF_DIVISOR, late_max)
+        delay, cap = (now - scheduled_start) / LATE_BACKOFF_DIVISOR, late_max
+    if delay >= cap:
+        delay = cap * (1 - random.uniform(0, MAX_DELAY_JITTER_FRACTION))
     return max(delay, MINIMUM_RECHECK_SECONDS)
 
 
