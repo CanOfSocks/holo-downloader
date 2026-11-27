@@ -26,6 +26,44 @@ def default_config_path() -> str:
     return os.environ.get("CONFIG_FILE", DEFAULT_CONFIG_FILE)
 
 
+def load_or_create_config(path: str) -> "ConfigHandler":
+    """Load the config, first creating a minimal one (a stream check every 30 minutes) if the file doesn't exist."""
+    if not os.path.exists(path):
+        doc = tomlkit.document()
+        schedule = tomlkit.table()
+        schedule.add(tomlkit.comment("Format: Minute Hour Day_of_Month Month Day_of_Week (standard 5 fields)"))
+        schedule.add("streams", "*/30 * * * *")
+        doc.add("cron_schedule", schedule)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(tomlkit.dumps(doc))
+    return ConfigHandler(config_file=path)
+
+
+def save_config_text(path: str, content: str) -> tuple[bool, str]:
+    """
+    Save config text from the web UI if it is valid TOML. Returns (saved, message).
+    Written to a temporary file and then swapped in, so a reader (the stall check, a new download)
+    never sees a half-written file and a crash can't leave a truncated config. A config mounted
+    into Docker as a single file can't be replaced (EBUSY/EXDEV), so it is then written in place.
+    """
+    try:
+        tomlkit.parse(content)
+    except Exception as e:
+        return False, f"Invalid TOML, configuration not saved: {e}"
+    temp_path = path + ".tmp"
+    try:
+        with open(temp_path, "w", encoding="utf-8", newline="") as f:
+            f.write(content)
+        os.replace(temp_path, path)
+    except OSError:
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            f.write(content)
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+    return True, "Config saved"
+
+
 def apply_quality_alias(options: dict) -> dict:
     """Replace a quality alias (e.g. "1080p") in options["resolution"] with its yt-dlp format and sort."""
     alias: Optional[dict] = quality_aliases.get(options.get("resolution"))
@@ -86,7 +124,7 @@ class ConfigHandler:
             return None
         return self.per_channel_output_template.get(channel_id)
 
-    def get_ytdlp(self, channel_id: Optional[str] = None) -> str:
+    def get_output_template(self, channel_id: Optional[str] = None) -> str:
         """yt-dlp output template (per channel template first, then the global output_path)."""
         output_folder = self.get_channel_output_template(channel_id=channel_id) or self.download_options.get('output_path', "")
         if not output_folder:
@@ -183,7 +221,7 @@ class ConfigHandler:
     def get_fetch_method(self) -> str:
         return self.download_options.get('video_fetch_method', "ytdlp")
 
-    def get_ytlp_playlist_limit(self) -> int:
+    def get_playlist_limit(self) -> int:
         return self.download_options.get("yt_dlp_playlist_limit", 20)
 
     def get_look_ahead(self) -> float:
@@ -377,7 +415,7 @@ class ConfigHandler:
             "batch_size": 5,
             "segment_retries": 10,
             "merge": self.get_mux(),
-            "output": str(self.get_unarchived_output_path(self.get_ytdlp())),
+            "output": str(self.get_unarchived_output_path(self.get_output_template())),
             "temp_folder": self.get_unarchived_temp_folder(),
             "write_thumbnail": self.get_thumbnail(),
             "embed_thumbnail": self.get_thumbnail(),

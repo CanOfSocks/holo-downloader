@@ -23,7 +23,6 @@ import traceback
 from typing import Optional, Union
 
 import common
-import discord_web
 from base_downloader import (CONFIRM_DELAY, STATUS_CANCELLED, STATUS_FINISHED, STATUS_STOPPED_MERGED,
                              STATUS_WAITING, BaseDownloader, next_upcoming_check_delay)
 from common import DiscoveredVideo, WaitResult
@@ -109,9 +108,6 @@ class UnarchivedDownloader(BaseDownloader):
         self._expiry_recovery_tried: bool = False
         # Set by the first recover(); later attempts use a new LiveStreamDownloader
         self._recovery_attempted: bool = False
-
-    def notify(self, status: str, message: Optional[str] = None) -> None:
-        discord_web.notify(self.id, status, message=message, config=self.config, embed_info=self.embed_info or None)
 
     # --- Main loop ---
 

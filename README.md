@@ -320,3 +320,23 @@ python -m venv .venv
 ```
 
 Run the offline tests with `.venv/bin/python -m pytest`.
+
+### Project layout
+
+| File | Purpose |
+| --- | --- |
+| `web.py` | Flask app and entry point (`web:app` for gunicorn). Routes and display formatting only; starts the scheduler on import. |
+| `jobs.py` | Active jobs: one thread per download or unarchived monitor, started with `start_job()`, and saving the result to history. |
+| `checks.py` | Scheduled checks (`[cron_schedule]`), the stall check and the APScheduler instance. |
+| `history.py` | The SQLite history of finished jobs. |
+| `base_downloader.py` | Behaviour shared by both job types: waiting for an upcoming stream, channel scan updates, cancel / check now / stop & merge. |
+| `downloadVid.py` | `VideoDownloader`: records a live stream with livestream_dl. |
+| `unarchived.py` | `UnarchivedDownloader`: saves stream URLs while live and recovers the stream if it is privated. |
+| `scan.py` | Channel scanning with yt-dlp: playlist listings, filters, the look-ahead window. |
+| `getVids.py`, `getYTDLP.py`, `getJson.py`, `getMembers.py` | The channel scans run by the checks (`video_fetch_method` chooses yt-dlp or holo.dev). |
+| `communityPosts.py` | Community tab download (runs `ytct.py`). |
+| `monitor.py` | Stall detection (`StallTracker`). |
+| `common.py` | Shared helpers: shutdown (`kill_all`), logging, caches, oEmbed requests, base yt-dlp options. |
+| `getConfig.py` | Reading, creating and saving `config.toml`. |
+| `discord_web.py` | Discord notifications (queued and sent by one background thread). |
+| `lockup_schedule.py` | Reads scheduled start times from yt-dlp's flat playlist listings. |

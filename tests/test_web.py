@@ -4,8 +4,12 @@ from datetime import datetime, timezone
 
 import pytest
 
+import checks
+import history
+import jobs
 import web
 from common import DiscoveredVideo
+from getConfig import default_config_path
 from livestream_dl import getUrls
 from downloadVid import VideoDownloader
 from unarchived import UnarchivedDownloader
@@ -16,19 +20,19 @@ def client():
     web.app.config["TESTING"] = True
     with web.app.test_client() as test_client:
         yield test_client
-    with web.LOCK:
-        for kind_jobs in web.jobs.values():
+    with jobs.LOCK:
+        for kind_jobs in jobs.jobs.values():
             kind_jobs.clear()
 
 
-def add_fake_job(kind: str, video_id: str, status: str, downloader_cls) -> web.ActiveJob:
+def add_fake_job(kind: str, video_id: str, status: str, downloader_cls) -> jobs.ActiveJob:
     downloader = downloader_cls(DiscoveredVideo(video_id))
     downloader.set_status(status)
     downloader.stats["video"] = {"downloaded_segments": 5, "latest_sequence": 9, "current_filesize": 1024}
     downloader.stats["audio"] = {"downloaded_segments": 5, "latest_sequence": 9, "current_filesize": 1024}
-    job = web.ActiveJob(video_id=video_id, kind=kind, downloader=downloader, started_at=datetime.now(timezone.utc))
-    with web.LOCK:
-        web.jobs[kind][video_id] = job
+    job = jobs.ActiveJob(video_id=video_id, kind=kind, downloader=downloader, started_at=datetime.now(timezone.utc))
+    with jobs.LOCK:
+        jobs.jobs[kind][video_id] = job
     return job
 
 
@@ -66,13 +70,13 @@ def test_stalled_job_highlights_merge(client):
 
 
 def test_history_shows_error_reason(client):
-    web.init_db()
+    history.init_db()
     job = add_fake_job("stream", "M7lc1UVf-VE", "Recording", VideoDownloader)
     job.downloader.set_error(getUrls.VideoInaccessibleError("Video M7lc1UVf-VE is a membership or premium video"))
-    web.save_to_history(job)
+    jobs.save_to_history(job)
     finished = add_fake_job("stream", "dQw4w9WgXcQ", "Finished", VideoDownloader)
     finished.downloader.error_reason = "Private"    # From an earlier attempt: not shown for a finished download
-    web.save_to_history(finished)
+    jobs.save_to_history(finished)
 
     body = client.get("/data/history").get_data(as_text=True)
     assert "Membership" in body and "Private" not in body
@@ -98,18 +102,18 @@ def test_job_view_copies_stats_and_only_api_gets_them(client):
     assert job.downloader.stats["video"]["downloaded_segments"] == 5
 
 
-def test_config_save_replaces_file_or_writes_in_place(client, monkeypatch, tmp_path):
+def test_config_save_replaces_file_or_writes_in_place(monkeypatch, tmp_path):
+    import getConfig
     path = tmp_path / "config.toml"
     path.write_text("old = 1\n", encoding="utf-8")
-    monkeypatch.setattr(web, "config_file_path", str(path))
-    assert web.save_config("new = 2\n") == (True, "Config saved")
+    assert getConfig.save_config_text(str(path), "new = 2\n") == (True, "Config saved")
     assert path.read_text(encoding="utf-8") == "new = 2\n"
 
     # A config mounted into Docker as a single file can't be replaced: written in place instead
     def busy(*args):
         raise OSError(16, "Device or resource busy")
-    monkeypatch.setattr(web.os, "replace", busy)
-    assert web.save_config("newer = 3\n")[0] is True
+    monkeypatch.setattr(getConfig.os, "replace", busy)
+    assert getConfig.save_config_text(str(path), "newer = 3\n")[0] is True
     assert path.read_text(encoding="utf-8") == "newer = 3\n"
     assert not (tmp_path / "config.toml.tmp").exists()
 
@@ -161,33 +165,34 @@ def test_unknown_action_is_404(client):
 
 
 def test_invalid_config_is_not_saved(client):
-    with open(web.config_file_path, encoding="utf-8") as f:
+    with open(default_config_path(), encoding="utf-8") as f:
         before = f.read()
     response = client.post("/config", data={"toml_content": "this is [not toml"}, follow_redirects=True)
     assert "Invalid TOML" in response.get_data(as_text=True)
-    with open(web.config_file_path, encoding="utf-8") as f:
+    with open(default_config_path(), encoding="utf-8") as f:
         assert f.read() == before
 
 
 def test_scheduler_shows_configured_cron(client, monkeypatch):
-    original = web.config_file_path
+    original = default_config_path()
     with open(original, encoding="utf-8") as f:
         content = f.read()
     test_config = original + ".cron.toml"
     with open(test_config, "w", encoding="utf-8") as f:
         f.write(content.replace("[cron_schedule]", '[cron_schedule]\nstreams = "*/30 * * * *"\nunarchived = "not a cron"'))
-    monkeypatch.setattr(web, "config_file_path", test_config)
+    monkeypatch.setenv("CONFIG_FILE", test_config)
     try:
-        web.update_scheduler()
+        checks.update_scheduler()
         rows = {row["id"]: row for row in client.get("/api/scheduler").get_json()}
         assert rows["streams-checker"]["cron"] == "*/30 * * * *" and rows["streams-checker"]["status"] == "Scheduled"
+        assert rows["streams-checker"]["next_run"].endswith("Z")
         assert rows["unarchived-checker"]["status"] == "Invalid"
         assert rows["members_only-checker"]["cron"] is None
         body = client.get("/data/scheduler").get_data(as_text=True)
         assert "*/30 * * * *" in body and "Invalid schedule" in body
     finally:
-        monkeypatch.setattr(web, "config_file_path", original)
-        web.update_scheduler()
+        monkeypatch.setenv("CONFIG_FILE", original)
+        checks.update_scheduler()
 
 
 def test_static_files_are_cacheable(client):
@@ -198,23 +203,23 @@ def test_static_files_are_cacheable(client):
 
 def test_start_job_builds_downloader_outside_lock_and_updates_existing(client, monkeypatch):
     started = []
-    monkeypatch.setattr(web.threading.Thread, "start", lambda self: started.append(self.name))
+    monkeypatch.setattr(jobs.threading.Thread, "start", lambda self: started.append(self.name))
 
     class CheckLock(VideoDownloader):
         def __init__(self, video):
-            assert not web.LOCK.locked(), "the downloader must be built without holding LOCK"
+            assert not jobs.LOCK.locked(), "the downloader must be built without holding LOCK"
             super().__init__(video)
-    monkeypatch.setitem(web.DOWNLOADER_CLASSES, "stream", CheckLock)
+    monkeypatch.setitem(jobs.DOWNLOADER_CLASSES, "stream", CheckLock)
 
-    assert web.start_job(DiscoveredVideo("dQw4w9WgXcQ"), "stream") is True
+    assert jobs.start_job(DiscoveredVideo("dQw4w9WgXcQ"), "stream") is True
     assert started == ["stream-dQw4w9WgXcQ"]
     # Found again by a scan: the running job gets the update and nothing new starts
-    assert web.start_job(DiscoveredVideo("dQw4w9WgXcQ", live_status="is_live"), "stream") is False
-    assert web.get_job("stream", "dQw4w9WgXcQ").downloader.hinted_live_status == "is_live"
+    assert jobs.start_job(DiscoveredVideo("dQw4w9WgXcQ", live_status="is_live"), "stream") is False
+    assert jobs.get_job("stream", "dQw4w9WgXcQ").downloader.hinted_live_status == "is_live"
     assert started == ["stream-dQw4w9WgXcQ"]
 
 
 def test_add_rejects_invalid_id(client):
     response = client.post("/actions/add", data={"video_id": "not a video"}, headers={"HX-Request": "true"})
     assert "warning" in response.headers["HX-Trigger"]
-    assert not web.jobs["stream"]
+    assert not jobs.jobs["stream"]

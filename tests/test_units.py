@@ -1,3 +1,6 @@
+import json
+import logging
+import os
 import threading
 import time
 from datetime import datetime, timezone
@@ -5,6 +8,7 @@ from datetime import datetime, timezone
 import pytest
 
 import common
+import scan
 import yt_dlp
 
 from base_downloader import LATE_BACKOFF_DIVISOR, MAX_DELAY_JITTER_FRACTION, describe_error, next_upcoming_check_delay
@@ -228,20 +232,20 @@ def test_config_file_env_is_default_path():
 
 def test_title_match_skips_description_lookup(monkeypatch):
     config = ConfigHandler()
-    monkeypatch.setattr(common, "extract_video", lambda *a, **k: pytest.fail("description should not be fetched"))
-    assert common.filtering({"id": "abc", "title": "Karaoke night"}, "UCtitle", config) is True
+    monkeypatch.setattr(scan, "extract_video", lambda *a, **k: pytest.fail("description should not be fetched"))
+    assert scan.passes_filters({"id": "abc", "title": "Karaoke night"}, "UCtitle", config) is True
 
 
 def test_description_filter_uses_extraction_when_missing(monkeypatch):
     config = ConfigHandler()
-    monkeypatch.setattr(common, "extract_video", lambda *a, **k: {"description": "Singing stream"})
-    assert common.filtering({"id": "def", "title": "Chatting"}, "UCdesc", config) is True
-    monkeypatch.setattr(common, "extract_video", lambda *a, **k: {"description": "Gaming"})
-    assert common.filtering({"id": "ghi", "title": "Chatting"}, "UCdesc", config) is False
+    monkeypatch.setattr(scan, "extract_video", lambda *a, **k: {"description": "Singing stream"})
+    assert scan.passes_filters({"id": "def", "title": "Chatting"}, "UCdesc", config) is True
+    monkeypatch.setattr(scan, "extract_video", lambda *a, **k: {"description": "Gaming"})
+    assert scan.passes_filters({"id": "ghi", "title": "Chatting"}, "UCdesc", config) is False
 
 
 def test_no_filters_passes():
-    assert common.filtering({"id": "x", "title": "anything"}, "UCnofilter", ConfigHandler()) is True
+    assert scan.passes_filters({"id": "x", "title": "anything"}, "UCnofilter", ConfigHandler()) is True
 
 
 # Channel ID body (the 22 characters after "UC") used by the members tests
@@ -269,7 +273,7 @@ class FakeYoutubeDL:
 
 @pytest.fixture
 def fake_ytdlp(monkeypatch):
-    monkeypatch.setattr(common, "YoutubeDL", FakeYoutubeDL)
+    monkeypatch.setattr(scan, "YoutubeDL", FakeYoutubeDL)
     monkeypatch.setattr(FakeYoutubeDL, "results", {})
     monkeypatch.setattr(FakeYoutubeDL, "requested", [])
     return FakeYoutubeDL
@@ -283,13 +287,13 @@ def test_members_scan_ignores_filters(monkeypatch, fake_ytdlp):
     fake_ytdlp.results["https://www.youtube.com/playlist?list=UUMO" + MEMBERS_SUFFIX] = {
         "entries": [{"id": "members0001", "title": "Members chat", "live_status": "is_upcoming",
                      "release_timestamp": None, "channel_id": channel}]}
-    monkeypatch.setattr(common, "extract_video", lambda *a, **k: {"description": "Gaming"})
+    monkeypatch.setattr(scan, "extract_video", lambda *a, **k: {"description": "Gaming"})
     monkeypatch.setattr(getMembers.kill_all, "wait", lambda *a, **k: False)
     config = ConfigHandler(config={"members_only": {"filtered": channel},
                                    "title_filter": {channel: "(?i)karaoke"}})
 
     # The same video is filtered out of a normal scan...
-    assert common.get_upcoming_or_live_videos(channel, config, tab="membership") == []
+    assert scan.get_upcoming_or_live_videos(channel, config, tab="membership") == []
 
     class Output(list):
         put = list.append
@@ -302,28 +306,28 @@ def test_members_scan_ignores_filters(monkeypatch, fake_ytdlp):
 def test_members_playlist_id_from_ids():
     config = ConfigHandler(config={})
     for value in ("UC", "UU", "UUMO", "UULF", "UUSH"):
-        assert common.members_playlist_id(value + MEMBERS_SUFFIX, config) == "UUMO" + MEMBERS_SUFFIX
+        assert scan.members_playlist_id(value + MEMBERS_SUFFIX, config) == "UUMO" + MEMBERS_SUFFIX
 
 
 def test_members_playlist_id_resolves_handle_once(fake_ytdlp):
     config = ConfigHandler(config={})
     fake_ytdlp.results["https://www.youtube.com/@testhandle"] = {"channel_id": "UC" + MEMBERS_SUFFIX, "entries": []}
-    assert common.members_playlist_id("@testhandle", config) == "UUMO" + MEMBERS_SUFFIX
-    assert common.members_playlist_id("@testhandle", config) == "UUMO" + MEMBERS_SUFFIX
+    assert scan.members_playlist_id("@testhandle", config) == "UUMO" + MEMBERS_SUFFIX
+    assert scan.members_playlist_id("@testhandle", config) == "UUMO" + MEMBERS_SUFFIX
     assert fake_ytdlp.requested == ["https://www.youtube.com/@testhandle"]
 
 
 def test_members_playlist_id_unknown_channel(fake_ytdlp):
     fake_ytdlp.results["https://www.youtube.com/@missing"] = {"entries": []}
     with pytest.raises(ValueError):
-        common.members_playlist_id("@missing", ConfigHandler(config={}))
+        scan.members_playlist_id("@missing", ConfigHandler(config={}))
 
 
 def test_members_scan_uses_uumo_for_handles(fake_ytdlp):
     config = ConfigHandler(config={})
     fake_ytdlp.results["https://www.youtube.com/@scanhandle"] = {"channel_id": "UC" + MEMBERS_SUFFIX}
     fake_ytdlp.results["https://www.youtube.com/playlist?list=UUMO" + MEMBERS_SUFFIX] = {"entries": []}
-    assert common.get_upcoming_or_live_videos("@scanhandle", config, tab="membership", apply_filters=False) == []
+    assert scan.get_upcoming_or_live_videos("@scanhandle", config, tab="membership", apply_filters=False) == []
     assert fake_ytdlp.requested[-1] == "https://www.youtube.com/playlist?list=UUMO" + MEMBERS_SUFFIX
 
 
@@ -335,8 +339,8 @@ def test_community_tab_uses_only_its_own_list(monkeypatch, tmp_path):
     monkeypatch.setattr(communityPosts, "run_until_done", lambda command, *a, **k: commands.append(command))
     # Independent of any other test (or shutdown) having set the global stop flag
     monkeypatch.setattr(communityPosts.kill_all, "is_set", lambda: False)
-    for name in ("filtering", "titleFilter", "descriptionFilter", "extract_video"):
-        monkeypatch.setattr(common, name, lambda *a, **k: pytest.fail("community tab must not use filters"))
+    for name in ("passes_filters", "title_filter_matches", "description_filter_matches", "extract_video"):
+        monkeypatch.setattr(scan, name, lambda *a, **k: pytest.fail("community tab must not use filters"))
     config = ConfigHandler(config={
         "channel_ids_to_match": {"normal": "UCnormal"},
         "members_only": {"members": "UCmembers"},
@@ -351,11 +355,11 @@ def test_community_tab_uses_only_its_own_list(monkeypatch, tmp_path):
 
 def test_playlist_url():
     channel = "UC" + MEMBERS_SUFFIX
-    assert common.playlist_url(channel, "streams") == ("https://www.youtube.com/playlist?list=UU" + MEMBERS_SUFFIX, True)
-    assert common.playlist_url(channel, "membership") == ("https://www.youtube.com/playlist?list=UUMO" + MEMBERS_SUFFIX, True)
-    assert common.playlist_url("UULF" + MEMBERS_SUFFIX, "membership") == ("https://www.youtube.com/playlist?list=UUMO" + MEMBERS_SUFFIX, True)
-    assert common.playlist_url("UUMO" + MEMBERS_SUFFIX, "streams") == ("https://www.youtube.com/playlist?list=UUMO" + MEMBERS_SUFFIX, True)
-    assert common.playlist_url("@handle", "streams") == ("https://www.youtube.com/channel/@handle/streams", False)
+    assert scan.playlist_url(channel, "streams") == ("https://www.youtube.com/playlist?list=UU" + MEMBERS_SUFFIX, True)
+    assert scan.playlist_url(channel, "membership") == ("https://www.youtube.com/playlist?list=UUMO" + MEMBERS_SUFFIX, True)
+    assert scan.playlist_url("UULF" + MEMBERS_SUFFIX, "membership") == ("https://www.youtube.com/playlist?list=UUMO" + MEMBERS_SUFFIX, True)
+    assert scan.playlist_url("UUMO" + MEMBERS_SUFFIX, "streams") == ("https://www.youtube.com/playlist?list=UUMO" + MEMBERS_SUFFIX, True)
+    assert scan.playlist_url("@handle", "streams") == ("https://www.youtube.com/channel/@handle/streams", False)
 
 
 # --- Misc ---
@@ -382,7 +386,6 @@ def _downloader(**hint):
 
 
 def test_upcoming_hint_checks_without_format_selection(monkeypatch):
-    from livestream_dl import getUrls
     downloader = _downloader(live_status="is_upcoming", release_timestamp=time.time() + 3600)
     monkeypatch.setattr(getUrls, "get_Video_Info", lambda **kw: pytest.fail("get_Video_Info fails for upcoming streams"))
     monkeypatch.setattr(downloader, "probe_status", lambda: {"live_status": "is_upcoming", "release_timestamp": 123.0, "formats": []})
@@ -391,7 +394,6 @@ def test_upcoming_hint_checks_without_format_selection(monkeypatch):
 
 
 def test_upcoming_stream_that_went_live_gets_formats(monkeypatch):
-    from livestream_dl import getUrls
     downloader = _downloader(live_status="is_upcoming")
     monkeypatch.setattr(downloader, "probe_status", lambda: {"live_status": "is_live", "formats": [{"format_id": "1"}]})
     monkeypatch.setattr(getUrls, "get_Video_Info", lambda **kw: ({"live_status": "is_live", "formats": ["processed"]}, "is_live"))
@@ -401,8 +403,6 @@ def test_upcoming_stream_that_went_live_gets_formats(monkeypatch):
 
 
 def test_no_formats_error_falls_back_to_probe(monkeypatch):
-    import yt_dlp
-    from livestream_dl import getUrls
 
     def no_formats(**kw):
         raise yt_dlp.utils.DownloadError("requested format is not available")
@@ -414,8 +414,6 @@ def test_no_formats_error_falls_back_to_probe(monkeypatch):
 
 
 def test_other_extraction_errors_still_raise(monkeypatch):
-    import yt_dlp
-    from livestream_dl import getUrls
 
     def blocked(**kw):
         raise yt_dlp.utils.DownloadError("some other failure")
@@ -426,7 +424,6 @@ def test_other_extraction_errors_still_raise(monkeypatch):
 
 
 def test_upcoming_hint_but_processed_video_raises(monkeypatch):
-    from livestream_dl import getUrls
     downloader = _downloader(live_status="is_upcoming")
     monkeypatch.setattr(downloader, "probe_status", lambda: {"live_status": "not_live"})
     monkeypatch.setattr(getUrls, "get_Video_Info", lambda **kw: pytest.fail("not_live is processed, no second extraction"))
@@ -435,7 +432,6 @@ def test_upcoming_hint_but_processed_video_raises(monkeypatch):
 
 
 def test_upcoming_hint_was_live_is_decided_by_get_video_info(monkeypatch):
-    from livestream_dl import getUrls
     downloader = _downloader(live_status="is_upcoming")
     monkeypatch.setattr(downloader, "probe_status", lambda: {"live_status": "was_live", "formats": [{"format_id": "1"}]})
     # livestream_dl reports post_live while the formats still have live stream URLs
@@ -455,7 +451,6 @@ def test_upcoming_hint_was_live_is_decided_by_get_video_info(monkeypatch):
 
 @pytest.mark.parametrize("hint", ["is_upcoming", None])
 def test_ended_video_without_formats_raises_processed(monkeypatch, hint):
-    from livestream_dl import getUrls
 
     def no_formats(**kw):
         raise yt_dlp.utils.DownloadError("requested format is not available")
@@ -483,7 +478,6 @@ def test_wait_at_least_ignores_wake_but_not_check_now():
 
 
 def test_private_report_is_confirmed_before_giving_up(monkeypatch):
-    from livestream_dl import getUrls
     downloader = _downloader()
     calls = []
 
@@ -500,7 +494,6 @@ def test_private_report_is_confirmed_before_giving_up(monkeypatch):
 
 
 def test_repeated_private_report_raises(monkeypatch):
-    from livestream_dl import getUrls
     downloader = _downloader()
 
     def private(**kw):
@@ -512,7 +505,6 @@ def test_repeated_private_report_raises(monkeypatch):
 
 
 def test_other_inaccessible_errors_are_not_retried(monkeypatch):
-    from livestream_dl import getUrls
     downloader = _downloader()
 
     def members(**kw):
@@ -524,7 +516,6 @@ def test_other_inaccessible_errors_are_not_retried(monkeypatch):
 
 
 def test_unarchived_private_report_is_confirmed_before_recovery(monkeypatch):
-    from livestream_dl import getUrls
     from unarchived import Refresh, UnarchivedDownloader
     downloader = UnarchivedDownloader(DiscoveredVideo("dQw4w9WgXcQ"))
 
@@ -556,8 +547,6 @@ def test_history_reason_reports_missing_segments():
 
 def _unarchived_with_saved_json(age: float):
     """An unarchived monitor whose saved info.json was extracted `age` seconds ago."""
-    import json
-    import os
     from unarchived import UnarchivedDownloader
     downloader = UnarchivedDownloader(DiscoveredVideo("dQw4w9WgXcQ"))
     os.makedirs(os.path.dirname(downloader.json_path), exist_ok=True)
@@ -672,7 +661,7 @@ def test_scheduled_start_from_lockup_metadata():
 
 
 def test_flat_listing_entries_get_release_timestamp():
-    import lockup_schedule  # noqa: F401 (installed by common)
+    # lockup_schedule.install() runs when scan is imported
     from yt_dlp import YoutubeDL
     from yt_dlp.extractor.youtube import YoutubeTabIE
     ie = YoutubeTabIE(YoutubeDL({'quiet': True}))
@@ -689,7 +678,7 @@ def test_flat_listing_entries_get_release_timestamp():
 def test_far_future_schedule_remembered_for_scans():
     downloader = _downloader(live_status="is_upcoming", release_timestamp=time.time() + 30 * 24 * 3600)
     assert downloader.stop_if_beyond_look_ahead()
-    assert common.known_schedules.get(downloader.id) == downloader.scheduled_start
+    assert scan.known_schedules.get(downloader.id) == downloader.scheduled_start
 
 
 # --- Unexpected status of an upcoming stream is confirmed ---
@@ -759,10 +748,10 @@ def test_unarchived_recovery_retry_uses_fresh_downloader(monkeypatch):
 def test_unarchived_scan_ignores_filters(monkeypatch, fake_ytdlp):
     """Title/description filters only apply to normal downloads, never to the unarchived monitor."""
     import getYTDLP
-    monkeypatch.setattr(common, "saved_unarchived_ids", lambda *a, **k: [])
+    monkeypatch.setattr(scan, "saved_unarchived_ids", lambda *a, **k: [])
     fake_ytdlp.results["https://www.youtube.com/playlist?list=UU" + MEMBERS_SUFFIX] = {
         "entries": [{"id": "unarchived1", "title": "Chatting", "live_status": "is_live", "channel_id": "UC" + MEMBERS_SUFFIX}]}
-    monkeypatch.setattr(common, "extract_video", lambda *a, **k: {"description": "Gaming"})
+    monkeypatch.setattr(scan, "extract_video", lambda *a, **k: {"description": "Gaming"})
     channel = "UC" + MEMBERS_SUFFIX
     config = ConfigHandler(config={"channel_ids_to_match": {"c": channel}, "unarchived_channel_ids_to_match": {"c": channel},
                                    "title_filter": {channel: "(?i)karaoke"}})
@@ -795,7 +784,6 @@ def test_http_client_reused_and_replaced_when_proxy_changes(monkeypatch):
 # --- Logging ---
 
 def test_named_loggers_share_one_set_of_handlers(tmp_path):
-    import logging
     config = ConfigHandler(config={"download_options": {"log_file": str(tmp_path / "holo.log"), "log_file_max_size": 1000}})
     try:
         web_logger = common.initialize_logging(config, "web", force=True)

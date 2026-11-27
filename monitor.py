@@ -50,7 +50,6 @@ class StallTracker:
     stalled: bool = False
     stalled_since: Optional[float] = None    # monotonic
     reason: Optional[str] = None
-    notified: bool = False
     auto_merge_triggered: bool = False
 
     def _reset(self, now_monotonic: float) -> None:
@@ -105,7 +104,6 @@ class StallTracker:
             # Segments are downloading (again): no longer stalled
             self.latest_at_last_progress = latest
             self._reset(now)
-            self.notified = False
             self.auto_merge_triggered = False
             return False
 

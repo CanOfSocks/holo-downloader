@@ -4,6 +4,7 @@ from typing import Container, Optional
 
 import common
 import discord_web
+import scan
 from common import DiscoveredVideo, kill_all
 from getConfig import ConfigHandler
 
@@ -29,17 +30,17 @@ def main(output, unarchived: bool = False, config: Optional[ConfigHandler] = Non
             logger.debug("Looking for: {0}".format(channel_name))
             # Title/description filters only apply to normal downloads: the unarchived monitor
             # watches every stream of its channels (as with video_fetch_method = "json")
-            videos = common.get_upcoming_or_live_videos(channel_id, config, tab="streams", passed_logger=logger,
-                                                        active_ids=active_ids, apply_filters=not unarchived)
+            videos = scan.get_upcoming_or_live_videos(channel_id, config, tab="streams", passed_logger=logger,
+                                                      active_ids=active_ids, apply_filters=not unarchived)
         except Exception as e:
             discord_web.notify(channel_id, "playlist-error", message=f"Error getting streams:\n{type(e).__name__}: {e}"[-500:], config=config)
             logger.exception("Error fetching streams for {0}. Check cookies.".format(channel_name))
             continue
         found_ids.update(video.id for video in videos)
-        common.put_all(output, videos)
+        scan.put_all(output, videos)
 
     if unarchived:
         # Resume monitors for streams that already have a saved info.json (e.g. after a restart).
         # IDs found by the scan above were already queued, so they are not queued twice.
-        saved = [DiscoveredVideo(video_id) for video_id in common.saved_unarchived_ids(config, logger) if video_id not in found_ids]
-        common.put_all(output, saved)
+        saved = [DiscoveredVideo(video_id) for video_id in scan.saved_unarchived_ids(config, logger) if video_id not in found_ids]
+        scan.put_all(output, saved)

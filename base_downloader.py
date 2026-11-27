@@ -3,7 +3,6 @@ Behaviour shared by the normal downloader (downloadVid.VideoDownloader) and the 
 monitor (unarchived.UnarchivedDownloader): waiting for an upcoming stream, accepting updates
 from channel scans, and the controls used by the web UI (cancel, check now, stop & merge).
 """
-import copy
 import errno
 import logging
 import random
@@ -14,6 +13,8 @@ from typing import Any, Dict, Optional, Union
 import yt_dlp
 
 import common
+import discord_web
+import scan
 from common import DiscoveredVideo, WaitResult, kill_all
 from getConfig import ConfigHandler, MINIMUM_RECHECK_SECONDS
 from livestream_dl import getUrls
@@ -236,6 +237,10 @@ class BaseDownloader:
         """Fetch the title/thumbnail for display. Called from the job thread, never while holding a lock."""
         self.embed_info = common.get_embed_info(self.id, proxy=self.config.get_proxy())
 
+    def notify(self, status: str, message: Optional[str] = None) -> None:
+        """Queue a Discord notification about this video (see discord_web)."""
+        discord_web.notify(self.id, status, message=message, config=self.config, embed_info=self.embed_info or None)
+
     # --- Controls used by the web UI and channel scans ---
 
     def cancel(self) -> None:
@@ -294,7 +299,7 @@ class BaseDownloader:
         self.logger.info("Scheduled start ({0}) is more than {1} hours away, no longer waiting".format(
             self.scheduled_start, self.config.get_look_ahead()))
         self.set_status(STATUS_BEYOND_LOOK_AHEAD)
-        common.known_schedules.set(self.id, self.scheduled_start)
+        scan.known_schedules.set(self.id, self.scheduled_start)
         return True
 
     def wait(self, seconds: float) -> WaitResult:
@@ -351,20 +356,9 @@ class BaseDownloader:
         livestream_dl's ExtractionLogger turns any warning containing "not available" into an error.
         Errors are classified the same way as get_Video_Info (private, members only, ...).
         """
-        options: dict[str, Any] = {
-            'quiet': True,
-            'skip_download': True,
-            'cookiefile': self.config.get_cookies_file(),
-            # Return the info of an upcoming stream instead of raising "This live event will begin in..."
-            'ignore_no_formats_error': True,
-            'logger': getUrls.ExtractionLogger(logger=self.logger, wait=False),
-        }
-        proxy = getUrls.proxy_for_ytdlp(self.config.get_proxy())
-        if proxy:
-            options['proxy'] = proxy
-        # Deep copy so yt-dlp can't modify the config's nested extractor_args
-        options.update(copy.deepcopy(self.config.get_ytdlp_options() or {}))
-
+        # Full extraction options (with the user's ytdlp_options); livestream_dl's logger so its
+        # error classification sees the same messages as get_Video_Info
+        options = common.ytdlp_options(self.config, getUrls.ExtractionLogger(logger=self.logger, wait=False), flat=False)
         with yt_dlp.YoutubeDL(options) as ydl:
             try:
                 return ydl.extract_info(getUrls.normalize_video_url(self.id), download=False, process=False) or {}

@@ -6,10 +6,12 @@ from typing import Any, Container, Dict, Optional
 import httpx
 
 import common
+import scan
 from common import DiscoveredVideo
 from getConfig import ConfigHandler
 
-url = "https://holo.dev/api/v1/lives/open"
+# Live and upcoming streams of Hololive channels
+HOLODEV_URL = "https://holo.dev/api/v1/lives/open"
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 
@@ -19,7 +21,7 @@ def parse_utc(value: str) -> datetime:
     return datetime.strptime(value, DATE_FORMAT).replace(tzinfo=timezone.utc)
 
 
-class json_object:
+class HolodevLive:
     """Wraps a holo.dev API entry so it can be used with the shared filter functions (which call .get())."""
     def __init__(self, live: Dict[str, Any]):
         self.holodev_id = live.get('id')
@@ -37,9 +39,9 @@ class json_object:
         return getattr(self, property, default)
 
 
-def getStreams(unarchived: bool, config: ConfigHandler, logger: logging.Logger) -> list[DiscoveredVideo]:
+def get_streams(unarchived: bool, config: ConfigHandler, logger: logging.Logger) -> list[DiscoveredVideo]:
     try:
-        response = common.get_http_client(config.get_proxy()).get(url)
+        response = common.get_http_client(config.get_proxy()).get(HOLODEV_URL)
         response.raise_for_status()
         data = response.json()
     except (httpx.HTTPError, ValueError):
@@ -51,16 +53,16 @@ def getStreams(unarchived: bool, config: ConfigHandler, logger: logging.Logger) 
     matching: list[DiscoveredVideo] = []
     for entry in data.get('lives', []):
         try:
-            live = json_object(entry)
+            live = HolodevLive(entry)
         except (TypeError, ValueError):
             logger.warning("Skipping holo.dev entry with unexpected data: {0}".format(entry))
             continue
         if live.platform != "youtube" or live.channel_id not in channel_ids:
             continue
-        if not common.withinFuture(config, live.start_at.timestamp()):
+        if not scan.within_time_window(config, live.start_at.timestamp()):
             continue
         # Filters only apply to normal downloads, not to the unarchived monitor
-        if not unarchived and not common.filtering(live, live.channel_id, config, logger):
+        if not unarchived and not scan.passes_filters(live, live.channel_id, config, logger):
             continue
         # The API doesn't say whether the stream is live yet, so only the start time is passed on
         matching.append(DiscoveredVideo(live.id, live.channel_id, None, live.start_at.timestamp()))
@@ -72,8 +74,8 @@ def main(output, unarchived: bool = False, config: Optional[ConfigHandler] = Non
     config = config or ConfigHandler()
     logger = logger or common.initialize_logging(config, "GetJson")
 
-    videos = getStreams(unarchived, config, logger)
-    common.put_all(output, videos)
+    videos = get_streams(unarchived, config, logger)
+    scan.put_all(output, videos)
     if unarchived:
         found = {video.id for video in videos}
-        common.put_all(output, [DiscoveredVideo(video_id) for video_id in common.saved_unarchived_ids(config, logger) if video_id not in found])
+        scan.put_all(output, [DiscoveredVideo(video_id) for video_id in scan.saved_unarchived_ids(config, logger) if video_id not in found])

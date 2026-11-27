@@ -4,7 +4,6 @@ import logging
 import threading
 from typing import Any, Dict, Optional, Union
 
-import discord_web
 from base_downloader import (STATUS_BEYOND_LOOK_AHEAD, STATUS_CANCELLED, STATUS_FINISHED,
                              STATUS_STOPPED_MERGED, BaseDownloader)
 from common import DiscoveredVideo
@@ -17,16 +16,13 @@ class VideoDownloader(BaseDownloader):
     def __init__(self, video: Union[DiscoveredVideo, str], config: Optional[ConfigHandler] = None,
                  logger: Optional[logging.Logger] = None, kill_this: Optional[threading.Event] = None):
         super().__init__(video, config=config, logger=logger, kill_this=kill_this, logger_name="Downloader")
-        self.outputFile: Optional[str] = None
-
-    def notify(self, status: str, message: Optional[str] = None) -> None:
-        discord_web.notify(self.id, status, message=message, config=self.config, embed_info=self.embed_info or None)
+        self.output_file: Optional[str] = None
 
     def prepare(self, info_dict: Dict[str, Any]) -> None:
         """Work out the output file name and keep a small copy of the info for the web UI."""
         # Same yt-dlp templating as yt-dlp's prepare_filename; "%" is replaced by livestream_dl
-        self.outputFile = self.livestream_downloader.output_filename(info_dict, outtmpl=self.config.get_ytdlp(self.channel_id))
-        self.logger.info("Output file: {0}".format(self.outputFile))
+        self.output_file = self.livestream_downloader.output_filename(info_dict, outtmpl=self.config.get_output_template(self.channel_id))
+        self.logger.info("Output file: {0}".format(self.output_file))
         if self.logger.isEnabledFor(logging.DEBUG):
             # Only serialise the (large) info dict when debug logging is on
             self.logger.debug("Info.json: {0}".format(json.dumps(info_dict)))
@@ -34,7 +30,7 @@ class VideoDownloader(BaseDownloader):
 
     def download(self, info_dict: Dict[str, Any]) -> None:
         """Download the stream segments, then mux and move the files (all done by livestream_dl)."""
-        options = self.config.get_livestream_dl_options(info_dict=info_dict, output_template=self.outputFile)
+        options = self.config.get_livestream_dl_options(info_dict=info_dict, output_template=self.output_file)
         self.notify("recording")
         self.start_recording(info_dict)
         self.livestream_downloader.download_segments(info_dict=info_dict, resolution=options.get("resolution"), options=options)

@@ -34,7 +34,7 @@ class ChatOnlyDownloader:
 
         options = {
             "ID": info_dict.get('id'),
-            "output": self.output_path or str(self.config.get_unarchived_output_path(self.config.get_ytdlp())),
+            "output": self.output_path or str(self.config.get_unarchived_output_path(self.config.get_output_template())),
             "temp_folder": self.config.get_unarchived_temp_folder(),
             "cookies": self.config.get_cookies_file(),
             "proxy": self.config.get_proxy(),

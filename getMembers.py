@@ -5,6 +5,7 @@ from typing import Container, Optional
 
 import common
 import discord_web
+import scan
 from common import kill_all
 from getConfig import ConfigHandler
 
@@ -24,10 +25,10 @@ def main(output, config: Optional[ConfigHandler] = None, logger: Optional[loggin
             logger.debug(f"Looking for membership streams for: {channel_name} ({channel_id})")
             # Title/description filters are keyed by channel and meant for the channel's public
             # streams, so they aren't applied here: every members stream of the channel is wanted
-            videos = common.get_upcoming_or_live_videos(channel_id, config, tab="membership", passed_logger=logger,
-                                                        active_ids=active_ids, apply_filters=False)
+            videos = scan.get_upcoming_or_live_videos(channel_id, config, tab="membership", passed_logger=logger,
+                                                      active_ids=active_ids, apply_filters=False)
         except Exception as e:
             logger.exception(f"Error fetching membership streams for {channel_name}. Check cookies.")
             discord_web.notify(channel_id, "membership-error", message=str(e)[-500:], config=config)
             continue
-        common.put_all(output, videos)
+        scan.put_all(output, videos)
