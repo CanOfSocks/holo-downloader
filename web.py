@@ -218,6 +218,9 @@ def manual_add():
     video_id = extract_video_id(raw)
     if not video_id:
         return action_response(f"'{raw.strip()}' is not a YouTube video ID or URL", "warning")
+    if common.kill_all.is_set():
+        # start_job starts nothing once the application is stopping
+        return action_response(f"The application is shutting down, {video_id} was not started", "warning")
     if jobs.start_job(DiscoveredVideo(video_id, manual=True), jobs.KIND_STREAM):
         return action_response(f"Started download for {video_id}")
     return action_response(f"Video {video_id} is already being downloaded.", "warning")

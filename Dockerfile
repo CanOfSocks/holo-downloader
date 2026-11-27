@@ -50,4 +50,7 @@ RUN python --version && deno --version && ffmpeg -version
 RUN mkdir -p /root/.cache ; chmod -R 777 /root/.cache
 
 CMD []
-ENTRYPOINT [ "sh", "-c", "/app/start.sh" ]
+# Exec form, so start.sh (which ends with `exec gunicorn`) replaces it as PID 1 and gunicorn receives
+# the SIGTERM from `docker stop` directly. With `sh -c` a shell could stay PID 1 without passing the
+# signal on, and Docker would kill everything after its stop timeout without a graceful shutdown.
+ENTRYPOINT [ "/app/start.sh" ]

@@ -1,4 +1,5 @@
 """Web app routes and templates, with fake jobs (no network or real downloads)."""
+import threading
 import time
 from datetime import datetime, timezone
 
@@ -243,6 +244,16 @@ def test_history_reloaded_only_when_it_changed(client):
     current = client.get("/data/history").headers["X-History-Version"]
     assert current != shown
     assert "HX-Trigger" not in client.get(f"/data/active?history_version={current}").headers
+
+
+def test_add_during_shutdown_says_so(client, monkeypatch):
+    import common
+    stopping = threading.Event()
+    stopping.set()
+    monkeypatch.setattr(common, "kill_all", stopping)
+    response = client.post("/actions/add", data={"video_id": "dQw4w9WgXcQ"}, headers={"HX-Request": "true"})
+    assert "shutting down" in response.headers["HX-Trigger"]
+    assert not jobs.jobs["stream"]
 
 
 def test_add_rejects_invalid_id(client):
