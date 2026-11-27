@@ -472,7 +472,11 @@ def job_view(job: ActiveJob) -> dict[str, Any]:
         'stats': {key: (dict(value) if isinstance(value, dict) else value) for key, value in stats.items()},
         'streams': streams,
         'total_size': sum(int(stats.get(kind, {}).get('current_filesize') or 0) for kind in ("video", "audio")),
-        'start_time': to_utc_iso(job.started_at),
+        'start_time': to_utc_iso(job.started_at),       # When the job was queued
+        # Once recording: the stream's own start time if known, otherwise when recording began
+        'recording_start': to_utc_iso(downloader.stream_started_at or downloader.recording_started_at),
+        'recording_start_source': ('stream' if downloader.stream_started_at
+                                   else 'recording' if downloader.recording_started_at else None),
         'scheduled_start': to_utc_iso(downloader.scheduled_start),
         'next_check_at': to_utc_iso(downloader.next_check_at),
         'is_waiting': downloader.status == STATUS_WAITING,

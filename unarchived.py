@@ -419,7 +419,7 @@ class UnarchivedDownloader(BaseDownloader):
             self.livestream_downloader.file_names['live_chat'] = FileInfo(self.chat_path, file_type='live_chat')
 
         try:
-            self.set_status("Recording")
+            self.start_recording(info_dict)
             # Recovery always selects the best formats ("bv+ba/best"), as before
             self.livestream_downloader.download_segments(info_dict=info_dict, resolution='bv+ba/best', options=options)
         except KeyboardInterrupt:

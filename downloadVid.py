@@ -36,7 +36,7 @@ class VideoDownloader(BaseDownloader):
         """Download the stream segments, then mux and move the files (all done by livestream_dl)."""
         options = self.config.get_livestream_dl_options(info_dict=info_dict, output_template=self.outputFile)
         self.notify("recording")
-        self.set_status("Recording")
+        self.start_recording(info_dict)
         self.livestream_downloader.download_segments(info_dict=info_dict, resolution=options.get("resolution"), options=options)
 
         if self.kill_this.is_set():

@@ -89,6 +89,25 @@ def test_api_active_includes_stall_fields(client):
     assert {"stalled", "stall_reason", "can_merge", "last_progress"} <= set(data[0])
 
 
+def test_started_shows_stream_start_once_recording(client):
+    job = add_fake_job("stream", "dQw4w9WgXcQ", "Waiting", VideoDownloader)
+    data = client.get("/api/active").get_json()[0]
+    assert data["recording_start"] is None and data["recording_start_source"] is None
+    assert "Stream start time" not in client.get("/data/active").get_data(as_text=True)
+
+    job.downloader.start_recording({"release_timestamp": 1_700_000_000})
+    data = client.get("/api/active").get_json()[0]
+    assert data["recording_start"] == "2023-11-14T22:13:20Z" and data["recording_start_source"] == "stream"
+    body = client.get("/data/active").get_data(as_text=True)
+    assert "Stream start time" in body and 'datetime="2023-11-14T22:13:20Z"' in body
+
+    # No stream start reported (or a scheduled time in the future): the time recording began
+    other = add_fake_job("stream", "jNQXAC9IVRw", "Waiting", VideoDownloader)
+    other.downloader.start_recording({"release_timestamp": time.time() + 3600})
+    row = {r["id"]: r for r in client.get("/api/active").get_json()}["jNQXAC9IVRw"]
+    assert row["recording_start_source"] == "recording" and row["recording_start"].endswith("Z")
+
+
 def test_merge_action_sets_graceful_stop(client):
     job = add_fake_job("stream", "dQw4w9WgXcQ", "Recording", VideoDownloader)
     response = client.post("/actions/merge/stream/dQw4w9WgXcQ", headers={"HX-Request": "true"})

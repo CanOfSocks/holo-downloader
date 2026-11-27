@@ -64,7 +64,17 @@
                 {% else %}-{% endfor %}
             </td>
             <td class="d-none d-lg-table-cell">{{ job.total_size | convert_bytes }}</td>
-            <td class="d-none d-lg-table-cell">{{ local_time(job.start_time) }}</td>
+            <td class="d-none d-lg-table-cell text-nowrap">
+                {% if job.recording_start %}
+                    {# Red dot: the time is the stream's start (or when recording began), not when the job was queued #}
+                    <span class="text-danger small" role="img"
+                          aria-label="{{ 'Stream start' if job.recording_start_source == 'stream' else 'Recording start' }}"
+                          title="{{ 'Stream start time' if job.recording_start_source == 'stream' else 'Recording start time' }}">●</span>
+                    {{ local_time(job.recording_start) }}
+                {% else %}
+                    {{ local_time(job.start_time) }}
+                {% endif %}
+            </td>
 
             <td class="text-end">
                 <div class="d-flex flex-column flex-sm-row gap-1 justify-content-end">

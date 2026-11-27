@@ -151,6 +151,11 @@ class BaseDownloader:
         # Epoch time of the next planned check, shown in the web UI while waiting
         self.next_check_at: Optional[float] = None
 
+        # Set when recording begins (see start_recording): epoch time recording began, and the
+        # stream's own start time when YouTube reports it. Shown in the web UI's "Started" column.
+        self.recording_started_at: Optional[float] = None
+        self.stream_started_at: Optional[float] = None
+
         # Brief reason for the last error (see describe_error), saved in history with STATUS_ERROR
         self.error_reason: Optional[str] = None
         # Consecutive extractions reporting the video private (see private_needs_confirmation)
@@ -177,6 +182,18 @@ class BaseDownloader:
         """Set STATUS_ERROR and remember a brief reason for it."""
         self.error_reason = describe_error(error)
         self.set_status(STATUS_ERROR)
+
+    def start_recording(self, info_dict: Dict[str, Any]) -> None:
+        """
+        Set the "Recording" status and remember when recording began. For a live (or post-live)
+        stream, yt-dlp's release_timestamp is the stream's actual start time.
+        """
+        if self.recording_started_at is None:
+            self.recording_started_at = time.time()
+        stream_start = info_dict.get('release_timestamp')
+        if isinstance(stream_start, (int, float)) and 0 < stream_start <= time.time() + 60:
+            self.stream_started_at = float(stream_start)
+        self.set_status("Recording")
 
     def is_recording(self) -> bool:
         return str(self.status).lower() == "recording"
