@@ -196,6 +196,24 @@ def test_static_files_are_cacheable(client):
     assert "max-age=3600" in response.headers["Cache-Control"]
 
 
+def test_start_job_builds_downloader_outside_lock_and_updates_existing(client, monkeypatch):
+    started = []
+    monkeypatch.setattr(web.threading.Thread, "start", lambda self: started.append(self.name))
+
+    class CheckLock(VideoDownloader):
+        def __init__(self, video):
+            assert not web.LOCK.locked(), "the downloader must be built without holding LOCK"
+            super().__init__(video)
+    monkeypatch.setitem(web.DOWNLOADER_CLASSES, "stream", CheckLock)
+
+    assert web.start_job(DiscoveredVideo("dQw4w9WgXcQ"), "stream") is True
+    assert started == ["stream-dQw4w9WgXcQ"]
+    # Found again by a scan: the running job gets the update and nothing new starts
+    assert web.start_job(DiscoveredVideo("dQw4w9WgXcQ", live_status="is_live"), "stream") is False
+    assert web.get_job("stream", "dQw4w9WgXcQ").downloader.hinted_live_status == "is_live"
+    assert started == ["stream-dQw4w9WgXcQ"]
+
+
 def test_add_rejects_invalid_id(client):
     response = client.post("/actions/add", data={"video_id": "not a video"}, headers={"HX-Request": "true"})
     assert "warning" in response.headers["HX-Trigger"]

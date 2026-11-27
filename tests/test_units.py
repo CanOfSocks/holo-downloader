@@ -776,6 +776,22 @@ def test_unarchived_scan_ignores_filters(monkeypatch, fake_ytdlp):
     assert normal == [] and [video.id for video in unarchived] == ["unarchived1"]
 
 
+# --- Shared HTTP client ---
+
+def test_http_client_reused_and_replaced_when_proxy_changes(monkeypatch):
+    closed = []
+    monkeypatch.setattr(common, "OLD_CLIENT_CLOSE_DELAY", 0)
+    first = common.get_http_client(None)
+    assert common.get_http_client(None) is first
+    monkeypatch.setattr(first, "close", lambda: closed.append(first))
+    second = common.get_http_client("http://127.0.0.1:9")
+    assert second is not first
+    deadline = time.monotonic() + 2
+    while not closed and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert closed == [first]
+
+
 # --- Logging ---
 
 def test_named_loggers_share_one_set_of_handlers(tmp_path):

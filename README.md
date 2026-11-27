@@ -17,7 +17,7 @@ The program supports standard streams, members-only content, unarchived (private
 
 
 * **Resiliency**: Uses `livestream_dl` (a custom wrapper around `yt-dlp` and `ffmpeg`) to handle stream interruptions and segment merging.
-* **Web UI**: A Flask-based interface (port 5000) for desktop and mobile to view active downloads, history, and schedules. Downloads that stop receiving segments are flagged as **stalled** and can be stopped and merged from the UI. Failed downloads show a brief reason in the history (e.g. *Membership*, *Private*, *Processed*), and finished downloads show how many segments could not be downloaded, if any. Times are shown in the browser's timezone.
+* **Web UI**: A Flask-based interface (port 5000) for desktop and mobile to view active downloads, history, and schedules. Downloads that stop receiving segments are flagged as **stalled** and can be stopped and merged from the UI. Failed downloads show a brief reason in the history (e.g. *Membership*, *Private*, *Processed*), and finished downloads show how many segments could not be downloaded, if any. Times are shown in the browser's timezone. The tables stop refreshing while the browser tab is hidden and refresh as soon as it is shown again.
 * **Notifications**: Integrates with Discord Webhooks for status updates (Recording, Done, Error).
 * **Flexible Filtering**: Filter downloads by regex matching on video titles or descriptions.
 

@@ -247,16 +247,23 @@ def start_job(video: Union[DiscoveredVideo, str], kind: str) -> bool:
     """
     if isinstance(video, str):
         video = DiscoveredVideo(video)
+    existing = get_job(kind, video.id)
+    if existing is not None:
+        existing.downloader.apply_discovery_hint(video)
+        return False
+    # Built before taking the lock: the constructor reads the config file, and the web UI and the
+    # stall check need the lock in the meantime. Nothing has started yet, so if another thread
+    # adds the same video first this instance is simply discarded.
+    downloader = DOWNLOADER_CLASSES[kind](video)
     with LOCK:
         existing = jobs[kind].get(video.id)
-        if existing is not None:
-            existing.downloader.apply_discovery_hint(video)
-            return False
-        # The constructor doesn't make network requests, so holding the lock here is quick
-        downloader = DOWNLOADER_CLASSES[kind](video)
-        job = ActiveJob(video_id=video.id, kind=kind, downloader=downloader, started_at=datetime.now(timezone.utc))
-        job.thread = threading.Thread(target=run_job, args=(job,), name=f"{kind}-{video.id}", daemon=True)
-        jobs[kind][video.id] = job
+        if existing is None:
+            job = ActiveJob(video_id=video.id, kind=kind, downloader=downloader, started_at=datetime.now(timezone.utc))
+            job.thread = threading.Thread(target=run_job, args=(job,), name=f"{kind}-{video.id}", daemon=True)
+            jobs[kind][video.id] = job
+    if existing is not None:
+        existing.downloader.apply_discovery_hint(video)
+        return False
     job.thread.start()
     return True
 

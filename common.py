@@ -258,23 +258,34 @@ OEMBED_TIMEOUT = httpx.Timeout(15.0, connect=10.0)
 # Info shown in the web UI and Discord messages rarely changes, so it is reused for a while
 EMBED_INFO_CACHE_SECONDS = 600
 
-_http_clients: dict[str, httpx.Client] = {}
-_http_clients_lock = threading.Lock()
+_http_client: Optional[httpx.Client] = None
+_http_client_proxy_key: Optional[str] = None
+_http_client_lock = threading.Lock()
 _embed_info_cache = BoundedCache(max_entries=500, ttl=EMBED_INFO_CACHE_SECONDS)
+# A replaced client is closed after this long, so requests still using it can finish
+OLD_CLIENT_CLOSE_DELAY = 120
 
 
 def get_http_client(proxy: Optional[Union[str, dict]] = None) -> httpx.Client:
     """
-    One shared httpx client per proxy setting, so connections are reused instead of a new client
-    (and TLS handshake) for every request. httpx clients are safe to share between threads.
+    One shared httpx client, so connections are reused instead of a new client (and TLS handshake)
+    for every request. httpx clients are safe to share between threads. When the proxy setting
+    changes, a new client is created and the old one closed (after a delay, as other threads may
+    still be using it), so old connection pools don't pile up.
     """
+    global _http_client, _http_client_proxy_key
     key = json.dumps(proxy, sort_keys=True, default=str)
-    with _http_clients_lock:
-        client = _http_clients.get(key)
-        if client is None or client.is_closed:
-            client = create_http_client(proxies=proxy, max_connections=4, timeout=OEMBED_TIMEOUT)
-            _http_clients[key] = client
-        return client
+    with _http_client_lock:
+        if _http_client is not None and not _http_client.is_closed and key == _http_client_proxy_key:
+            return _http_client
+        old_client = _http_client
+        client = _http_client = create_http_client(proxies=proxy, max_connections=4, timeout=OEMBED_TIMEOUT)
+        _http_client_proxy_key = key
+    if old_client is not None and not old_client.is_closed:
+        closer = threading.Timer(OLD_CLIENT_CLOSE_DELAY, old_client.close)
+        closer.daemon = True
+        closer.start()
+    return client
 
 
 @dataclass
@@ -296,7 +307,8 @@ def fetch_oembed(video_id: str, proxy: Optional[Union[str, dict]] = None) -> Oem
             params={"format": "json", "url": f"https://www.youtube.com/watch?v={video_id}"},
             headers=headers.get_httpx_header(),
         )
-    except httpx.HTTPError as e:
+    except (httpx.HTTPError, RuntimeError) as e:
+        # RuntimeError: the shared client was closed after the proxy setting changed (see get_http_client)
         return OembedResult(status_code=None, data=None, error=f"{type(e).__name__}: {e}")
 
     if response.status_code != 200:
