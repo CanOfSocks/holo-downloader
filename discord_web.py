@@ -19,8 +19,8 @@ from getConfig import ConfigHandler
 # If Discord is unreachable for a long time, drop new messages instead of using more and more memory
 MAX_QUEUED_MESSAGES = 200
 WEBHOOK_TIMEOUT = 30
-# On shutdown, queued messages are still sent for this long (the worker waits for jobs to stop for
-# a similar time, see gunicorn.conf.py), so "done"/"error" messages of stopping jobs aren't lost
+# On shutdown, queued messages are still sent for this long, so "done"/"error" messages of stopping
+# jobs aren't lost. Under gunicorn the exiting worker waits for them with flush() (see gunicorn.conf.py).
 SHUTDOWN_SEND_SECONDS = 8
 
 _ANSI_ESCAPE = re.compile(r'\x1B[@-_][0-?]*[ -/]*[@-~]')
@@ -104,6 +104,24 @@ def _worker_loop() -> None:
             _logger.exception("Unable to send Discord notification")
         finally:
             _queue.task_done()
+
+
+def flush(timeout: float) -> bool:
+    """
+    Wait up to `timeout` seconds for every queued notification to be sent (used on shutdown,
+    as the sender is a daemon thread that ends with the process). Returns True if none are left.
+    """
+    deadline = time.monotonic() + timeout
+    if _queue.unfinished_tasks:
+        # The sender may have exited already (see _worker_loop), so make sure one is running
+        _ensure_worker()
+    with _queue.all_tasks_done:
+        while _queue.unfinished_tasks:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return False
+            _queue.all_tasks_done.wait(remaining)
+    return True
 
 
 def _channel_embed(title: str, description: str, notification: _Notification) -> DiscordEmbed:

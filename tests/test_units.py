@@ -842,6 +842,64 @@ def test_gunicorn_config_does_not_load_the_app():
     assert result.stdout.split() == ["False", "False"], result.stderr
 
 
+def _shutting_down(monkeypatch):
+    stopping = threading.Event()
+    stopping.set()
+    monkeypatch.setattr(common, "kill_all", stopping)
+
+
+def test_jobs_cancelled_by_shutdown_are_not_saved_to_history(monkeypatch):
+    import jobs
+    from base_downloader import STATUS_CANCELLED
+
+    class StopsForShutdown:
+        status = "Waiting"
+
+        def main(self):
+            self.status = STATUS_CANCELLED
+    saved = []
+    monkeypatch.setattr(jobs, "save_to_history", lambda job: saved.append(job.video_id))
+    job = jobs.ActiveJob(video_id="dQw4w9WgXcQ", kind="stream", downloader=StopsForShutdown(), started_at=datetime.now(timezone.utc))
+    monkeypatch.setitem(jobs.jobs["stream"], "dQw4w9WgXcQ", job)
+    _shutting_down(monkeypatch)
+    jobs.run_job(job)
+    assert saved == [] and "dQw4w9WgXcQ" not in jobs.jobs["stream"]
+
+    # Finished (or failed) jobs are still saved during shutdown, and a cancel without shutdown too
+    job.downloader = StopsForShutdown()
+    job.downloader.main = lambda: setattr(job.downloader, "status", "Finished")
+    jobs.run_job(job)
+    assert saved == ["dQw4w9WgXcQ"]
+    monkeypatch.setattr(common, "kill_all", threading.Event())
+    job.downloader = StopsForShutdown()
+    jobs.run_job(job)
+    assert saved == ["dQw4w9WgXcQ", "dQw4w9WgXcQ"]
+
+
+def test_no_new_jobs_during_shutdown(monkeypatch):
+    import jobs
+    monkeypatch.setitem(jobs.DOWNLOADER_CLASSES, "stream", lambda video: pytest.fail("nothing is built during shutdown"))
+    _shutting_down(monkeypatch)
+    assert jobs.start_job(DiscoveredVideo("dQw4w9WgXcQ"), "stream") is False
+
+
+def test_discord_flush_waits_for_queued_messages(monkeypatch):
+    import discord_web
+    sent = []
+
+    def slow_send(notification):
+        time.sleep(0.2)
+        sent.append(notification.status)
+    monkeypatch.setattr(discord_web, "send_webhook", slow_send)
+    monkeypatch.setattr(discord_web, "_worker", None)
+    for status in ("done", "error"):
+        discord_web._queue.put_nowait(discord_web._Notification("https://example.invalid", "dQw4w9WgXcQ", status, None, None, None))
+    # No sender running yet: flush starts one and waits for both messages
+    assert discord_web.flush(5) is True
+    assert sent == ["done", "error"]
+    assert discord_web.flush(0) is True
+
+
 def test_discord_sends_queued_messages_on_shutdown(monkeypatch):
     import discord_web
     sent = []

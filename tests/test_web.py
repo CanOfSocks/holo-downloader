@@ -219,6 +219,17 @@ def test_start_job_builds_downloader_outside_lock_and_updates_existing(client, m
     assert started == ["stream-dQw4w9WgXcQ"]
 
 
+def test_polled_tables_send_history_version_without_passing_it_to_actions(client):
+    body = client.get("/").get_data(as_text=True)
+    assert body.count("hx-vals='js:{history_version") == 2
+    # The pollers are separate elements targeting the table containers, so the action forms
+    # swapped into the containers have no ancestor with hx-vals
+    assert 'hx-target="#active-downloads-container"' in body and 'hx-target="#unarchive-monitor-container"' in body
+    for container in ('id="active-downloads-container">', 'id="unarchive-monitor-container">'):
+        start = body.index(container)
+        assert "hx-vals" not in body[body.rindex("<div", 0, start):body.index("</div>", start)]
+
+
 def test_history_reloaded_only_when_it_changed(client):
     history.init_db()
     shown = client.get("/data/history").headers["X-History-Version"]

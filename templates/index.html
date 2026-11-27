@@ -25,20 +25,26 @@
 
     <div class="card mb-4 shadow-sm">
         <div class="card-header bg-primary text-white">Active Downloads</div>
-        <div class="card-body p-0 p-sm-3" id="active-downloads-container"
-             hx-get="/data/active" hx-vals='js:{history_version: window.historyVersion || ""}'
-             hx-trigger="load, every 3s [!document.hidden], visibilitychange[!document.hidden] from:document, refreshTables from:body" hx-swap="innerHTML">
+        <div class="card-body p-0 p-sm-3" id="active-downloads-container">
             <p class="text-center text-muted m-3">Loading active downloads...</p>
         </div>
+        {# Polls the table into the container. A separate element, so the action forms in the table don't
+           inherit its hx-vals (htmx 1.9 ignores hx-disinherit for hx-vals). #}
+        <div hidden hx-get="/data/active" hx-target="#active-downloads-container" hx-swap="innerHTML"
+             hx-vals='js:{history_version: window.historyVersion || ""}'
+             hx-trigger="load, every 3s [!document.hidden], visibilitychange[!document.hidden] from:document, refreshTables from:body"></div>
     </div>
 
     <div class="card mb-4 shadow-sm">
         <div class="card-header bg-secondary text-white">Unarchived Stream Monitors</div>
-        <div class="card-body p-0 p-sm-3" id="unarchive-monitor-container"
-             hx-get="/data/unarchived" hx-vals='js:{history_version: window.historyVersion || ""}'
-             hx-trigger="load, every 30s [!document.hidden], visibilitychange[!document.hidden] from:document, refreshTables from:body" hx-swap="innerHTML">
+        <div class="card-body p-0 p-sm-3" id="unarchive-monitor-container">
             <p class="text-center text-muted m-3">Loading unarchived monitor activities...</p>
         </div>
+        {# Polls the table into the container. A separate element, so the action forms in the table don't
+           inherit its hx-vals (htmx 1.9 ignores hx-disinherit for hx-vals). #}
+        <div hidden hx-get="/data/unarchived" hx-target="#unarchive-monitor-container" hx-swap="innerHTML"
+             hx-vals='js:{history_version: window.historyVersion || ""}'
+             hx-trigger="load, every 30s [!document.hidden], visibilitychange[!document.hidden] from:document, refreshTables from:body"></div>
     </div>
 
     <div class="card mb-4 shadow-sm">

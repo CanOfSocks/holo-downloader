@@ -11,7 +11,7 @@ from typing import Optional, Union
 
 import common
 import history
-from base_downloader import BaseDownloader
+from base_downloader import STATUS_CANCELLED, BaseDownloader
 from common import DiscoveredVideo
 from downloadVid import VideoDownloader
 from monitor import StallTracker
@@ -84,8 +84,17 @@ def save_to_history(job: ActiveJob) -> None:
     history.save(job.video_id, job.kind, downloader.status, stream_total_size(downloader.stats), downloader.history_reason())
 
 
+def stopped_by_shutdown(job: ActiveJob) -> bool:
+    """
+    True if the job was cancelled because the application is shutting down. Such jobs are not
+    saved to history: they are found again by the next channel scan after the restart, and
+    saving them would push real entries out of the history on every restart.
+    """
+    return common.kill_all.is_set() and job.downloader.status == STATUS_CANCELLED
+
+
 def run_job(job: ActiveJob) -> None:
-    """Thread target for a job. Always records the result in history and removes the job."""
+    """Thread target for a job. Records the result in history (see stopped_by_shutdown) and removes the job."""
     try:
         job.downloader.main()
     except Exception as e:
@@ -93,7 +102,10 @@ def run_job(job: ActiveJob) -> None:
         job.downloader.set_error(e)
     finally:
         try:
-            save_to_history(job)
+            if stopped_by_shutdown(job):
+                logger.debug(f"{job.video_id} stopped for shutdown, not saved to history")
+            else:
+                save_to_history(job)
         except Exception:
             logger.exception(f"Unable to save {job.video_id} to history")
         with LOCK:
@@ -104,8 +116,11 @@ def start_job(video: Union[DiscoveredVideo, str], kind: str) -> bool:
     """
     Start a job thread for the video unless one is already running. If it is, the channel
     scan's information is passed to it instead (e.g. so a waiting job starts when the stream goes live).
-    Returns True if a new job was started.
+    Returns True if a new job was started. Nothing is started once the application is shutting
+    down (a channel scan may still be finding videos then).
     """
+    if common.kill_all.is_set():
+        return False
     if isinstance(video, str):
         video = DiscoveredVideo(video)
     existing = get_job(kind, video.id)

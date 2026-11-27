@@ -18,7 +18,7 @@ The program supports standard streams, members-only content, unarchived (private
 
 * **Resiliency**: Uses `livestream_dl` (a custom wrapper around `yt-dlp` and `ffmpeg`) to handle stream interruptions and segment merging.
 * **Web UI**: A Flask-based interface (port 5000) for desktop and mobile to view active downloads, history, and schedules. Downloads that stop receiving segments are flagged as **stalled** and can be stopped and merged from the UI. Failed downloads show a brief reason in the history (e.g. *Membership*, *Private*, *Processed*), and finished downloads show how many segments could not be downloaded, if any. Times are shown in the browser's timezone. The tables stop refreshing while the browser tab is hidden and refresh as soon as it is shown again.
-* **Notifications**: Integrates with Discord Webhooks for status updates (Recording, Done, Error). Messages still queued when the app stops are sent for up to 8 seconds before it exits.
+* **Notifications**: Integrates with Discord Webhooks for status updates (Recording, Done, Error). Messages still queued when the app stops are sent before it exits (see below).
 * **Flexible Filtering**: Filter downloads by regex matching on video titles or descriptions.
 
 ## Docker Usage
@@ -51,7 +51,7 @@ docker run -d \
 
 ```
 
-When the container stops, downloads are told to stop and given up to 8 seconds to close their files before the app exits. Docker allows 10 seconds by default (`docker stop -t`, compose `stop_grace_period`); a stopped download is not merged.
+When the container stops, no new downloads are started, and the running ones are told to stop and given time to close their files; then queued Discord messages are sent. Together this takes at most 8 seconds before the app exits; Docker allows 10 seconds by default (`docker stop -t`, compose `stop_grace_period`). A stopped download is not merged. Downloads and monitors stopped this way are not added to the history: the next channel scan after the restart finds them again.
 
 ### Environment Variables
 
