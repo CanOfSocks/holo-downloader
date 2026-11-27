@@ -484,6 +484,10 @@ include_m3u8 = true
 [community_tab_options]
 archive_file = "/app/com-tab-archive.txt"
 community_dir = "/app/CommunityPosts"
+# Defaults to cookies_file in [download_options]
+cookies_file = "/app/cookies.txt"
+# Write the cookies YouTube refreshes back to the cookies file
+save_cookies = true
 
 [cron_schedule]
 streams = "*/30 * * * *"

@@ -159,9 +159,14 @@ class ConfigHandler:
         return usable_cookies_path(self.download_options.get("cookies_file"))
 
     def get_community_tab_cookies(self) -> Optional[str]:
+        """[community_tab_options] cookies_file, or [download_options] cookies_file if it isn't set."""
         if self.community_tab_options.get("cookies_file") is not None:
             return usable_cookies_path(self.community_tab_options.get("cookies_file"))
         return self.get_cookies_file()
+
+    def get_community_tab_save_cookies(self) -> bool:
+        """Write the cookies YouTube refreshes during a community tab download back to the cookies file."""
+        return bool(self.community_tab_options.get("save_cookies", True))
 
     # --- Filters ---
 

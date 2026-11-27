@@ -1,6 +1,21 @@
+# syntax=docker/dockerfile:1
+# (The syntax line enables `ADD <git repository>` and `RUN --mount`, used for ytct below.)
+
 # Use the stable livestream_dl "latest" image as the base. Override with
 # --build-arg BASE_IMAGE=ghcr.io/canofsocks/livestream_dl:dev for the dev image.
 ARG BASE_IMAGE=ghcr.io/canofsocks/livestream_dl:latest
+# ytct.py (imported by communityPosts.py) and its youtube_community_tab library
+ARG YTCT_REPO=CanOfSocks/youtube-community-tab
+ARG YTCT_BRANCH=dev
+
+# Both come from one commit of the branch. ADD of a git repository looks up the branch's current
+# commit on every build, so a new commit always rebuilds the install step below; a
+# `pip install git+...` step would be served from the build cache and keep an old library.
+FROM scratch AS ytct-source
+ARG YTCT_REPO
+ARG YTCT_BRANCH
+ADD https://github.com/${YTCT_REPO}.git#${YTCT_BRANCH} /
+
 FROM ${BASE_IMAGE}
 
 ARG PYTHONDONTWRITEBYTECODE=1
@@ -22,29 +37,23 @@ COPY . .
 # mounted (the real cookies are excluded by .dockerignore and must be mounted at runtime).
 RUN chmod +x *.py /app/start.sh && touch /app/cookies.txt
 
-# ytct.py (imported by communityPosts.py) and its youtube_community_tab library below come from the
-# same branch, so they always match
-ARG YTCT_REPO=CanOfSocks/youtube-community-tab
-ARG YTCT_BRANCH=dev
-ADD https://raw.githubusercontent.com/${YTCT_REPO}/${YTCT_BRANCH}/ytct.py .
-
 # --- System Dependencies ---
 RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/repositories && \
     # Add some dns caching because it is cheap to do
     apk add --no-cache dnsmasq && \
     #
-    apk add --no-cache --virtual .build-deps git && \
-    #
     # Install Python Dependencies in one go
-    # We upgrade pip first, then install requirements + the git repo
+    # We upgrade pip first, then install requirements
     pip install --no-cache-dir -U pip && \
     pip install --no-cache-dir -U \
         gunicorn \
-        -r /app/requirements.txt \
-        "youtube-community-tab @ git+https://github.com/${YTCT_REPO}.git@${YTCT_BRANCH}#subdirectory=youtube-community-tab" && \
-    #
-    # Cleanup: Remove git and curl to save space
-    apk del .build-deps
+        -r /app/requirements.txt
+
+# ytct.py and the youtube_community_tab library from the ytct-source stage. The checkout is mounted
+# (writable, as pip builds in it; the changes are discarded) rather than copied, so it isn't left in the image.
+RUN --mount=type=bind,from=ytct-source,target=/tmp/youtube-community-tab,rw \
+    cp /tmp/youtube-community-tab/ytct.py /app/ytct.py && \
+    pip install --no-cache-dir /tmp/youtube-community-tab/youtube-community-tab
 
 # --- Verify Tools ---
 # Ensure the "Secret Sauce" Deno wrapper from the base image is still working [cite: 7, 10]

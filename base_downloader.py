@@ -472,7 +472,7 @@ class BaseDownloader:
         while True:
             try:
                 info_dict, live_status = self.extract_info(include_dash=include_dash, include_m3u8=include_m3u8)
-            except (getUrls.VideoInaccessibleError, UnexpectedStatusError) as e:
+            except (getUrls.VideoInaccessibleError, getUrls.VideoUnavailableError, UnexpectedStatusError) as e:
                 if not self.report_needs_confirmation(e):
                     raise
                 self.set_status(STATUS_WAITING)

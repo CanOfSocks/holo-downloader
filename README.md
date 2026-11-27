@@ -247,8 +247,12 @@ Downloads community posts (text and images). The `[community_tab]` list is indep
 [community_tab_options]
 community_dir = "/app/CommunityPosts"        # Output directory
 archive_file = "/app/com-tab-archive.txt"    # File tracking downloaded post IDs
+cookies_file = "/app/cookies.txt"            # Optional: defaults to cookies_file in [download_options]
+save_cookies = true                          # Optional: write refreshed cookies back to the cookies file (default true)
 
 ```
+
+Community tab downloads use the cookies file set here, or the `[download_options]` `cookies_file` if none is set (members-only posts need cookies of an account with that membership). The cookies YouTube refreshes during a download are written back to that file, so it stays valid longer; the previous version is kept as `<cookies file>.bak`. This also works when `cookies.txt` is mounted as a single file, as in `compose.yml`. Set `save_cookies = false` to leave the file untouched.
 
 ### 8. Logging Options
 

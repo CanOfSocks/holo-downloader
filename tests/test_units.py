@@ -374,11 +374,17 @@ def fake_ytct(monkeypatch):
             return result
 
     ytct.Downloader = Downloader
+    ytct.save_cookie_file = lambda jar, path, backup=True: None
     handler = types.ModuleType("youtube_community_tab.requests_handler")
     handler.requests_cache = session
+    # A library module that prints, like community_tab.py does before raising
+    library = types.ModuleType("youtube_community_tab.community_tab")
+    exec("def complain(message):\n    print(message)", library.__dict__)
+    ytct.library = library
     monkeypatch.setitem(sys.modules, "ytct", ytct)
     monkeypatch.setitem(sys.modules, "youtube_community_tab", types.ModuleType("youtube_community_tab"))
     monkeypatch.setitem(sys.modules, "youtube_community_tab.requests_handler", handler)
+    monkeypatch.setitem(sys.modules, "youtube_community_tab.community_tab", library)
     # Independent of any other test (or shutdown) having set the global stop flag
     monkeypatch.setattr(communityPosts, "kill_all", threading.Event())
     return ytct
@@ -408,23 +414,50 @@ def test_community_tab_uses_only_its_own_list(monkeypatch, tmp_path, fake_ytct):
     assert options["dates"] and options["reverse"] and options["ignore_errors"]
 
 
+def test_community_tab_cookies_default_to_download_cookies(tmp_path, fake_ytct):
+    """Without [community_tab_options] cookies_file the [download_options] one is used, and
+    refreshed cookies are saved back by default."""
+    import communityPosts
+
+    main_cookies, community_cookies = tmp_path / "cookies.txt", tmp_path / "community.txt"
+    main_cookies.write_text("")
+    community_cookies.write_text("")
+    config = ConfigHandler(config={"download_options": {"cookies_file": str(main_cookies)},
+                                   "community_tab": {"posts": "UCposts"},
+                                   "community_tab_options": {"community_dir": str(tmp_path)}})
+    communityPosts.main(config=config)
+    assert fake_ytct.calls[-1]["cookies"] == str(main_cookies)
+    assert fake_ytct.calls[-1]["save_cookies"] is True
+
+    config = ConfigHandler(config={"download_options": {"cookies_file": str(main_cookies)},
+                                   "community_tab": {"posts": "UCposts"},
+                                   "community_tab_options": {"community_dir": str(tmp_path), "cookies_file": str(community_cookies),
+                                                             "save_cookies": False}})
+    communityPosts.main(config=config)
+    assert fake_ytct.calls[-1]["cookies"] == str(community_cookies)
+    assert fake_ytct.calls[-1]["save_cookies"] is False
+
+
 def test_community_tab_logs_to_the_holo_log(tmp_path, fake_ytct, caplog):
-    """ytct's lines go to holo.community_posts at a level matching what they report."""
+    """ytct's lines (and the library's print() messages) go to holo.community_posts at a level
+    matching what they report."""
     import communityPosts
 
     def on_download(log, link):
         log("community tab", "getting posts from community tab (page 1)", "\r")
         log("community tab", "found 2 posts")
         log("post:Ugx1", "writing Ugx1.json")
+        log("post:Ugx1", "could not get video ID, video may be private or deleted")
         log("post:Ugx2", "failed: KeyError: 'x'")
         log("cookies", "WARNING: YouTube did not accept the login cookies (not logged in)")
+        fake_ytct.library.complain("[Can't get the contents from the tab]")
         return ["Ugx1"], ["Ugx2: KeyError: 'x'"]
 
     fake_ytct.on_download = on_download
     config = ConfigHandler(config={"community_tab": {"posts": "UCposts"},
                                    "community_tab_options": {"community_dir": str(tmp_path)}})
     logger = logging.getLogger("holo.community_posts")
-    logger.setLevel(logging.DEBUG)
+    # The app logger doesn't propagate to the root logger, where caplog listens
     with caplog.at_level(logging.DEBUG, logger="holo.community_posts"):
         logger.addHandler(caplog.handler)
         try:
@@ -435,12 +468,54 @@ def test_community_tab_logs_to_the_holo_log(tmp_path, fake_ytct, caplog):
     assert lines["Community tab posts: [community tab] getting posts from community tab (page 1)"] == logging.DEBUG
     assert lines["Community tab posts: [community tab] found 2 posts"] == logging.INFO
     assert lines["Community tab posts: [post:Ugx1] writing Ugx1.json"] == logging.DEBUG
+    assert lines["Community tab posts: [post:Ugx1] could not get video ID, video may be private or deleted"] == logging.INFO
     assert lines["Community tab posts: [post:Ugx2] failed: KeyError: 'x'"] == logging.WARNING
     assert lines["Community tab posts: [cookies] WARNING: YouTube did not accept the login cookies (not logged in)"] == logging.WARNING
-    assert any(level == logging.WARNING and "1 new, 1 failed" in message for message, level in lines.items())
-    # The library's own requests get a timeout
+    assert lines["Community tab posts: [library] [Can't get the contents from the tab]"] == logging.WARNING
+    # The summary only counts the failures, which were each logged as a warning already
+    assert lines["Community tab posts: 1 new posts, 1 failed (retried on the next run)"] == logging.INFO
+    # The library's own requests get a timeout, unless one is passed
     fake_ytct.session.get("https://www.youtube.com/")
-    assert fake_ytct.session.timeouts == [communityPosts.REQUEST_TIMEOUT_SECONDS]
+    fake_ytct.session.request("GET", "https://www.youtube.com/", None, None, None, None, None, None, 5)
+    fake_ytct.session.get("https://www.youtube.com/", timeout=7)
+    assert fake_ytct.session.timeouts == [communityPosts.REQUEST_TIMEOUT_SECONDS, None, 7]
+
+
+def test_library_print_outside_a_download_still_prints(fake_ytct, capsys):
+    import communityPosts
+
+    communityPosts.route_library_prints()
+    fake_ytct.library.complain("hello")
+    assert capsys.readouterr().out == "hello\n"
+
+
+def test_cookies_are_saved_in_place_when_the_file_cannot_be_replaced(tmp_path):
+    """A cookies file bind-mounted into Docker can't be replaced by a rename (EBUSY)."""
+    import errno
+
+    import communityPosts
+
+    cookies = tmp_path / "cookies.txt"
+    cookies.write_text("old")
+
+    def library_save(jar, path, backup=True):
+        # Like the library: write <path>.tmp, back up the file, then rename over it
+        with open(f"{path}.tmp", "w") as file:
+            file.write(jar)
+        with open(f"{path}.bak", "w") as file:
+            file.write(open(path).read())
+        raise OSError(errno.EBUSY, "Device or resource busy")
+
+    save = communityPosts.save_cookie_file_in_place(library_save)
+    assert save("new", str(cookies)) == f"{cookies}.bak"
+    assert cookies.read_text() == "new"
+    assert not os.path.exists(f"{cookies}.tmp")
+
+    def read_only(jar, path, backup=True):
+        raise PermissionError(errno.EACCES, "Permission denied")   # nothing written
+
+    with pytest.raises(PermissionError):
+        communityPosts.save_cookie_file_in_place(read_only)("new", str(cookies))
 
 
 def test_community_tab_stops_on_shutdown(tmp_path, fake_ytct):
@@ -623,6 +698,33 @@ def test_private_report_is_confirmed_before_giving_up(monkeypatch):
     monkeypatch.setattr(downloader, "wait", lambda seconds: waits.append(seconds) or WaitResult.ELAPSED)
     assert downloader.wait_for_stream() == {"live_status": "is_live", "formats": ["f"]}
     assert len(calls) == 2 and len(waits) == 1 and waits[0] == pytest.approx(60, abs=1)
+
+
+def test_unavailable_report_is_confirmed_before_giving_up(monkeypatch):
+    """"Video unavailable" is also seen briefly for working videos, so it is checked once more."""
+    downloader = _downloader()
+    calls = []
+
+    def extract(**kw):
+        calls.append(1)
+        if len(calls) == 1:
+            raise getUrls.VideoUnavailableError("Video unavailable")
+        return {"live_status": "is_live", "formats": ["f"]}, "is_live"
+    monkeypatch.setattr(getUrls, "get_Video_Info", extract)
+    monkeypatch.setattr(downloader, "wait", lambda seconds: WaitResult.ELAPSED)
+    assert downloader.wait_for_stream() == {"live_status": "is_live", "formats": ["f"]}
+    assert len(calls) == 2
+
+
+def test_repeated_unavailable_report_raises(monkeypatch):
+    downloader = _downloader()
+
+    def unavailable(**kw):
+        raise getUrls.VideoUnavailableError("Video unavailable")
+    monkeypatch.setattr(getUrls, "get_Video_Info", unavailable)
+    monkeypatch.setattr(downloader, "wait", lambda seconds: WaitResult.ELAPSED)
+    with pytest.raises(getUrls.VideoUnavailableError):
+        downloader.wait_for_stream()
 
 
 def test_repeated_private_report_raises(monkeypatch):
