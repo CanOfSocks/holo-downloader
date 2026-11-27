@@ -43,8 +43,10 @@ def save_config_text(path: str, content: str) -> tuple[bool, str]:
     """
     Save config text from the web UI if it is valid TOML. Returns (saved, message).
     Written to a temporary file and then swapped in, so a reader (the stall check, a new download)
-    never sees a half-written file and a crash can't leave a truncated config. A config mounted
-    into Docker as a single file can't be replaced (EBUSY/EXDEV), so it is then written in place.
+    never sees a half-written file and a crash can't leave a truncated config.
+    It is written in place instead only when the temporary file can't be created (read-only
+    folder) or can't be swapped in (a config mounted into Docker as a single file: EBUSY/EXDEV).
+    If writing the temporary file fails (e.g. disk full), config.toml is left untouched.
     """
     try:
         tomlkit.parse(content)
@@ -52,16 +54,58 @@ def save_config_text(path: str, content: str) -> tuple[bool, str]:
         return False, f"Invalid TOML, configuration not saved: {e}"
     temp_path = path + ".tmp"
     try:
-        with open(temp_path, "w", encoding="utf-8", newline="") as f:
-            f.write(content)
-        os.replace(temp_path, path)
+        if not _replace_with_temp_file(path, temp_path, content):
+            with open(path, "w", encoding="utf-8", newline="") as f:
+                f.write(content)
+    except OSError as e:
+        return False, f"Unable to save the configuration: {e}"
+    return True, "Config saved"
+
+
+def _replace_with_temp_file(path: str, temp_path: str, content: str) -> bool:
+    """
+    Write `content` to temp_path and swap it in. Returns False if the temporary file can't be
+    created or swapped in (the caller then writes in place). A failed write raises OSError.
+    """
+    try:
+        temp_file = open(temp_path, "w", encoding="utf-8", newline="")
     except OSError:
-        with open(path, "w", encoding="utf-8", newline="") as f:
-            f.write(content)
+        return False
+    try:
+        with temp_file:
+            temp_file.write(content)
+        try:
+            os.replace(temp_path, path)
+        except OSError:
+            return False
+        return True
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
-    return True, "Config saved"
+
+
+# Cookies paths already reported as unusable, so the warning is logged once per path
+_unusable_cookies_logged: set[str] = set()
+
+
+def usable_cookies_path(value: Optional[str]) -> Optional[str]:
+    """
+    The configured cookies file, or None if none is set or the path exists but isn't a file.
+    Docker creates a directory when a bind-mounted file (e.g. cookies.txt in compose.yml) doesn't
+    exist on the host; yt-dlp would fail every extraction trying to load it. A path that doesn't
+    exist at all is passed on unchanged (yt-dlp then simply has no cookies).
+    """
+    if value is None:
+        return None
+    path = str(Path(value))
+    if os.path.exists(path) and not os.path.isfile(path):
+        if path not in _unusable_cookies_logged:
+            _unusable_cookies_logged.add(path)
+            logging.getLogger("holo.config").warning(
+                "Cookies file {0} is not a file (a directory?), continuing without cookies. If it is mounted "
+                "into Docker, create the file on the host first, e.g. `touch cookies.txt`.".format(path))
+        return None
+    return path
 
 
 def apply_quality_alias(options: dict) -> dict:
@@ -100,13 +144,11 @@ class ConfigHandler:
     # --- Cookies ---
 
     def get_cookies_file(self) -> Optional[str]:
-        if self.download_options.get("cookies_file") is not None:
-            return str(Path(self.download_options.get("cookies_file")))
-        return None
+        return usable_cookies_path(self.download_options.get("cookies_file"))
 
     def get_community_tab_cookies(self) -> Optional[str]:
         if self.community_tab_options.get("cookies_file") is not None:
-            return str(Path(self.community_tab_options.get("cookies_file")))
+            return usable_cookies_path(self.community_tab_options.get("cookies_file"))
         return self.get_cookies_file()
 
     # --- Filters ---

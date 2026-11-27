@@ -26,6 +26,7 @@ The program supports standard streams, members-only content, unarchived (private
 The recommended way to run this application is via Docker. You will need to create a `config.toml`, a temporary folder, a final download folder, and a `cookies.txt` file (if using Members/Unarchived features).
 
 > **Note:** `cookies.txt` holds your YouTube account session. It is ignored by git and by Docker builds (`.gitignore` / `.dockerignore`), so it is never committed or baked into an image; mount it into the container as shown below. The image contains an empty placeholder.
+> Create the file on the host **before** the first start (e.g. `touch cookies.txt`, then paste your cookies in). If it doesn't exist, Docker creates a *directory* with that name instead; the app then logs a warning and continues without cookies.
 
 ### Run Command
 
@@ -185,7 +186,7 @@ The `output_path` template follows [yt-dlp output template](https://github.com/y
 | `video_fetch_method` | String | `ytdlp` | `ytdlp` (scans channel page) or `json` (uses holo.dev API, Hololive only). |
 | `look_ahead` | Int | `48` | Hours into the future to schedule downloads for. A waiting download stops (status "Beyond look-ahead") if the stream is rescheduled further out than this; a later channel scan starts it again once it is within the window. Videos added by hand in the web UI are not limited. |
 | `upcoming_wait_for_video_max` | Float | `900` | Maximum seconds between checks of a stream that is past its scheduled start but not live yet (Minimum: 60). Checks start every 60 seconds and slow down the later the stream is (a quarter of the time it is late). Increasing reduces yt-dlp extractions, but can increase the time until recording starts if a livestream starts late. Checks at the maximum are shortened by a random 0-10% so streams don't all get checked at once. |
-| `upcoming_recheck_max` | Float | `10800` | Maximum seconds between yt-dlp extractions of a stream waiting for its scheduled start (Minimum: 60). The downloader waits until the scheduled start without extracting, but re-checks at least this often in case the schedule moved. Independent of the channel scan, which also starts the download straight away if it sees the stream live. Checks at the maximum are shortened by a random 0-10% so streams found in the same scan don't all get checked at once. If a check reports a waiting stream as private, or as anything other than upcoming, live or just ended (e.g. no live status at all), it is checked once more a minute later before the download gives up, as single degraded extractions have reported working streams that way. |
+| `upcoming_recheck_max` | Float | `10800` | Maximum seconds between yt-dlp extractions of a stream waiting for its scheduled start (Minimum: 60). The downloader waits until the scheduled start without extracting, but re-checks at least this often in case the schedule moved. Independent of the channel scan, which also starts the download straight away if it sees the stream live. Checks at the maximum are shortened by a random 0-10% so streams found in the same scan don't all get checked at once. If a check reports a waiting stream as private, or as anything other than upcoming, live or just ended (e.g. no live status at all), it is checked once more a minute later before the download gives up, as single degraded extractions have reported working streams that way. A confirmed unexpected status is shown in the history as *Error* with the reason *Unexpected status*. |
 | `proxies` | String | *None* | Proxy URL (e.g., `"http://10.0.1.2:3128"`). |
 | `randomise_lists` | Bool | `False` | Randomize channel check order to reduce bot detection patterns. |
 | `ytdlp_options` | String| *None* | A JSON string that will be added to the yt-dlp options for stream URL extraction. E.g `'{"extractor_args":{"youtubepot-bgutilhttp":{"base_url":["http://bgutil-provider:4416"]}}}'` |
@@ -303,7 +304,7 @@ The buttons post to these endpoints, which can also be used directly (`<kind>` i
 
 > **Note:** The older `/actions/cancel/<video_id>` and `/actions/cancel_unarchived/<video_id>` endpoints have been removed; use `/actions/cancel/<kind>/<video_id>`.
 
-Configuration saved from the web UI is checked to be valid TOML first, then written to a temporary file and swapped in, so nothing reads a half-written file. When `config.toml` is mounted into Docker as a single file (which can't be swapped), it is written in place instead.
+Configuration saved from the web UI is checked to be valid TOML first, then written to a temporary file and swapped in, so nothing reads a half-written file. When `config.toml` is mounted into Docker as a single file (which can't be swapped), or the temporary file can't be created, it is written in place instead. If the write itself fails (e.g. the disk is full), the existing config is left untouched and the web UI shows the error.
 
 ---
 

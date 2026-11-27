@@ -31,3 +31,13 @@ log_level = "WARNING"
 
 os.environ["CONFIG_FILE"] = _CONFIG_PATH
 os.environ["HISTORY_DB"] = os.path.join(_TEST_DIR, "stream_history.db")
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _close_shared_http_clients():
+    """No test leaves a shared httpx client (e.g. one with a test proxy) behind for the next one."""
+    yield
+    import common
+    common.close_http_clients()

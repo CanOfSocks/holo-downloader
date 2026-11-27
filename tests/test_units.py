@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 import threading
 import time
 from datetime import datetime, timezone
@@ -515,9 +514,9 @@ def test_other_inaccessible_errors_are_not_retried(monkeypatch):
         downloader.wait_for_stream()
 
 
-def test_unarchived_private_report_is_confirmed_before_recovery(monkeypatch):
-    from unarchived import Refresh, UnarchivedDownloader
-    downloader = UnarchivedDownloader(DiscoveredVideo("dQw4w9WgXcQ"))
+def test_unarchived_private_report_is_confirmed_before_recovery(monkeypatch, tmp_path):
+    from unarchived import Refresh
+    downloader = _unarchived(tmp_path)
 
     def private(**kw):
         raise getUrls.VideoInaccessibleError("Video dQw4w9WgXcQ is private")
@@ -545,11 +544,16 @@ def test_history_reason_reports_missing_segments():
     assert downloader.history_reason() == "Private"
 
 
-def _unarchived_with_saved_json(age: float):
-    """An unarchived monitor whose saved info.json was extracted `age` seconds ago."""
+def _unarchived(tmp_path, **hint):
+    """An unarchived monitor whose temp folder is this test's own tmp_path (no files shared with other tests)."""
     from unarchived import UnarchivedDownloader
-    downloader = UnarchivedDownloader(DiscoveredVideo("dQw4w9WgXcQ"))
-    os.makedirs(os.path.dirname(downloader.json_path), exist_ok=True)
+    config = ConfigHandler(config={"download_options": {"temp_dir": str(tmp_path), "unarchived_tempdir": str(tmp_path)}})
+    return UnarchivedDownloader(DiscoveredVideo("dQw4w9WgXcQ", **hint), config=config)
+
+
+def _unarchived_with_saved_json(tmp_path, age: float):
+    """An unarchived monitor whose saved info.json was extracted `age` seconds ago."""
+    downloader = _unarchived(tmp_path)
     with open(downloader.json_path, "w", encoding="utf-8") as f:
         json.dump({"id": "dQw4w9WgXcQ", "epoch": time.time() - age}, f)
     downloader.json_saved_at = downloader._saved_json_time()
@@ -560,9 +564,9 @@ def _bot_check(**kw):
     raise getUrls.RateLimitException("Rate limited or blocked by YouTube anti-bot measures")
 
 
-def test_unarchived_rate_limit_retries_without_error_notification(monkeypatch):
+def test_unarchived_rate_limit_retries_without_error_notification(monkeypatch, tmp_path):
     from unarchived import INFO_JSON_MAX_AGE, RECOVER_BEFORE_EXPIRY, URL_REFRESH_RETRY, Refresh
-    downloader = _unarchived_with_saved_json(age=INFO_JSON_MAX_AGE - RECOVER_BEFORE_EXPIRY - 300)
+    downloader = _unarchived_with_saved_json(tmp_path, age=INFO_JSON_MAX_AGE - RECOVER_BEFORE_EXPIRY - 300)
     monkeypatch.setattr(getUrls, "get_Video_Info", _bot_check)
     monkeypatch.setattr(downloader, "notify", lambda *a, **kw: pytest.fail("no error notification for a rate limit"))
     assert downloader.refresh_urls() is Refresh.RATE_LIMITED
@@ -571,9 +575,9 @@ def test_unarchived_rate_limit_retries_without_error_notification(monkeypatch):
     assert downloader.next_url_refresh < time.time() + URL_REFRESH_RETRY
 
 
-def test_unarchived_recovers_before_saved_urls_expire(monkeypatch):
+def test_unarchived_recovers_before_saved_urls_expire(monkeypatch, tmp_path):
     from unarchived import INFO_JSON_MAX_AGE, RECOVER_BEFORE_EXPIRY
-    downloader = _unarchived_with_saved_json(age=INFO_JSON_MAX_AGE - RECOVER_BEFORE_EXPIRY + 60)
+    downloader = _unarchived_with_saved_json(tmp_path, age=INFO_JSON_MAX_AGE - RECOVER_BEFORE_EXPIRY + 60)
     monkeypatch.setattr(getUrls, "get_Video_Info", _bot_check)
     recovered = []
     monkeypatch.setattr(downloader, "recover", lambda: recovered.append(1) or True)
@@ -582,11 +586,11 @@ def test_unarchived_recovers_before_saved_urls_expire(monkeypatch):
     assert recovered == [1]
 
 
-def test_unarchived_expiry_recovery_conditions():
+def test_unarchived_expiry_recovery_conditions(tmp_path):
     from unarchived import INFO_JSON_MAX_AGE, RECOVER_BEFORE_EXPIRY
-    early = _unarchived_with_saved_json(age=3600)
+    early = _unarchived_with_saved_json(tmp_path, age=3600)
     assert early._recover_before_expiry(suspicious=False) is False
-    late = _unarchived_with_saved_json(age=INFO_JSON_MAX_AGE - RECOVER_BEFORE_EXPIRY + 60)
+    late = _unarchived_with_saved_json(tmp_path, age=INFO_JSON_MAX_AGE - RECOVER_BEFORE_EXPIRY + 60)
     late.processed = True
     # Public archive: only if the cheap check has since reported the video inaccessible
     assert late._recover_before_expiry(suspicious=False) is False
@@ -695,31 +699,55 @@ def test_unexpected_status_of_upcoming_stream_is_confirmed(monkeypatch, reported
     assert len(waits) == 1 and waits[0] == pytest.approx(60, abs=1)
 
 
-def test_repeated_unexpected_status_raises_processed(monkeypatch):
+def test_repeated_unexpected_status_raises(monkeypatch):
     from base_downloader import UnexpectedStatusError
     downloader = _downloader(live_status="is_upcoming")
     monkeypatch.setattr(downloader, "probe_status", lambda: {"live_status": "not_live"})
     monkeypatch.setattr(downloader, "wait", lambda seconds: WaitResult.ELAPSED)
     with pytest.raises(UnexpectedStatusError):
         downloader.wait_for_stream()
-    assert describe_error(UnexpectedStatusError("x")) == "Processed"
+    # Shown in history as what it is, not as a processed (public) video
+    assert describe_error(UnexpectedStatusError("x")) == "Unexpected status"
 
 
-def test_unarchived_unexpected_status_is_confirmed(monkeypatch):
-    from unarchived import Refresh, UnarchivedDownloader
-    downloader = UnarchivedDownloader(DiscoveredVideo("dQw4w9WgXcQ", live_status="is_upcoming"))
+def test_unarchived_unexpected_status_is_confirmed_then_stops(monkeypatch, tmp_path):
+    from base_downloader import STATUS_ERROR
+    from unarchived import Refresh
+    downloader = _unarchived(tmp_path, live_status="is_upcoming")
     monkeypatch.setattr(downloader, "probe_status", lambda: {"live_status": None})
     assert downloader.refresh_urls() is Refresh.UNCONFIRMED
+    assert downloader.refresh_urls() is Refresh.UNEXPECTED
+    assert downloader.status == STATUS_ERROR and downloader.history_reason() == "Unexpected status"
+    assert not downloader.processed
+
+    # The monitor loop stops on it
+    downloader = _unarchived(tmp_path, live_status="is_upcoming")
+    monkeypatch.setattr(downloader, "probe_status", lambda: {"live_status": None})
+
+    def confirming_check_due(seconds):
+        downloader.next_url_refresh = 0.0   # As if CONFIRM_DELAY had passed
+        return WaitResult.ELAPSED
+    monkeypatch.setattr(downloader, "wait", confirming_check_due)
+    downloader._monitor()
+    assert downloader.status == STATUS_ERROR
+
+
+def test_unarchived_unexpected_status_with_saved_urls_keeps_watching(monkeypatch, tmp_path):
+    from unarchived import Refresh
+    downloader = _unarchived_with_saved_json(tmp_path, age=60)
+    downloader.hinted_live_status = "is_upcoming"
+    monkeypatch.setattr(downloader, "probe_status", lambda: {"live_status": "not_live"})
+    monkeypatch.setattr(downloader, "_record_baseline", lambda: None)
+    assert downloader.refresh_urls() is Refresh.UNCONFIRMED
+    # Saved URLs could still be needed: handled like a public archive, so monitoring continues
     assert downloader.refresh_urls() is Refresh.PROCESSED
-    assert downloader.processed
 
 
 # --- Unarchived monitor ---
 
-def test_unarchived_cancel_during_wait_is_recorded_as_cancelled(monkeypatch):
+def test_unarchived_cancel_during_wait_is_recorded_as_cancelled(monkeypatch, tmp_path):
     from base_downloader import STATUS_CANCELLED
-    from unarchived import UnarchivedDownloader
-    downloader = UnarchivedDownloader(DiscoveredVideo("dQw4w9WgXcQ"))
+    downloader = _unarchived(tmp_path)
     downloader.set_status("Monitoring")
     downloader.next_url_refresh = time.time() + 3600   # Nothing due: goes straight to the wait
     threading.Timer(0.2, downloader.cancel).start()
@@ -727,8 +755,8 @@ def test_unarchived_cancel_during_wait_is_recorded_as_cancelled(monkeypatch):
     assert downloader.status == STATUS_CANCELLED
 
 
-def test_unarchived_recovery_retry_uses_fresh_downloader(monkeypatch):
-    downloader = _unarchived_with_saved_json(age=60)
+def test_unarchived_recovery_retry_uses_fresh_downloader(monkeypatch, tmp_path):
+    downloader = _unarchived_with_saved_json(tmp_path, age=60)
     monkeypatch.setattr(downloader, "notify", lambda *a, **kw: None)
     used = []
 
@@ -767,18 +795,81 @@ def test_unarchived_scan_ignores_filters(monkeypatch, fake_ytdlp):
 
 # --- Shared HTTP client ---
 
-def test_http_client_reused_and_replaced_when_proxy_changes(monkeypatch):
-    closed = []
-    monkeypatch.setattr(common, "OLD_CLIENT_CLOSE_DELAY", 0)
+def test_http_clients_per_proxy_and_idle_ones_closed(monkeypatch):
     first = common.get_http_client(None)
     assert common.get_http_client(None) is first
-    monkeypatch.setattr(first, "close", lambda: closed.append(first))
+    # Jobs started before a proxy change use the old setting: both clients stay open and are reused
     second = common.get_http_client("http://127.0.0.1:9")
     assert second is not first
-    deadline = time.monotonic() + 2
-    while not closed and time.monotonic() < deadline:
-        time.sleep(0.01)
-    assert closed == [first]
+    assert common.get_http_client(None) is first and common.get_http_client("http://127.0.0.1:9") is second
+    assert not first.is_closed
+    # Once the old setting hasn't been used for a while, its client is closed
+    monkeypatch.setattr(common, "IDLE_CLIENT_CLOSE_SECONDS", -1)
+    assert common.get_http_client("http://127.0.0.1:9") is second
+    assert first.is_closed and not second.is_closed
+
+
+# --- Cookies file ---
+
+def test_cookies_path_that_is_a_directory_is_ignored(tmp_path):
+    folder = tmp_path / "cookies.txt"
+    folder.mkdir()   # What Docker creates when the mounted file doesn't exist on the host
+    assert ConfigHandler(config={"download_options": {"cookies_file": str(folder)}}).get_cookies_file() is None
+    cookies = tmp_path / "real_cookies.txt"
+    cookies.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
+    config = ConfigHandler(config={"download_options": {"cookies_file": str(cookies)}})
+    assert config.get_cookies_file() == str(cookies)
+    assert config.get_community_tab_cookies() == str(cookies)
+    # A path that doesn't exist yet is passed on (yt-dlp then has no cookies)
+    missing = str(tmp_path / "missing.txt")
+    assert ConfigHandler(config={"download_options": {"cookies_file": missing}}).get_cookies_file() == missing
+
+
+# --- Saving the config ---
+
+def test_failed_config_write_leaves_config_untouched(tmp_path, monkeypatch):
+    import builtins
+    import getConfig
+    path = tmp_path / "config.toml"
+    path.write_text("old = 1\n", encoding="utf-8")
+    real_open = builtins.open
+
+    class FullDisk:
+        def __init__(self, file):
+            self.file = file
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            self.file.close()
+
+        def write(self, text):
+            raise OSError(28, "No space left on device")
+
+    def fake_open(file, mode="r", *args, **kwargs):
+        handle = real_open(file, mode, *args, **kwargs)
+        return FullDisk(handle) if str(file).endswith(".tmp") else handle
+    monkeypatch.setattr(getConfig, "open", fake_open, raising=False)
+    saved, message = getConfig.save_config_text(str(path), "new = 2\n")
+    assert saved is False and "No space left" in message
+    assert path.read_text(encoding="utf-8") == "old = 1\n"
+    assert not (tmp_path / "config.toml.tmp").exists()
+
+
+def test_config_written_in_place_when_temp_file_cannot_be_created(tmp_path, monkeypatch):
+    import getConfig
+    path = tmp_path / "config.toml"
+    path.write_text("old = 1\n", encoding="utf-8")
+    real_open = open
+
+    def read_only_folder(file, mode="r", *args, **kwargs):
+        if str(file).endswith(".tmp"):
+            raise PermissionError(13, "Permission denied")
+        return real_open(file, mode, *args, **kwargs)
+    monkeypatch.setattr(getConfig, "open", read_only_folder, raising=False)
+    assert getConfig.save_config_text(str(path), "new = 2\n") == (True, "Config saved")
+    assert path.read_text(encoding="utf-8") == "new = 2\n"
 
 
 # --- Logging ---
@@ -797,4 +888,22 @@ def test_named_loggers_share_one_set_of_handlers(tmp_path):
         assert "[WARNING] [dQw4w9WgXcQ]" in (tmp_path / "holo.log").read_text(encoding="utf-8")
     finally:
         # Back to the test config's console-only logging, releasing the temporary log file
+        common.initialize_logging(ConfigHandler(), force=True)
+
+
+def test_console_logging_kept_until_config_is_readable(monkeypatch):
+    app_logger = logging.getLogger(common.APP_LOGGER_NAME)
+    monkeypatch.setattr(common, "_logging_state", None)
+    try:
+        common._configure_app_logger(None, force=False)
+        console_handlers = list(app_logger.handlers)
+        assert len(console_handlers) == 1
+        # Still no readable config: the handlers are not rebuilt on every call
+        common._configure_app_logger(None, force=False)
+        assert app_logger.handlers == console_handlers
+        # A readable config replaces them once
+        common._configure_app_logger(ConfigHandler(), force=False)
+        assert common._logging_state == "config" and app_logger.handlers != console_handlers
+        assert len(app_logger.handlers) == 1
+    finally:
         common.initialize_logging(ConfigHandler(), force=True)

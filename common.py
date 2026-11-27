@@ -61,7 +61,8 @@ if threading.current_thread() is threading.main_thread():
 # handler: several handlers rotating the same file would rotate it independently and lose lines.
 APP_LOGGER_NAME = "holo"
 _logging_lock = threading.Lock()
-_logging_configured = False
+# None: no handlers yet; "console": console only (no readable config yet); "config": set up from the config
+_logging_state: Optional[str] = None
 
 
 class _LogFormatter(logging.Formatter):
@@ -88,18 +89,19 @@ def _file_handler(log_file: str, options: Dict[str, Any]) -> logging.Handler:
 
 
 def _configure_app_logger(config: Optional[ConfigHandler], force: bool) -> None:
-    """Add the console (and log file) handlers to the application logger, once (again if force)."""
-    global _logging_configured
+    """
+    Add the console (and log file) handlers to the application logger. They are set up once from
+    the config; if the config can't be read yet, console-only handlers are set up once and replaced
+    when a config is first available. force replaces them again (e.g. `web.py --config`).
+    """
+    global _logging_state
     app_logger = logging.getLogger(APP_LOGGER_NAME)
     with _logging_lock:
         if config is not None:
             # The level is applied every time, so a changed log_level applies to the next check or download
             app_logger.setLevel(_log_level(config.get_log_level()))
-        if _logging_configured and not force:
+        if not force and (_logging_state == "config" or (_logging_state == "console" and config is None)):
             return
-        for handler in list(app_logger.handlers):
-            app_logger.removeHandler(handler)
-            handler.close()
         if config is None:
             app_logger.setLevel(logging.INFO)
         # Handlers further up (e.g. gunicorn's root logger) must not print every line again
@@ -115,11 +117,16 @@ def _configure_app_logger(config: Optional[ConfigHandler], force: bool) -> None:
             except OSError:
                 # Unable to create or open the file (e.g. read-only mount): log to the console only
                 pass
+        # The new handlers are added before the old ones are removed, so no line logged by another
+        # thread meanwhile is lost (at worst one is printed twice)
+        old_handlers = list(app_logger.handlers)
         for handler in handlers:
             handler.setFormatter(formatter)
             app_logger.addHandler(handler)
-        # Without a config (it couldn't be read yet) the file handler is added once it can be
-        _logging_configured = config is not None
+        for handler in old_handlers:
+            app_logger.removeHandler(handler)
+            handler.close()
+        _logging_state = "config" if config is not None else "console"
 
 
 def initialize_logging(config: Optional[ConfigHandler] = None, logger_name: Optional[str] = None,
@@ -128,7 +135,8 @@ def initialize_logging(config: Optional[ConfigHandler] = None, logger_name: Opti
     Return the logger `holo.<logger_name>` (the application logger if no name is given). With a
     video_id, the logger is wrapped so each line shows the video id. The handlers are configured
     from the config file the first time; later calls only apply the configured log level.
-    If the config can't be read (e.g. it doesn't exist yet) console-only INFO logging is used.
+    If the config can't be read (e.g. it doesn't exist yet) console-only INFO logging is used
+    until it can.
     """
     if config is None:
         try:
@@ -245,34 +253,48 @@ OEMBED_TIMEOUT = httpx.Timeout(15.0, connect=10.0)
 # Info shown in the web UI and Discord messages rarely changes, so it is reused for a while
 EMBED_INFO_CACHE_SECONDS = 600
 
-_http_client: Optional[httpx.Client] = None
-_http_client_proxy_key: Optional[str] = None
-_http_client_lock = threading.Lock()
+# Shared httpx clients by proxy setting: (client, time.monotonic() it was last handed out)
+_http_clients: dict[str, tuple[httpx.Client, float]] = {}
+_http_clients_lock = threading.Lock()
 _embed_info_cache = BoundedCache(max_entries=500, ttl=EMBED_INFO_CACHE_SECONDS)
-# A replaced client is closed after this long, so requests still using it can finish
-OLD_CLIENT_CLOSE_DELAY = 120
+# A client not handed out for this long is closed. Far longer than any request takes (see
+# OEMBED_TIMEOUT), so a request is never still using it; while jobs started before a proxy change
+# still use the old setting, both clients stay open.
+IDLE_CLIENT_CLOSE_SECONDS = 1800
 
 
 def get_http_client(proxy: Optional[Union[str, dict]] = None) -> httpx.Client:
     """
-    One shared httpx client, so connections are reused instead of a new client (and TLS handshake)
-    for every request. httpx clients are safe to share between threads. When the proxy setting
-    changes, a new client is created and the old one closed (after a delay, as other threads may
-    still be using it), so old connection pools don't pile up.
+    A shared httpx client for the proxy setting, so connections are reused instead of a new client
+    (and TLS handshake) for every request. httpx clients are safe to share between threads.
+    Clients of other proxy settings that haven't been used for IDLE_CLIENT_CLOSE_SECONDS are
+    closed, so old connection pools don't pile up after the proxy setting changes.
     """
-    global _http_client, _http_client_proxy_key
     key = json.dumps(proxy, sort_keys=True, default=str)
-    with _http_client_lock:
-        if _http_client is not None and not _http_client.is_closed and key == _http_client_proxy_key:
-            return _http_client
-        old_client = _http_client
-        client = _http_client = create_http_client(proxies=proxy, max_connections=4, timeout=OEMBED_TIMEOUT)
-        _http_client_proxy_key = key
-    if old_client is not None and not old_client.is_closed:
-        closer = threading.Timer(OLD_CLIENT_CLOSE_DELAY, old_client.close)
-        closer.daemon = True
-        closer.start()
+    now = time.monotonic()
+    idle: list[httpx.Client] = []
+    with _http_clients_lock:
+        entry = _http_clients.get(key)
+        client = entry[0] if entry is not None and not entry[0].is_closed else None
+        if client is None:
+            client = create_http_client(proxies=proxy, max_connections=4, timeout=OEMBED_TIMEOUT)
+        _http_clients[key] = (client, now)
+        for other_key, (other, last_used) in list(_http_clients.items()):
+            if other_key != key and now - last_used > IDLE_CLIENT_CLOSE_SECONDS:
+                del _http_clients[other_key]
+                idle.append(other)
+    for other in idle:
+        other.close()
     return client
+
+
+def close_http_clients() -> None:
+    """Close every shared client (used by the tests)."""
+    with _http_clients_lock:
+        clients = [client for client, _ in _http_clients.values()]
+        _http_clients.clear()
+    for client in clients:
+        client.close()
 
 
 @dataclass
@@ -295,7 +317,7 @@ def fetch_oembed(video_id: str, proxy: Optional[Union[str, dict]] = None) -> Oem
             headers=headers.get_httpx_header(),
         )
     except (httpx.HTTPError, RuntimeError) as e:
-        # RuntimeError: the shared client was closed after the proxy setting changed (see get_http_client)
+        # RuntimeError: the shared client was closed (see get_http_client)
         return OembedResult(status_code=None, data=None, error=f"{type(e).__name__}: {e}")
 
     if response.status_code != 200:

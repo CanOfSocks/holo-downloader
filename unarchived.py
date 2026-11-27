@@ -24,7 +24,7 @@ from typing import Optional, Union
 
 import common
 from base_downloader import (CONFIRM_DELAY, STATUS_CANCELLED, STATUS_FINISHED, STATUS_STOPPED_MERGED,
-                             STATUS_WAITING, BaseDownloader, next_upcoming_check_delay)
+                             STATUS_WAITING, BaseDownloader, UnexpectedStatusError, next_upcoming_check_delay)
 from common import DiscoveredVideo, WaitResult
 from getChatOnly import ChatOnlyDownloader
 from getConfig import ConfigHandler, MINIMUM_RECHECK_SECONDS
@@ -76,6 +76,7 @@ class Refresh(enum.Enum):
     PRIVATE = "private"        # Inaccessible (private, members-only, removed...)
     UNCONFIRMED = "unconfirmed"  # Reported private (or an unexpected status) once: checked again first (see report_needs_confirmation)
     PROCESSED = "processed"    # Archive is public, so there is nothing to recover
+    UNEXPECTED = "unexpected"  # Upcoming stream confirmed with an unexpected status and no saved URLs: stop (see UnexpectedStatusError)
     RATE_LIMITED = "rate_limited"  # Rate limited or stopped by YouTube's bot check
     FAILED = "failed"          # Any other error (network, ...)
 
@@ -166,6 +167,9 @@ class UnarchivedDownloader(BaseDownloader):
                 self.logger.info("Stream archive is public and no stream URLs were saved, stopping monitor")
                 self.set_status(STATUS_PUBLIC)
                 return
+            elif outcome is Refresh.UNEXPECTED:
+                # The status (STATUS_ERROR with the reason) was set by refresh_urls
+                return
 
             if self.stop_if_beyond_look_ahead():
                 return
@@ -237,6 +241,13 @@ class UnarchivedDownloader(BaseDownloader):
             if self.report_needs_confirmation(e):
                 self.next_url_refresh = now + CONFIRM_DELAY
                 return Refresh.UNCONFIRMED
+            if isinstance(e, UnexpectedStatusError) and not os.path.exists(self.json_path):
+                # Confirmed, and no stream URLs were saved: nothing to monitor or recover. (With
+                # saved URLs it is handled like a public archive below, so the cheap checks keep
+                # watching until they expire.)
+                self.logger.warning(f"Stopping monitor: {e}")
+                self.set_error(e)
+                return Refresh.UNEXPECTED
             if isinstance(e, getUrls.VideoProcessedError):
                 return self._archive_is_public(e, now)
             self.logger.info(f"Video is inaccessible: {e}")

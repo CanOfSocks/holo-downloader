@@ -44,7 +44,8 @@ def get_streams(unarchived: bool, config: ConfigHandler, logger: logging.Logger)
         response = common.get_http_client(config.get_proxy()).get(HOLODEV_URL)
         response.raise_for_status()
         data = response.json()
-    except (httpx.HTTPError, ValueError):
+    except (httpx.HTTPError, ValueError, RuntimeError):
+        # RuntimeError: the shared client was closed (see common.get_http_client)
         logger.exception("Error retrieving streams from holo.dev")
         return []
     logger.debug("Received %d lives from holo.dev", len(data.get('lives', [])))

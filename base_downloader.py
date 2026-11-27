@@ -70,8 +70,9 @@ _INACCESSIBLE_REASONS = (
 class UnexpectedStatusError(getUrls.VideoProcessedError):
     """
     A stream expected to be upcoming was reported as something other than upcoming, live or
-    ended-but-downloadable (e.g. "not_live", or no live status at all). Treated like a processed
-    video once confirmed by a second extraction (see report_needs_confirmation).
+    ended-but-downloadable (e.g. "not_live", or no live status at all). Once confirmed by a second
+    extraction (see report_needs_confirmation) the job ends with STATUS_ERROR and the reason
+    "Unexpected status" (see describe_error).
     """
 
 
@@ -86,6 +87,8 @@ def describe_error(error: BaseException) -> str:
     if isinstance(error, getUrls.VideoInaccessibleError):
         message = str(error).lower()
         return next((reason for text, reason in _INACCESSIBLE_REASONS if text in message), "Inaccessible")
+    if isinstance(error, UnexpectedStatusError):
+        return "Unexpected status"
     if isinstance(error, getUrls.VideoProcessedError):
         return "Processed"
     if isinstance(error, getUrls.VideoUnavailableError):
