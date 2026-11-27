@@ -22,7 +22,11 @@ COPY . .
 # mounted (the real cookies are excluded by .dockerignore and must be mounted at runtime).
 RUN chmod +x *.py /app/start.sh && touch /app/cookies.txt
 
-ADD https://raw.githubusercontent.com/HoloArchivists/youtube-community-tab/master/ytct.py .
+# ytct.py (imported by communityPosts.py) and its youtube_community_tab library below come from the
+# same branch, so they always match
+ARG YTCT_REPO=CanOfSocks/youtube-community-tab
+ARG YTCT_BRANCH=dev
+ADD https://raw.githubusercontent.com/${YTCT_REPO}/${YTCT_BRANCH}/ytct.py .
 
 # --- System Dependencies ---
 RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/repositories && \
@@ -37,7 +41,7 @@ RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/reposi
     pip install --no-cache-dir -U \
         gunicorn \
         -r /app/requirements.txt \
-        "git+https://github.com/HoloArchivists/youtube-community-tab.git#egg=youtube-community-tab&subdirectory=youtube-community-tab" && \
+        "youtube-community-tab @ git+https://github.com/${YTCT_REPO}.git@${YTCT_BRANCH}#subdirectory=youtube-community-tab" && \
     #
     # Cleanup: Remove git and curl to save space
     apk del .build-deps

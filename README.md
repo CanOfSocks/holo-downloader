@@ -339,7 +339,7 @@ Run the offline tests with `.venv/bin/python -m pytest`.
 | `unarchived.py` | `UnarchivedDownloader`: saves stream URLs while live and recovers the stream if it is privated. |
 | `scan.py` | Channel scanning with yt-dlp: playlist listings, filters, the look-ahead window. |
 | `getVids.py`, `getYTDLP.py`, `getJson.py`, `getMembers.py` | The channel scans run by the checks (`video_fetch_method` chooses yt-dlp or holo.dev). |
-| `communityPosts.py` | Community tab download (runs `ytct.py`). |
+| `communityPosts.py` | Community tab download (imports `ytct.py` from the [youtube-community-tab dev branch](https://github.com/CanOfSocks/youtube-community-tab/tree/dev); its output goes to the holo-downloader log). |
 | `monitor.py` | Stall detection (`StallTracker`). |
 | `common.py` | Shared helpers: logging, caches, oEmbed requests, base yt-dlp options. |
 | `shutdown.py` | The `kill_all` shutdown event and signal handlers (kept separate so the gunicorn master, which loads `gunicorn.conf.py`, doesn't set up the app's logging). |

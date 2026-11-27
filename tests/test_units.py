@@ -331,14 +331,65 @@ def test_members_scan_uses_uumo_for_handles(fake_ytdlp):
     assert fake_ytdlp.requested[-1] == "https://www.youtube.com/playlist?list=UUMO" + MEMBERS_SUFFIX
 
 
-def test_community_tab_uses_only_its_own_list(monkeypatch, tmp_path):
+class FakeSession:
+    def __init__(self):
+        self.timeouts = []
+
+    def request(self, method, url, *args, **kwargs):
+        self.timeouts.append(kwargs.get("timeout"))
+
+    def get(self, url, **kwargs):
+        return self.request("GET", url, **kwargs)
+
+
+@pytest.fixture
+def fake_ytct(monkeypatch):
+    """A stand-in for ytct.py and the youtube_community_tab library. `on_download(log, link)` runs for
+    each link and returns the result's (downloaded, failed) lists."""
+    import sys
+    import types
+
+    import communityPosts
+
+    session = FakeSession()
+    ytct = types.SimpleNamespace(calls=[], on_download=lambda log, link: ([], []), session=session)
+
+    class Downloader:
+        def __init__(self, log=None, **options):
+            self.log = log
+            ytct.calls.append(options)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc_info):
+            self.log("ytct", "closed")
+
+        def download_all(self, links):
+            result = types.SimpleNamespace(downloaded=[], failed=[])
+            for link in links:
+                downloaded, failed = ytct.on_download(self.log, link)
+                result.downloaded += downloaded
+                result.failed += failed
+            return result
+
+    ytct.Downloader = Downloader
+    handler = types.ModuleType("youtube_community_tab.requests_handler")
+    handler.requests_cache = session
+    monkeypatch.setitem(sys.modules, "ytct", ytct)
+    monkeypatch.setitem(sys.modules, "youtube_community_tab", types.ModuleType("youtube_community_tab"))
+    monkeypatch.setitem(sys.modules, "youtube_community_tab.requests_handler", handler)
+    # Independent of any other test (or shutdown) having set the global stop flag
+    monkeypatch.setattr(communityPosts, "kill_all", threading.Event())
+    return ytct
+
+
+def test_community_tab_uses_only_its_own_list(monkeypatch, tmp_path, fake_ytct):
     """Only [community_tab] channels are fetched, and filters are never involved."""
     import communityPosts
 
-    commands = []
-    monkeypatch.setattr(communityPosts, "run_until_done", lambda command, *a, **k: commands.append(command))
-    # Independent of any other test (or shutdown) having set the global stop flag
-    monkeypatch.setattr(communityPosts.kill_all, "is_set", lambda: False)
+    links = []
+    fake_ytct.on_download = lambda log, link: links.append(link) or ([], [])
     for name in ("passes_filters", "title_filter_matches", "description_filter_matches", "extract_video"):
         monkeypatch.setattr(scan, name, lambda *a, **k: pytest.fail("community tab must not use filters"))
     config = ConfigHandler(config={
@@ -347,10 +398,91 @@ def test_community_tab_uses_only_its_own_list(monkeypatch, tmp_path):
         "community_tab": {"posts": "UCposts"},
         "title_filter": {"UCposts": "(?i)karaoke"},
         "description_filter": {"UCposts": "(?i)singing"},
-        "community_tab_options": {"community_dir": str(tmp_path)},
+        "community_tab_options": {"community_dir": str(tmp_path), "archive_file": str(tmp_path / "archive.txt")},
     })
     communityPosts.main(config=config)
-    assert [command[-1] for command in commands] == ["https://www.youtube.com/channel/UCposts/posts"]
+    assert links == ["https://www.youtube.com/channel/UCposts/posts"]
+    options = fake_ytct.calls[0]
+    assert options["directory"] == os.path.join(str(tmp_path), "posts")
+    assert options["post_archive"] == str(tmp_path / "archive.txt")
+    assert options["dates"] and options["reverse"] and options["ignore_errors"]
+
+
+def test_community_tab_logs_to_the_holo_log(tmp_path, fake_ytct, caplog):
+    """ytct's lines go to holo.community_posts at a level matching what they report."""
+    import communityPosts
+
+    def on_download(log, link):
+        log("community tab", "getting posts from community tab (page 1)", "\r")
+        log("community tab", "found 2 posts")
+        log("post:Ugx1", "writing Ugx1.json")
+        log("post:Ugx2", "failed: KeyError: 'x'")
+        log("cookies", "WARNING: YouTube did not accept the login cookies (not logged in)")
+        return ["Ugx1"], ["Ugx2: KeyError: 'x'"]
+
+    fake_ytct.on_download = on_download
+    config = ConfigHandler(config={"community_tab": {"posts": "UCposts"},
+                                   "community_tab_options": {"community_dir": str(tmp_path)}})
+    logger = logging.getLogger("holo.community_posts")
+    logger.setLevel(logging.DEBUG)
+    with caplog.at_level(logging.DEBUG, logger="holo.community_posts"):
+        logger.addHandler(caplog.handler)
+        try:
+            communityPosts.main(config=config, logger=logger)
+        finally:
+            logger.removeHandler(caplog.handler)
+    lines = {record.getMessage(): record.levelno for record in caplog.records}
+    assert lines["Community tab posts: [community tab] getting posts from community tab (page 1)"] == logging.DEBUG
+    assert lines["Community tab posts: [community tab] found 2 posts"] == logging.INFO
+    assert lines["Community tab posts: [post:Ugx1] writing Ugx1.json"] == logging.DEBUG
+    assert lines["Community tab posts: [post:Ugx2] failed: KeyError: 'x'"] == logging.WARNING
+    assert lines["Community tab posts: [cookies] WARNING: YouTube did not accept the login cookies (not logged in)"] == logging.WARNING
+    assert any(level == logging.WARNING and "1 new, 1 failed" in message for message, level in lines.items())
+    # The library's own requests get a timeout
+    fake_ytct.session.get("https://www.youtube.com/")
+    assert fake_ytct.session.timeouts == [communityPosts.REQUEST_TIMEOUT_SECONDS]
+
+
+def test_community_tab_stops_on_shutdown(tmp_path, fake_ytct):
+    """A shutdown stops the channel at ytct's next log line and skips the remaining channels;
+    ytct's cleanup still runs and may log."""
+    import communityPosts
+
+    links, after_stop = [], []
+
+    def on_download(log, link):
+        links.append(link)
+        communityPosts.kill_all.set()
+        log("post:Ugx1", "writing Ugx1.json")
+        after_stop.append(link)
+        return [], []
+
+    fake_ytct.on_download = on_download
+    config = ConfigHandler(config={"community_tab": {"a": "UCa", "b": "UCb"},
+                                   "community_tab_options": {"community_dir": str(tmp_path)}})
+    communityPosts.main(config=config)
+    assert links == ["https://www.youtube.com/channel/UCa/posts"]
+    assert after_stop == []
+
+
+def test_community_tab_channel_timeout(monkeypatch, tmp_path, fake_ytct):
+    import communityPosts
+
+    reached = []
+
+    monkeypatch.setattr(communityPosts, "CHANNEL_TIMEOUT_SECONDS", -1)
+
+    def on_download(log, link):
+        log("post:Ugx1", "writing Ugx1.json")
+        reached.append(link)
+        return [], []
+
+    fake_ytct.on_download = on_download
+    config = ConfigHandler(config={"community_tab": {"a": "UCa", "b": "UCb"},
+                                   "community_tab_options": {"community_dir": str(tmp_path)}})
+    communityPosts.main(config=config)
+    # Each channel times out on its own; the next one still runs
+    assert len(fake_ytct.calls) == 2 and reached == []
 
 
 def test_playlist_url():
