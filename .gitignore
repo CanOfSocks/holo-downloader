@@ -7,3 +7,5 @@ __pycache__
 venv/
 # Created by the web app when run locally
 stream_history.db*
+# YouTube account cookies: mount them into the container, never commit them
+cookies.txt

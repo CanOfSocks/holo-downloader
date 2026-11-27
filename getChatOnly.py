@@ -1,6 +1,7 @@
 """Live chat only download from a saved info.json (used by the unarchived monitor)."""
 import json
 import logging
+import os
 import threading
 from typing import Optional
 
@@ -17,7 +18,10 @@ class ChatOnlyDownloader:
         # Pass the owning job's event so cancelling the job also stops the chat download
         self.kill_this: threading.Event = kill_this or threading.Event()
         self.config: ConfigHandler = config or ConfigHandler()
-        self.logger = logger or initialize_logging(self.config, logger_name="chat_downloader")
+        # Always a LoggerAdapter: LiveStreamDownloader sets `propagate = False` on the logger it is
+        # given, which on a plain child logger would stop its lines reaching the application handlers
+        self.logger = logger or initialize_logging(self.config, logger_name="chat_downloader",
+                                                   video_id=os.path.basename(json_file).split(".")[0])
         self.downloader = LiveStreamDownloader(kill_all=kill_all, logger=self.logger, kill_this=self.kill_this)
 
     def main(self):

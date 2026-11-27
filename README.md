@@ -25,6 +25,8 @@ The program supports standard streams, members-only content, unarchived (private
 
 The recommended way to run this application is via Docker. You will need to create a `config.toml`, a temporary folder, a final download folder, and a `cookies.txt` file (if using Members/Unarchived features).
 
+> **Note:** `cookies.txt` holds your YouTube account session. It is ignored by git and by Docker builds (`.gitignore` / `.dockerignore`), so it is never committed or baked into an image; mount it into the container as shown below. The image contains an empty placeholder.
+
 ### Run Command
 
 ```bash
@@ -130,7 +132,7 @@ The "unarchived channels" option saves the video stream urls (info.json file) to
 Filters allow you to restrict downloads based on REGEX strings.
 
 * **Logic:** If a filter is present, it **will** be used. Filters are **inclusive OR**; if either the title OR description matches the regex, the video is downloaded.
-* **Scope:** Filters are never applied to `[members_only]` (every upcoming or live members stream of those channels is downloaded) or to `[community_tab]`.
+* **Scope:** Filters only apply to `[channel_ids_to_match]`. They are never applied to `[members_only]` (every upcoming or live members stream of those channels is downloaded), to `[unarchived_channel_ids_to_match]` (every stream of those channels is monitored) or to `[community_tab]`.
 * **Syntax:** Python `re` library syntax.
 
 ```toml
@@ -183,7 +185,7 @@ The `output_path` template follows [yt-dlp output template](https://github.com/y
 | `video_fetch_method` | String | `ytdlp` | `ytdlp` (scans channel page) or `json` (uses holo.dev API, Hololive only). |
 | `look_ahead` | Int | `48` | Hours into the future to schedule downloads for. A waiting download stops (status "Beyond look-ahead") if the stream is rescheduled further out than this; a later channel scan starts it again once it is within the window. Videos added by hand in the web UI are not limited. |
 | `upcoming_wait_for_video_max` | Float | `900` | Maximum seconds between checks of a stream that is past its scheduled start but not live yet (Minimum: 60). Checks start every 60 seconds and slow down the later the stream is (a quarter of the time it is late). Increasing reduces yt-dlp extractions, but can increase the time until recording starts if a livestream starts late. Checks at the maximum are shortened by a random 0-10% so streams don't all get checked at once. |
-| `upcoming_recheck_max` | Float | `10800` | Maximum seconds between yt-dlp extractions of a stream waiting for its scheduled start (Minimum: 60). The downloader waits until the scheduled start without extracting, but re-checks at least this often in case the schedule moved. Independent of the channel scan, which also starts the download straight away if it sees the stream live. Checks at the maximum are shortened by a random 0-10% so streams found in the same scan don't all get checked at once. |
+| `upcoming_recheck_max` | Float | `10800` | Maximum seconds between yt-dlp extractions of a stream waiting for its scheduled start (Minimum: 60). The downloader waits until the scheduled start without extracting, but re-checks at least this often in case the schedule moved. Independent of the channel scan, which also starts the download straight away if it sees the stream live. Checks at the maximum are shortened by a random 0-10% so streams found in the same scan don't all get checked at once. If a check reports a waiting stream as private, or as anything other than upcoming, live or just ended (e.g. no live status at all), it is checked once more a minute later before the download gives up, as single degraded extractions have reported working streams that way. |
 | `proxies` | String | *None* | Proxy URL (e.g., `"http://10.0.1.2:3128"`). |
 | `randomise_lists` | Bool | `False` | Randomize channel check order to reduce bot detection patterns. |
 | `ytdlp_options` | String| *None* | A JSON string that will be added to the yt-dlp options for stream URL extraction. E.g `'{"extractor_args":{"youtubepot-bgutilhttp":{"base_url":["http://bgutil-provider:4416"]}}}'` |
@@ -247,10 +249,13 @@ archive_file = "/app/com-tab-archive.txt"    # File tracking downloaded post IDs
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
-| `log_level` | String | `INFO` | Level (DEBUG, INFO, WARNING, ERROR). |
-| `log_file` | String | *None* | Path to write logs to. |
+| `log_level` | String | `INFO` | Level (DEBUG, VERBOSE, INFO, WARNING, ERROR). A changed level applies from the next check or download, without a restart. |
+| `log_file` | String | *None* | Path to write logs to (in addition to the console). Read when the app starts. |
 | `log_file_max_size` | Int | *None* | Max size in bytes before log rotation. |
-| `log_file_keep_backup` | Int | *None* | Number of log backups to keep. |
+| `log_file_rotate_when` | String | *None* | Rotate the log by time instead of size (Python `TimedRotatingFileHandler` values, e.g. `midnight`, `H`). Ignored if `log_file_max_size` is set. |
+| `log_file_keep_backup` | Int | *None* | Number of log backups to keep (default 5 for size rotation, 7 for time rotation). |
+
+All parts of the app write through one shared set of log handlers, so the log file is rotated in one place. Lines from a download start with the video ID, e.g. `[INFO] [dQw4w9WgXcQ] 2026-11-27 12:00:00 - Output file: ...`.
 
 ### 9. Torrent & Web UI Options
 
@@ -284,7 +289,21 @@ The stalled flag is cleared as soon as a new segment is downloaded again, includ
 
 **Stop & merge** (⏹️) ends a recording download and merges/moves what has been downloaded so far, as if the stream had ended. It is available for every recording download and highlighted for stalled ones. **Cancel** (🗑️) stops without merging. Waiting downloads also have **Check now** (🔄).
 
-The same data is available as JSON from `/api/active`, `/api/unarchived`, `/api/history` and `/api/scheduler`. Times in the API are ISO 8601 UTC strings.
+The same data is available as JSON from `/api/active`, `/api/unarchived`, `/api/history` and `/api/scheduler`. Times in the API are ISO 8601 UTC strings. `/api/active` and `/api/unarchived` also include each job's raw livestream_dl `stats`.
+
+The buttons post to these endpoints, which can also be used directly (`<kind>` is `stream` or `unarchived`):
+
+| Endpoint (POST) | Action |
+| --- | --- |
+| `/actions/add` | Start a download (form field `video_id`: a video ID or URL) |
+| `/actions/cancel/<kind>/<video_id>` | Cancel a job |
+| `/actions/merge/<kind>/<video_id>` | Stop & merge a recording job |
+| `/actions/check/<kind>/<video_id>` | Check a waiting job now |
+| `/actions/force_run/<check>-checker` | Run a scheduled check now (`streams`, `unarchived`, `members_only`, `community_posts`) |
+
+> **Note:** The older `/actions/cancel/<video_id>` and `/actions/cancel_unarchived/<video_id>` endpoints have been removed; use `/actions/cancel/<kind>/<video_id>`.
+
+Configuration saved from the web UI is checked to be valid TOML first, then written to a temporary file and swapped in, so nothing reads a half-written file. When `config.toml` is mounted into Docker as a single file (which can't be swapped), it is written in place instead.
 
 ---
 

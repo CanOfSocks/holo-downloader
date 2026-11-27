@@ -690,3 +690,107 @@ def test_far_future_schedule_remembered_for_scans():
     downloader = _downloader(live_status="is_upcoming", release_timestamp=time.time() + 30 * 24 * 3600)
     assert downloader.stop_if_beyond_look_ahead()
     assert common.known_schedules.get(downloader.id) == downloader.scheduled_start
+
+
+# --- Unexpected status of an upcoming stream is confirmed ---
+
+@pytest.mark.parametrize("reported", [None, "not_live"])
+def test_unexpected_status_of_upcoming_stream_is_confirmed(monkeypatch, reported):
+    downloader = _downloader(live_status="is_upcoming")
+    probes = iter([{"live_status": reported}, {"live_status": "is_live", "formats": [{"format_id": "1"}]}])
+    monkeypatch.setattr(downloader, "probe_status", lambda: next(probes))
+    monkeypatch.setattr(getUrls, "get_Video_Info", lambda **kw: ({"live_status": "is_live", "formats": ["f"]}, "is_live"))
+    waits = []
+    monkeypatch.setattr(downloader, "wait", lambda seconds: waits.append(seconds) or WaitResult.ELAPSED)
+    assert downloader.wait_for_stream() == {"live_status": "is_live", "formats": ["f"]}
+    assert len(waits) == 1 and waits[0] == pytest.approx(60, abs=1)
+
+
+def test_repeated_unexpected_status_raises_processed(monkeypatch):
+    from base_downloader import UnexpectedStatusError
+    downloader = _downloader(live_status="is_upcoming")
+    monkeypatch.setattr(downloader, "probe_status", lambda: {"live_status": "not_live"})
+    monkeypatch.setattr(downloader, "wait", lambda seconds: WaitResult.ELAPSED)
+    with pytest.raises(UnexpectedStatusError):
+        downloader.wait_for_stream()
+    assert describe_error(UnexpectedStatusError("x")) == "Processed"
+
+
+def test_unarchived_unexpected_status_is_confirmed(monkeypatch):
+    from unarchived import Refresh, UnarchivedDownloader
+    downloader = UnarchivedDownloader(DiscoveredVideo("dQw4w9WgXcQ", live_status="is_upcoming"))
+    monkeypatch.setattr(downloader, "probe_status", lambda: {"live_status": None})
+    assert downloader.refresh_urls() is Refresh.UNCONFIRMED
+    assert downloader.refresh_urls() is Refresh.PROCESSED
+    assert downloader.processed
+
+
+# --- Unarchived monitor ---
+
+def test_unarchived_cancel_during_wait_is_recorded_as_cancelled(monkeypatch):
+    from base_downloader import STATUS_CANCELLED
+    from unarchived import UnarchivedDownloader
+    downloader = UnarchivedDownloader(DiscoveredVideo("dQw4w9WgXcQ"))
+    downloader.set_status("Monitoring")
+    downloader.next_url_refresh = time.time() + 3600   # Nothing due: goes straight to the wait
+    threading.Timer(0.2, downloader.cancel).start()
+    downloader._monitor()
+    assert downloader.status == STATUS_CANCELLED
+
+
+def test_unarchived_recovery_retry_uses_fresh_downloader(monkeypatch):
+    downloader = _unarchived_with_saved_json(age=60)
+    monkeypatch.setattr(downloader, "notify", lambda *a, **kw: None)
+    used = []
+
+    def failing_download(self, **kw):
+        used.append(self)
+        raise RuntimeError("recovery failed")
+    monkeypatch.setattr(type(downloader.livestream_downloader), "download_segments", failing_download)
+    assert downloader.recover() is False
+    # "Stop & merge" during the failed attempt, then a successful refresh changes the status
+    downloader.livestream_downloader.graceful_stop.set()
+    downloader.set_status("Monitoring")
+    assert downloader.recover() is False
+    assert used[0] is not used[1]
+    assert not used[1].graceful_stop.is_set()
+
+
+def test_unarchived_scan_ignores_filters(monkeypatch, fake_ytdlp):
+    """Title/description filters only apply to normal downloads, never to the unarchived monitor."""
+    import getYTDLP
+    monkeypatch.setattr(common, "saved_unarchived_ids", lambda *a, **k: [])
+    fake_ytdlp.results["https://www.youtube.com/playlist?list=UU" + MEMBERS_SUFFIX] = {
+        "entries": [{"id": "unarchived1", "title": "Chatting", "live_status": "is_live", "channel_id": "UC" + MEMBERS_SUFFIX}]}
+    monkeypatch.setattr(common, "extract_video", lambda *a, **k: {"description": "Gaming"})
+    channel = "UC" + MEMBERS_SUFFIX
+    config = ConfigHandler(config={"channel_ids_to_match": {"c": channel}, "unarchived_channel_ids_to_match": {"c": channel},
+                                   "title_filter": {channel: "(?i)karaoke"}})
+
+    class Output(list):
+        put = list.append
+
+    normal, unarchived = Output(), Output()
+    getYTDLP.main(normal, unarchived=False, config=config)
+    getYTDLP.main(unarchived, unarchived=True, config=config)
+    assert normal == [] and [video.id for video in unarchived] == ["unarchived1"]
+
+
+# --- Logging ---
+
+def test_named_loggers_share_one_set_of_handlers(tmp_path):
+    import logging
+    config = ConfigHandler(config={"download_options": {"log_file": str(tmp_path / "holo.log"), "log_file_max_size": 1000}})
+    try:
+        web_logger = common.initialize_logging(config, "web", force=True)
+        job_logger = common.initialize_logging(config, "Downloader", video_id="dQw4w9WgXcQ")
+        app_logger = logging.getLogger(common.APP_LOGGER_NAME)
+        file_handlers = [h for h in app_logger.handlers if isinstance(h, logging.FileHandler)]
+        assert len(file_handlers) == 1
+        assert not web_logger.handlers and not job_logger.logger.handlers
+        job_logger.warning("hello")
+        file_handlers[0].flush()
+        assert "[WARNING] [dQw4w9WgXcQ]" in (tmp_path / "holo.log").read_text(encoding="utf-8")
+    finally:
+        # Back to the test config's console-only logging, releasing the temporary log file
+        common.initialize_logging(ConfigHandler(), force=True)

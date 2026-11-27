@@ -30,10 +30,11 @@ LATE_BACKOFF_DIVISOR = 4
 # bursts of extractions are what trigger rate limiting.
 MAX_DELAY_JITTER_FRACTION = 0.1
 
-# An extraction reporting the video private is only believed when the next one, this many seconds
-# later, reports it again. One degraded extraction ("No title found in player responses") has been
-# seen reporting a working stream as private, and livestream_dl confirms such reports the same way.
-PRIVATE_CONFIRM_DELAY = 60
+# An extraction reporting the video private, or an upcoming stream as ended/processed, is only
+# believed when the next one, this many seconds later, reports it again. One degraded extraction
+# ("No title found in player responses") has been seen reporting a working stream as private, and
+# livestream_dl confirms such reports the same way.
+CONFIRM_DELAY = 60
 
 # yt-dlp live statuses of a stream that is over and has been (or is being) processed
 ENDED_LIVE_STATUSES = ("was_live", "not_live")
@@ -63,6 +64,14 @@ _INACCESSIBLE_REASONS = (
     ("removed", "Removed"),
     ("not available on this player", "Player unsupported"),
 )
+
+
+class UnexpectedStatusError(getUrls.VideoProcessedError):
+    """
+    A stream expected to be upcoming was reported as something other than upcoming, live or
+    ended-but-downloadable (e.g. "not_live", or no live status at all). Treated like a processed
+    video once confirmed by a second extraction (see report_needs_confirmation).
+    """
 
 
 def describe_error(error: BaseException) -> str:
@@ -158,8 +167,8 @@ class BaseDownloader:
 
         # Brief reason for the last error (see describe_error), saved in history with STATUS_ERROR
         self.error_reason: Optional[str] = None
-        # Consecutive extractions reporting the video private (see private_needs_confirmation)
-        self._private_reports: int = 0
+        # Consecutive extractions reporting each kind of unconfirmed status (see report_needs_confirmation)
+        self._unconfirmed_reports: Dict[str, int] = {}
 
         # Small dicts used for display (the full info_dict is not kept)
         self.embed_info: Dict[str, Any] = {}
@@ -366,19 +375,24 @@ class BaseDownloader:
                     raise
                 raise classified from e
 
-    def private_needs_confirmation(self, error: BaseException) -> bool:
+    def report_needs_confirmation(self, error: BaseException) -> bool:
         """
-        True (and logged) for the first of consecutive extractions reporting the video private: the
-        caller checks again after PRIVATE_CONFIRM_DELAY instead of giving up or starting recovery.
-        Later reports return False until an extraction succeeds again.
+        True (and logged) for the first of consecutive extractions reporting the video private, or
+        an upcoming stream with an unexpected status (UnexpectedStatusError): the caller checks again
+        after CONFIRM_DELAY instead of giving up or starting recovery. Later reports of the same
+        kind return False until an extraction succeeds again.
         """
-        if not isinstance(error, getUrls.VideoInaccessibleError) or "private" not in str(error).lower():
+        if isinstance(error, UnexpectedStatusError):
+            kind = "unexpected status"
+        elif isinstance(error, getUrls.VideoInaccessibleError) and "private" in str(error).lower():
+            kind = "private"
+        else:
             return False
-        self._private_reports += 1
-        if self._private_reports > 1:
+        self._unconfirmed_reports[kind] = self._unconfirmed_reports.get(kind, 0) + 1
+        if self._unconfirmed_reports[kind] > 1:
             return False
-        self.logger.warning("Extraction reported the video private ({0}), checking again in {1}s before treating it as private".format(
-            error, PRIVATE_CONFIRM_DELAY))
+        self.logger.warning("Extraction reported {0} ({1}), checking again in {2}s before believing it".format(
+            kind, error, CONFIRM_DELAY))
         return True
 
     def extract_info(self, include_dash: bool = False, include_m3u8: bool = False) -> tuple[dict, str]:
@@ -388,8 +402,8 @@ class BaseDownloader:
         live; for an upcoming stream the info has live_status "is_upcoming" and no formats.
         """
         info_dict, live_status = self._extract_info(include_dash=include_dash, include_m3u8=include_m3u8)
-        # The video is accessible, so a later "private" report needs confirming again
-        self._private_reports = 0
+        # The extraction worked, so a later "private" or unexpected status report needs confirming again
+        self._unconfirmed_reports.clear()
         return info_dict, live_status
 
     def _extract_info(self, include_dash: bool, include_m3u8: bool) -> tuple[dict, str]:
@@ -406,8 +420,10 @@ class BaseDownloader:
                 # URLs: while live stream URLs are still listed it is downloaded like post_live.
                 self.logger.info("Stream has ended, checking whether it can still be downloaded")
             elif live_status not in ("is_upcoming", *common.LIVE_STATUSES):
-                # Same check as get_Video_Info: a processed video can't be downloaded as a stream
-                raise getUrls.VideoProcessedError("Video has been processed, please use yt-dlp directly")
+                # Same check as get_Video_Info: a processed video can't be downloaded as a stream.
+                # A subclass, so callers confirm it once (a degraded extraction can lack the status).
+                raise UnexpectedStatusError("Upcoming stream reported as {0}: video has been processed or the "
+                                            "extraction was incomplete".format(live_status or "having no live status"))
             elif live_status == "is_upcoming" or not info_dict.get('formats'):
                 self.hinted_live_status = live_status
                 return info_dict, live_status
@@ -456,11 +472,11 @@ class BaseDownloader:
         while True:
             try:
                 info_dict, live_status = self.extract_info(include_dash=include_dash, include_m3u8=include_m3u8)
-            except getUrls.VideoInaccessibleError as e:
-                if not self.private_needs_confirmation(e):
+            except (getUrls.VideoInaccessibleError, UnexpectedStatusError) as e:
+                if not self.report_needs_confirmation(e):
                     raise
                 self.set_status(STATUS_WAITING)
-                if not self.wait_at_least(PRIVATE_CONFIRM_DELAY):
+                if not self.wait_at_least(CONFIRM_DELAY):
                     return None
                 continue
             if live_status in common.LIVE_STATUSES and info_dict.get('formats'):

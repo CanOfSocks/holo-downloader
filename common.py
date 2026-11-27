@@ -6,6 +6,7 @@ import enum
 import html
 import json
 import logging
+import logging.handlers
 import os
 import random
 import re
@@ -24,7 +25,7 @@ from yt_dlp import YoutubeDL
 import lockup_schedule
 from getConfig import ConfigHandler
 from livestream_dl import getUrls, headers
-from livestream_dl.download_Live import create_http_client, setup_logging
+from livestream_dl.download_Live import create_http_client
 from livestream_dl.monitor_channel import VideoStatusCache
 from livestream_dl.YoutubeURL import YTDLPLogger
 
@@ -58,34 +59,90 @@ if threading.current_thread() is threading.main_thread():
 
 # --- Logging ---
 
+# Every logger of the application is a child of this one ("holo.web", "holo.Downloader", ...).
+# Only this logger has handlers, so there is a single console handler and a single log file
+# handler: several handlers rotating the same file would rotate it independently and lose lines.
+APP_LOGGER_NAME = "holo"
+_logging_lock = threading.Lock()
+_logging_configured = False
+
+
+class _LogFormatter(logging.Formatter):
+    """'[LEVEL] [video id] time - message', with the video id part only for job loggers (see initialize_logging)."""
+    def format(self, record: logging.LogRecord) -> str:
+        video_id = getattr(record, "video_id", None)
+        record.video_tag = f" [{video_id}]" if video_id else ""
+        return super().format(record)
+
+
+def _log_level(name: str) -> int:
+    level = logging.getLevelName(str(name).upper())   # Also knows livestream_dl's VERBOSE level
+    return level if isinstance(level, int) else logging.INFO
+
+
+def _file_handler(log_file: str, options: Dict[str, Any]) -> logging.Handler:
+    if options.get("maxBytes"):
+        return logging.handlers.RotatingFileHandler(log_file, maxBytes=options["maxBytes"],
+                                                    backupCount=options.get("backupCount") or 5, encoding="utf-8")
+    if options.get("when"):
+        return logging.handlers.TimedRotatingFileHandler(log_file, when=options["when"],
+                                                         backupCount=options.get("backupCount") or 7, encoding="utf-8")
+    return logging.FileHandler(log_file, mode="a", encoding="utf-8")
+
+
+def _configure_app_logger(config: Optional[ConfigHandler], force: bool) -> None:
+    """Add the console (and log file) handlers to the application logger, once (again if force)."""
+    global _logging_configured
+    app_logger = logging.getLogger(APP_LOGGER_NAME)
+    with _logging_lock:
+        if config is not None:
+            # The level is applied every time, so a changed log_level applies to the next check or download
+            app_logger.setLevel(_log_level(config.get_log_level()))
+        if _logging_configured and not force:
+            return
+        for handler in list(app_logger.handlers):
+            app_logger.removeHandler(handler)
+            handler.close()
+        if config is None:
+            app_logger.setLevel(logging.INFO)
+        # Handlers further up (e.g. gunicorn's root logger) must not print every line again
+        app_logger.propagate = False
+        formatter = _LogFormatter("[%(levelname)s]%(video_tag)s %(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+
+        handlers: list[logging.Handler] = [logging.StreamHandler()]
+        log_file = config.get_log_file() if config is not None else None
+        if log_file:
+            try:
+                os.makedirs(os.path.dirname(os.path.abspath(log_file)), exist_ok=True)
+                handlers.append(_file_handler(log_file, config.get_log_file_options()))
+            except OSError:
+                # Unable to create or open the file (e.g. read-only mount): log to the console only
+                pass
+        for handler in handlers:
+            handler.setFormatter(formatter)
+            app_logger.addHandler(handler)
+        # Without a config (it couldn't be read yet) the file handler is added once it can be
+        _logging_configured = config is not None
+
+
 def initialize_logging(config: Optional[ConfigHandler] = None, logger_name: Optional[str] = None,
-                       force: bool = False, video_id: Optional[str] = None):
+                       force: bool = False, video_id: Optional[str] = None) -> Union[logging.Logger, logging.LoggerAdapter]:
     """
-    Return a logger configured from the config file. Loggers are cached by name by the logging
-    module and handlers are only added the first time, so calling this repeatedly is cheap.
+    Return the logger `holo.<logger_name>` (the application logger if no name is given). With a
+    video_id, the logger is wrapped so each line shows the video id. The handlers are configured
+    from the config file the first time; later calls only apply the configured log level.
     If the config can't be read (e.g. it doesn't exist yet) console-only INFO logging is used.
     """
     if config is None:
         try:
             config = ConfigHandler()
         except Exception:
-            return setup_logging(log_level="INFO", console=True, logger_name=logger_name, force=force, video_id=video_id)
-
-    log_file = config.get_log_file()
-    if log_file:
-        try:
-            os.makedirs(os.path.dirname(os.path.abspath(log_file)), exist_ok=True)
-        except OSError:
-            # Unable to create the folder (e.g. read-only mount): log to the console only
-            log_file = None
-
-    try:
-        return setup_logging(log_level=config.get_log_level(), console=True, file=log_file,
-                             file_options=config.get_log_file_options(), logger_name=logger_name,
-                             force=force, video_id=video_id)
-    except OSError:
-        return setup_logging(log_level=config.get_log_level(), console=True, logger_name=logger_name,
-                             force=force, video_id=video_id)
+            config = None
+    _configure_app_logger(config, force)
+    logger = logging.getLogger(f"{APP_LOGGER_NAME}.{logger_name}" if logger_name else APP_LOGGER_NAME)
+    if video_id:
+        return logging.LoggerAdapter(logger, {"video_id": video_id})
+    return logger
 
 
 logger = initialize_logging()

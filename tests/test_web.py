@@ -87,6 +87,31 @@ def test_api_active_includes_stall_fields(client):
     assert data[0]["id"] == "dQw4w9WgXcQ"
     assert data[0]["start_time"].endswith("Z")
     assert {"stalled", "stall_reason", "can_merge", "last_progress"} <= set(data[0])
+    assert data[0]["stats"]["video"]["downloaded_segments"] == 5
+
+
+def test_job_view_copies_stats_and_only_api_gets_them(client):
+    job = add_fake_job("stream", "dQw4w9WgXcQ", "Recording", VideoDownloader)
+    assert "stats" not in web.job_view(job)
+    view = web.job_view(job, include_stats=True)
+    view["stats"]["video"]["downloaded_segments"] = 999
+    assert job.downloader.stats["video"]["downloaded_segments"] == 5
+
+
+def test_config_save_replaces_file_or_writes_in_place(client, monkeypatch, tmp_path):
+    path = tmp_path / "config.toml"
+    path.write_text("old = 1\n", encoding="utf-8")
+    monkeypatch.setattr(web, "config_file_path", str(path))
+    assert web.save_config("new = 2\n") == (True, "Config saved")
+    assert path.read_text(encoding="utf-8") == "new = 2\n"
+
+    # A config mounted into Docker as a single file can't be replaced: written in place instead
+    def busy(*args):
+        raise OSError(16, "Device or resource busy")
+    monkeypatch.setattr(web.os, "replace", busy)
+    assert web.save_config("newer = 3\n")[0] is True
+    assert path.read_text(encoding="utf-8") == "newer = 3\n"
+    assert not (tmp_path / "config.toml.tmp").exists()
 
 
 def test_started_shows_stream_start_once_recording(client):

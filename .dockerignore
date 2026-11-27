@@ -27,3 +27,5 @@ requirements-dev.txt
 stream_history.db*
 # livestream_dl comes from the base image; a local checkout must not be copied over it
 livestream_dl/
+# YouTube account cookies are mounted at runtime and must never be baked into an image
+cookies.txt

@@ -18,8 +18,9 @@ ENV COMMIT_HASH=${HOLO_COMMIT_HASH}
 
 COPY . .
 
-# Set permissions
-RUN chmod +x *.py /app/start.sh
+# Set permissions. An empty cookies.txt placeholder keeps /app/cookies.txt a file when none is
+# mounted (the real cookies are excluded by .dockerignore and must be mounted at runtime).
+RUN chmod +x *.py /app/start.sh && touch /app/cookies.txt
 
 ADD https://raw.githubusercontent.com/HoloArchivists/youtube-community-tab/master/ytct.py .
 

@@ -27,7 +27,10 @@ def main(output, unarchived: bool = False, config: Optional[ConfigHandler] = Non
             return
         try:
             logger.debug("Looking for: {0}".format(channel_name))
-            videos = common.get_upcoming_or_live_videos(channel_id, config, tab="streams", passed_logger=logger, active_ids=active_ids)
+            # Title/description filters only apply to normal downloads: the unarchived monitor
+            # watches every stream of its channels (as with video_fetch_method = "json")
+            videos = common.get_upcoming_or_live_videos(channel_id, config, tab="streams", passed_logger=logger,
+                                                        active_ids=active_ids, apply_filters=not unarchived)
         except Exception as e:
             discord_web.notify(channel_id, "playlist-error", message=f"Error getting streams:\n{type(e).__name__}: {e}"[-500:], config=config)
             logger.exception("Error fetching streams for {0}. Check cookies.".format(channel_name))

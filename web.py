@@ -202,8 +202,21 @@ def save_config(content: str) -> tuple[bool, str]:
         tomlkit.parse(content)
     except Exception as e:
         return False, f"Invalid TOML, configuration not saved: {e}"
-    with open(config_file_path, "w", encoding="utf-8", newline="") as f:
-        f.write(content)
+    # Written to a temporary file and then swapped in, so a reader (the stall check, a new
+    # download) never sees a half-written file and a crash can't leave a truncated config.
+    # A config mounted into Docker as a single file can't be replaced (EBUSY/EXDEV), so it is
+    # then written in place.
+    temp_path = config_file_path + ".tmp"
+    try:
+        with open(temp_path, "w", encoding="utf-8", newline="") as f:
+            f.write(content)
+        os.replace(temp_path, config_file_path)
+    except OSError:
+        with open(config_file_path, "w", encoding="utf-8", newline="") as f:
+            f.write(content)
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
     return True, "Config saved"
 
 
@@ -452,10 +465,22 @@ app.jinja_env.filters['convert_bytes'] = convert_bytes
 app.jinja_env.filters['utc_iso'] = to_utc_iso
 
 
-def job_view(job: ActiveJob) -> dict[str, Any]:
-    """Data shown for an active job in the web UI and the JSON API (plain, JSON serialisable)."""
+def snapshot_stats(stats: dict) -> dict:
+    """
+    Copy of livestream_dl's stats dict, which its download threads change while it is read.
+    dict() copies in one step (iterating the live dict could fail with "dictionary changed size
+    during iteration"); the nested per-stream dicts are copied the same way.
+    """
+    return {key: (dict(value) if isinstance(value, dict) else value) for key, value in dict(stats).items()}
+
+
+def job_view(job: ActiveJob, include_stats: bool = False) -> dict[str, Any]:
+    """
+    Data shown for an active job in the web UI and the JSON API (plain, JSON serialisable).
+    The raw stats are only included for the JSON API (include_stats); the table doesn't use them.
+    """
     downloader = job.downloader
-    stats = downloader.stats
+    stats = snapshot_stats(downloader.stats)
     downloaded, _ = segment_totals(stats)
     streams = {
         kind: {
@@ -468,8 +493,7 @@ def job_view(job: ActiveJob) -> dict[str, Any]:
         'id': job.video_id,
         'kind': job.kind,
         'info': downloader.display_info(),
-        'status': downloader.status,
-        'stats': {key: (dict(value) if isinstance(value, dict) else value) for key, value in stats.items()},
+        'status': stats.get('status') or "Unknown",
         'streams': streams,
         'total_size': sum(int(stats.get(kind, {}).get('current_filesize') or 0) for kind in ("video", "audio")),
         'start_time': to_utc_iso(job.started_at),       # When the job was queued
@@ -479,7 +503,7 @@ def job_view(job: ActiveJob) -> dict[str, Any]:
                                    else 'recording' if downloader.recording_started_at else None),
         'scheduled_start': to_utc_iso(downloader.scheduled_start),
         'next_check_at': to_utc_iso(downloader.next_check_at),
-        'is_waiting': downloader.status == STATUS_WAITING,
+        'is_waiting': stats.get('status') == STATUS_WAITING,
         'can_merge': downloader.is_recording() and not downloader.merge_requested,
         'merge_requested': downloader.merge_requested,
         'stalled': job.stall.stalled,
@@ -493,11 +517,13 @@ def job_view(job: ActiveJob) -> dict[str, Any]:
             'last_cheap_check': to_utc_iso(downloader.last_cheap_check),
             'cheap_checks_active': downloader.next_cheap_check is not None,
         })
+    if include_stats:
+        view['stats'] = stats
     return view
 
 
-def jobs_data(kind: str) -> list[dict[str, Any]]:
-    return [job_view(job) for job in sorted(snapshot_jobs(kind), key=lambda j: j.started_at)]
+def jobs_data(kind: str, include_stats: bool = False) -> list[dict[str, Any]]:
+    return [job_view(job, include_stats) for job in sorted(snapshot_jobs(kind), key=lambda j: j.started_at)]
 
 
 def action_response(message: str, level: str = "success"):
@@ -635,12 +661,12 @@ def config_page():
 
 @app.route('/api/active')
 def api_active():
-    return jsonify(jobs_data("stream"))
+    return jsonify(jobs_data("stream", include_stats=True))
 
 
 @app.route('/api/unarchived')
 def api_unarchived():
-    return jsonify(jobs_data("unarchived"))
+    return jsonify(jobs_data("unarchived", include_stats=True))
 
 
 @app.route('/api/history')
