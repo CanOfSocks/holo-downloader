@@ -6,6 +6,7 @@ Downloads run in background threads. Each one is tracked as an ActiveJob in `job
 thread finishes, when the result is written to the history database.
 """
 import json
+import logging
 import os
 import queue
 import random
@@ -58,6 +59,40 @@ config_file_path: str = default_config_path()
 LOCK = threading.Lock()   # Protects `jobs`
 scheduler = BackgroundScheduler(daemon=True)
 logger = common.initialize_logging(logger_name="web")
+
+STALL_CHECK_JOB_ID = "stall-checker"
+
+# Scheduler job ids whose routine "Running job" / "executed successfully" lines are logged at DEBUG
+# instead of INFO. Add an id here to quiet another job (the cron checks use "<check name>-checker").
+# The filter reads this set when each line is logged, so adding to it at runtime works too.
+QUIET_JOB_IDS: set[str] = {
+    STALL_CHECK_JOB_ID,
+}
+
+
+class _QuietJobFilter(logging.Filter):
+    """
+    Log APScheduler's INFO lines for the jobs in `job_ids` at DEBUG instead.
+    Warnings and errors (missed runs, exceptions) keep their level.
+    """
+    def __init__(self, job_ids: set[str]):
+        super().__init__()
+        self.job_ids = job_ids   # Kept by reference so later additions apply
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.levelno != logging.INFO or not isinstance(record.args, tuple) or not record.args:
+            return True
+        if getattr(record.args[0], 'id', None) not in self.job_ids:
+            return True
+        # Handlers further up don't recheck the logger level, so drop it here unless DEBUG is enabled
+        if not logging.getLogger(record.name).isEnabledFor(logging.DEBUG):
+            return False
+        record.levelno = logging.DEBUG
+        record.levelname = logging.getLevelName(logging.DEBUG)
+        return True
+
+
+logging.getLogger("apscheduler.executors.default").addFilter(_QuietJobFilter(QUIET_JOB_IDS))
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-key-placeholder')
@@ -345,7 +380,7 @@ def update_scheduler() -> tuple[bool, str]:
             logger.error(f"Cron Error for {name}: {e}")
             _invalid_crons.add(name)
             messages.append(f"Invalid cron expression for {name}: {e}")
-    scheduler.add_job(check_stalls, trigger='interval', seconds=STALL_CHECK_SECONDS, id="stall-checker",
+    scheduler.add_job(check_stalls, trigger='interval', seconds=STALL_CHECK_SECONDS, id=STALL_CHECK_JOB_ID,
                       max_instances=1, coalesce=True, replace_existing=True)
     if messages:
         return False, "; ".join(messages)
