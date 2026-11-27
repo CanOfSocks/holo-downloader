@@ -3,17 +3,19 @@ Download history: an SQLite table of the last HISTORY_LIMIT finished jobs, shown
 """
 import os
 import sqlite3
+import threading
 import time
 from contextlib import closing
 from typing import Optional
 
 DB_FILE = os.environ.get('HISTORY_DB', 'stream_history.db')
 HISTORY_LIMIT = 50
-# After a job finishes, the active table response tells browsers to reload the history for this
-# many seconds. Longer than the 3s active table poll, so every open browser sees it.
-HISTORY_SIGNAL_SECONDS = 10
 
-_changed_at: float = 0.0
+# Increases each time an entry is added. The web UI compares it with the version it last loaded,
+# so each browser reloads the history table once per change (see web._render_jobs_table).
+# It starts from the time the app started, so a browser left open across a restart reloads too.
+_version: int = int(time.time())
+_version_lock = threading.Lock()
 
 
 def connect() -> sqlite3.Connection:
@@ -58,10 +60,11 @@ def get_all() -> list[sqlite3.Row]:
 
 
 def mark_changed() -> None:
-    global _changed_at
-    _changed_at = time.time()
+    global _version
+    with _version_lock:
+        _version += 1
 
 
-def changed_recently() -> bool:
-    """True for HISTORY_SIGNAL_SECONDS after a job finished (see HISTORY_SIGNAL_SECONDS)."""
-    return time.time() - _changed_at < HISTORY_SIGNAL_SECONDS
+def version() -> int:
+    """The current history version (see _version)."""
+    return _version

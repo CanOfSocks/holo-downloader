@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import threading
 import time
 from datetime import datetime, timezone
@@ -793,6 +794,70 @@ def test_unarchived_scan_ignores_filters(monkeypatch, fake_ytdlp):
     assert normal == [] and [video.id for video in unarchived] == ["unarchived1"]
 
 
+def test_unarchived_deleted_video_is_confirmed_then_recovered(monkeypatch, tmp_path):
+    """'Video unavailable' (deleted) starts recovery like a private video, after one more check."""
+    from unarchived import Refresh
+    downloader = _unarchived(tmp_path)
+
+    def deleted(**kw):
+        raise getUrls.VideoUnavailableError("Video dQw4w9WgXcQ is unavailable")
+    monkeypatch.setattr(getUrls, "get_Video_Info", deleted)
+    monkeypatch.setattr(downloader, "notify", lambda *a, **kw: pytest.fail("no error notification for a deleted video"))
+    assert downloader.refresh_urls() is Refresh.UNCONFIRMED
+    assert downloader.refresh_urls() is Refresh.PRIVATE
+
+
+# --- yt-dlp options ---
+
+def test_user_ytdlp_options_override_scan_defaults():
+    config = ConfigHandler(config={"download_options": {"ytdlp_options": '{"sleep_interval_requests": 5}'}})
+    assert scan.scan_ytdlp_options(config, common.logger, flat=False)["sleep_interval_requests"] == 5
+    assert scan.scan_ytdlp_options(ConfigHandler(config={}), common.logger, flat=False)["sleep_interval_requests"] == 1
+    # Flat listings never use the user's options
+    assert scan.scan_ytdlp_options(config, common.logger, flat=True)["sleep_interval_requests"] == 1
+
+
+# --- Shutdown ---
+
+def test_wait_for_jobs_waits_until_threads_stop(monkeypatch):
+    import jobs
+    stop = threading.Event()
+    thread = threading.Thread(target=stop.wait, daemon=True)
+    thread.start()
+    job = jobs.ActiveJob(video_id="dQw4w9WgXcQ", kind="stream", downloader=None, started_at=datetime.now(timezone.utc), thread=thread)
+    monkeypatch.setitem(jobs.jobs["stream"], "dQw4w9WgXcQ", job)
+    assert jobs.wait_for_jobs(0.1) == 1
+    threading.Timer(0.1, stop.set).start()
+    assert jobs.wait_for_jobs(5) == 0
+
+
+def test_gunicorn_config_does_not_load_the_app():
+    """The gunicorn master loads gunicorn.conf.py: it must not set up the app's logging (log file) there."""
+    import subprocess
+    import sys
+    code = ("import runpy, sys, logging; runpy.run_path('gunicorn.conf.py'); "
+            "print('common' in sys.modules, bool(logging.getLogger('holo').handlers))")
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=60,
+                            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    assert result.stdout.split() == ["False", "False"], result.stderr
+
+
+def test_discord_sends_queued_messages_on_shutdown(monkeypatch):
+    import discord_web
+    sent = []
+    monkeypatch.setattr(discord_web, "send_webhook", lambda notification: sent.append(notification.status))
+    stopping = threading.Event()
+    stopping.set()
+    monkeypatch.setattr(common, "kill_all", stopping)
+    monkeypatch.setattr(discord_web, "SHUTDOWN_SEND_SECONDS", 2)
+    for status in ("done", "error"):
+        discord_web._queue.put_nowait(discord_web._Notification("https://example.invalid", "dQw4w9WgXcQ", status, None, None, None))
+    started = time.monotonic()
+    discord_web._worker_loop()
+    assert sent == ["done", "error"]
+    assert time.monotonic() - started < 5
+
+
 # --- Shared HTTP client ---
 
 def test_http_clients_per_proxy_and_idle_ones_closed(monkeypatch):
@@ -855,6 +920,29 @@ def test_failed_config_write_leaves_config_untouched(tmp_path, monkeypatch):
     assert saved is False and "No space left" in message
     assert path.read_text(encoding="utf-8") == "old = 1\n"
     assert not (tmp_path / "config.toml.tmp").exists()
+
+
+def test_config_swap_keeps_file_mode(tmp_path, monkeypatch):
+    import stat
+    import getConfig
+    path = tmp_path / "config.toml"
+    path.write_text("old = 1\n", encoding="utf-8")
+    original_mode = stat.S_IMODE(os.stat(path).st_mode)
+    modes = []
+    real_chmod = os.chmod
+    monkeypatch.setattr(getConfig.os, "chmod", lambda p, mode: modes.append(mode) or real_chmod(p, mode))
+    assert getConfig.save_config_text(str(path), "new = 2\n") == (True, "Config saved")
+    assert modes == [original_mode] and stat.S_IMODE(os.stat(path).st_mode) == original_mode
+
+
+def test_config_of_another_user_is_written_in_place(tmp_path, monkeypatch):
+    import getConfig
+    path = tmp_path / "config.toml"
+    path.write_text("old = 1\n", encoding="utf-8")
+    monkeypatch.setattr(getConfig.os, "getuid", lambda: os.stat(path).st_uid + 1, raising=False)
+    monkeypatch.setattr(getConfig.os, "replace", lambda *a: pytest.fail("a file of another user must not be replaced"))
+    assert getConfig.save_config_text(str(path), "new = 2\n") == (True, "Config saved")
+    assert path.read_text(encoding="utf-8") == "new = 2\n"
 
 
 def test_config_written_in_place_when_temp_file_cannot_be_created(tmp_path, monkeypatch):

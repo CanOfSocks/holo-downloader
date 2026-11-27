@@ -18,7 +18,7 @@ The program supports standard streams, members-only content, unarchived (private
 
 * **Resiliency**: Uses `livestream_dl` (a custom wrapper around `yt-dlp` and `ffmpeg`) to handle stream interruptions and segment merging.
 * **Web UI**: A Flask-based interface (port 5000) for desktop and mobile to view active downloads, history, and schedules. Downloads that stop receiving segments are flagged as **stalled** and can be stopped and merged from the UI. Failed downloads show a brief reason in the history (e.g. *Membership*, *Private*, *Processed*), and finished downloads show how many segments could not be downloaded, if any. Times are shown in the browser's timezone. The tables stop refreshing while the browser tab is hidden and refresh as soon as it is shown again.
-* **Notifications**: Integrates with Discord Webhooks for status updates (Recording, Done, Error).
+* **Notifications**: Integrates with Discord Webhooks for status updates (Recording, Done, Error). Messages still queued when the app stops are sent for up to 8 seconds before it exits.
 * **Flexible Filtering**: Filter downloads by regex matching on video titles or descriptions.
 
 ## Docker Usage
@@ -50,6 +50,8 @@ docker run -d \
   'canofsocks/holo-downloader:latest'
 
 ```
+
+When the container stops, downloads are told to stop and given up to 8 seconds to close their files before the app exits. Docker allows 10 seconds by default (`docker stop -t`, compose `stop_grace_period`); a stopped download is not merged.
 
 ### Environment Variables
 
@@ -119,7 +121,7 @@ The value can be a channel ID (`UC...`), one of the channel's playlist IDs (`UU.
 
 #### Unarchived (Privated) Streams
 *Monitors for streams that become unavailable/private immediately after ending.*   
-The "unarchived channels" option saves the video stream urls (info.json file) to the temporary directory while the stream is live (or post-live) and refreshes them with yt-dlp every 1 hour 50 minutes. Every 10 minutes a cheap check (one small request to YouTube's oEmbed endpoint, no yt-dlp) looks for the video becoming inaccessible; a suspicious result is confirmed with a full yt-dlp extraction (an extraction reporting the video private is checked once more a minute later, as single degraded extractions have reported working streams as private). If a stream becomes inaccessible before the stream URLs expire (about 6 hours after extraction), an attempt to download the stream via livestream_dl's `--recovery` option is triggered using the saved info.json file. If the URL refreshes keep failing (for example rate limiting or YouTube's "confirm you're not a bot" check), it can't be confirmed whether the video was privated, so recovery is started with the saved URLs 30 minutes before they expire rather than letting them go unused. Monitoring continues until the saved info.json is 6 hours old.  
+The "unarchived channels" option saves the video stream urls (info.json file) to the temporary directory while the stream is live (or post-live) and refreshes them with yt-dlp every 1 hour 50 minutes. Every 10 minutes a cheap check (one small request to YouTube's oEmbed endpoint, no yt-dlp) looks for the video becoming inaccessible; a suspicious result is confirmed with a full yt-dlp extraction (an extraction reporting the video private or unavailable is checked once more a minute later, as single degraded extractions have reported working streams that way). If a stream becomes inaccessible (privated, deleted, removed...) before the stream URLs expire (about 6 hours after extraction), an attempt to download the stream via livestream_dl's `--recovery` option is triggered using the saved info.json file. If the URL refreshes keep failing (for example rate limiting or YouTube's "confirm you're not a bot" check), it can't be confirmed whether the video was privated, so recovery is started with the saved URLs 30 minutes before they expire rather than letting them go unused. Monitoring continues until the saved info.json is 6 hours old.  
 > **Note:** oEmbed also reports an error for videos with embedding disabled. For those videos the cheap check is turned off and only the URL refreshes detect the video being privated.  
 
 > **Warning:** This option should be treated as a last resort option as it is currently unreliable. Streams that are important to you should always be recorded live.
@@ -191,7 +193,7 @@ The `output_path` template follows [yt-dlp output template](https://github.com/y
 | `upcoming_recheck_max` | Float | `10800` | Maximum seconds between yt-dlp extractions of a stream waiting for its scheduled start (Minimum: 60). The downloader waits until the scheduled start without extracting, but re-checks at least this often in case the schedule moved. Independent of the channel scan, which also starts the download straight away if it sees the stream live. Checks at the maximum are shortened by a random 0-10% so streams found in the same scan don't all get checked at once. If a check reports a waiting stream as private, or as anything other than upcoming, live or just ended (e.g. no live status at all), it is checked once more a minute later before the download gives up, as single degraded extractions have reported working streams that way. A confirmed unexpected status is shown in the history as *Error* with the reason *Unexpected status*. |
 | `proxies` | String | *None* | Proxy URL (e.g., `"http://10.0.1.2:3128"`). |
 | `randomise_lists` | Bool | `False` | Randomize channel check order to reduce bot detection patterns. |
-| `ytdlp_options` | String| *None* | A JSON string that will be added to the yt-dlp options for stream URL extraction. E.g `'{"extractor_args":{"youtubepot-bgutilhttp":{"base_url":["http://bgutil-provider:4416"]}}}'` |
+| `ytdlp_options` | String| *None* | A JSON string that will be added to the yt-dlp options for stream URL extraction, and for the single-video extractions of channel scans (where it can also override the scan defaults, e.g. `"sleep_interval_requests": 5` to space out requests more). E.g `'{"extractor_args":{"youtubepot-bgutilhttp":{"base_url":["http://bgutil-provider:4416"]}}}'` |
 | `new_segment_wait_limit` | Int | 0 | Maximum wait cycles for new segments before stopping download (if end is not detected first). Each cycle is approximately 10 seconds, e.g. 1800 is 18000 seconds (5 hours). 0 waits until the end of the stream is detected. |
 | `stall_timeout` | Int | `900` | Seconds without a new downloaded segment (while recording) before a download is marked as stalled in the web UI and a Discord message is sent. |
 | `stall_auto_merge` | Int | `0` | Seconds a download can stay stalled before it is automatically stopped and the downloaded segments merged. `0` disables this. |
@@ -306,7 +308,7 @@ The buttons post to these endpoints, which can also be used directly (`<kind>` i
 
 > **Note:** The older `/actions/cancel/<video_id>` and `/actions/cancel_unarchived/<video_id>` endpoints have been removed; use `/actions/cancel/<kind>/<video_id>`.
 
-Configuration saved from the web UI is checked to be valid TOML first, then written to a temporary file and swapped in, so nothing reads a half-written file. When `config.toml` is mounted into Docker as a single file (which can't be swapped), or the temporary file can't be created, it is written in place instead. If the write itself fails (e.g. the disk is full), the existing config is left untouched and the web UI shows the error.
+Configuration saved from the web UI is checked to be valid TOML first, then written to a temporary file and swapped in, so nothing reads a half-written file. When `config.toml` is mounted into Docker as a single file (which can't be swapped), or the temporary file can't be created, it is written in place instead. If the write itself fails (e.g. the disk is full), the existing config is left untouched and the web UI shows the error. A swapped-in config keeps the file permissions of the old one (it contains the webhook URL); a config owned by another user is written in place so its owner doesn't change.
 
 ---
 
@@ -339,7 +341,8 @@ Run the offline tests with `.venv/bin/python -m pytest`.
 | `getVids.py`, `getYTDLP.py`, `getJson.py`, `getMembers.py` | The channel scans run by the checks (`video_fetch_method` chooses yt-dlp or holo.dev). |
 | `communityPosts.py` | Community tab download (runs `ytct.py`). |
 | `monitor.py` | Stall detection (`StallTracker`). |
-| `common.py` | Shared helpers: shutdown (`kill_all`), logging, caches, oEmbed requests, base yt-dlp options. |
+| `common.py` | Shared helpers: logging, caches, oEmbed requests, base yt-dlp options. |
+| `shutdown.py` | The `kill_all` shutdown event and signal handlers (kept separate so the gunicorn master, which loads `gunicorn.conf.py`, doesn't set up the app's logging). |
 | `getConfig.py` | Reading, creating and saving `config.toml`. |
 | `discord_web.py` | Discord notifications (queued and sent by one background thread). |
 | `lockup_schedule.py` | Reads scheduled start times from yt-dlp's flat playlist listings. |

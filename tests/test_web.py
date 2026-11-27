@@ -219,6 +219,21 @@ def test_start_job_builds_downloader_outside_lock_and_updates_existing(client, m
     assert started == ["stream-dQw4w9WgXcQ"]
 
 
+def test_history_reloaded_only_when_it_changed(client):
+    history.init_db()
+    shown = client.get("/data/history").headers["X-History-Version"]
+    # Up to date, or the page hasn't loaded the history yet: no reload
+    assert "HX-Trigger" not in client.get(f"/data/active?history_version={shown}").headers
+    assert "HX-Trigger" not in client.get("/data/active?history_version=").headers
+    # A job finishes: the page showing the old version reloads the history, once it has the new one it stops
+    jobs.save_to_history(add_fake_job("stream", "dQw4w9WgXcQ", "Finished", VideoDownloader))
+    assert client.get(f"/data/active?history_version={shown}").headers["HX-Trigger"] == "historyUpdated"
+    assert client.get(f"/data/unarchived?history_version={shown}").headers["HX-Trigger"] == "historyUpdated"
+    current = client.get("/data/history").headers["X-History-Version"]
+    assert current != shown
+    assert "HX-Trigger" not in client.get(f"/data/active?history_version={current}").headers
+
+
 def test_add_rejects_invalid_id(client):
     response = client.post("/actions/add", data={"video_id": "not a video"}, headers={"HX-Request": "true"})
     assert "warning" in response.headers["HX-Trigger"]

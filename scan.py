@@ -46,15 +46,15 @@ _UNARCHIVED_JSON_PATTERN = re.compile(r"^([0-9A-Za-z_-]{10}[048AEIMQUYcgkosw])\.
 
 def scan_ytdlp_options(config: ConfigHandler, this_logger: logging.Logger, flat: bool) -> dict:
     """
-    yt-dlp options for channel scans (see common.ytdlp_options). Warnings are hidden, and requests
-    are spaced out by a second as a scan makes many of them.
+    yt-dlp options for channel scans (see common.ytdlp_options). By default warnings are hidden,
+    and requests are spaced out by a second as a scan makes many of them.
     flat=True:  cheap playlist listing (one request per page); the user's `ytdlp_options` are not
                 applied as they are intended for video extraction.
-    flat=False: full extraction of a single video, with the user's `ytdlp_options`.
+    flat=False: full extraction of a single video, with the user's `ytdlp_options` (which can
+                override the defaults above, e.g. a longer sleep_interval_requests).
     """
-    options = common.ytdlp_options(config, YTDLPLogger(logger=this_logger), flat=flat)
-    options.update({'no_warnings': True, 'sleep_interval_requests': 1})
-    return options
+    return common.ytdlp_options(config, YTDLPLogger(logger=this_logger), flat=flat,
+                                defaults={'no_warnings': True, 'sleep_interval_requests': 1})
 
 
 def within_time_window(config: ConfigHandler, release_time: Optional[float]) -> bool:

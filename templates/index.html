@@ -26,7 +26,8 @@
     <div class="card mb-4 shadow-sm">
         <div class="card-header bg-primary text-white">Active Downloads</div>
         <div class="card-body p-0 p-sm-3" id="active-downloads-container"
-             hx-get="/data/active" hx-trigger="load, every 3s [!document.hidden], visibilitychange[!document.hidden] from:document, refreshTables from:body" hx-swap="innerHTML">
+             hx-get="/data/active" hx-vals='js:{history_version: window.historyVersion || ""}'
+             hx-trigger="load, every 3s [!document.hidden], visibilitychange[!document.hidden] from:document, refreshTables from:body" hx-swap="innerHTML">
             <p class="text-center text-muted m-3">Loading active downloads...</p>
         </div>
     </div>
@@ -34,7 +35,8 @@
     <div class="card mb-4 shadow-sm">
         <div class="card-header bg-secondary text-white">Unarchived Stream Monitors</div>
         <div class="card-body p-0 p-sm-3" id="unarchive-monitor-container"
-             hx-get="/data/unarchived" hx-trigger="load, every 30s [!document.hidden], visibilitychange[!document.hidden] from:document, refreshTables from:body" hx-swap="innerHTML">
+             hx-get="/data/unarchived" hx-vals='js:{history_version: window.historyVersion || ""}'
+             hx-trigger="load, every 30s [!document.hidden], visibilitychange[!document.hidden] from:document, refreshTables from:body" hx-swap="innerHTML">
             <p class="text-center text-muted m-3">Loading unarchived monitor activities...</p>
         </div>
     </div>
@@ -50,9 +52,20 @@
     <div class="card mb-4 shadow-sm">
         <div class="card-header bg-secondary text-white">History (Last 50)</div>
         <div class="card-body p-0 p-sm-3" id="history-container"
-             hx-get="/data/history" hx-trigger="load, every 60s [!document.hidden], visibilitychange[!document.hidden] from:document, historyUpdated from:body" hx-swap="innerHTML">
+             hx-get="/data/history" hx-trigger="load, every 60s [!document.hidden], historyUpdated from:body" hx-swap="innerHTML">
             <p class="text-center text-muted m-3">Loading history...</p>
         </div>
     </div>
 </div>
+{% endblock %}
+{% block scripts %}
+<script>
+    // Version of the history table shown (from /data/history's X-History-Version header). The
+    // active tables send it with each poll, and the server answers with 'historyUpdated' only when
+    // a job has finished since, so the history is reloaded once per change.
+    document.body.addEventListener("htmx:afterRequest", function (event) {
+        const version = event.detail.xhr && event.detail.xhr.getResponseHeader("X-History-Version");
+        if (version) window.historyVersion = version;
+    });
+</script>
 {% endblock %}

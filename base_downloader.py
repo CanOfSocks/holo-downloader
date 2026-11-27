@@ -374,8 +374,8 @@ class BaseDownloader:
 
     def report_needs_confirmation(self, error: BaseException) -> bool:
         """
-        True (and logged) for the first of consecutive extractions reporting the video private, or
-        an upcoming stream with an unexpected status (UnexpectedStatusError): the caller checks again
+        True (and logged) for the first of consecutive extractions reporting the video private or
+        unavailable, or an upcoming stream with an unexpected status (UnexpectedStatusError): the caller checks again
         after CONFIRM_DELAY instead of giving up or starting recovery. Later reports of the same
         kind return False until an extraction succeeds again.
         """
@@ -383,6 +383,9 @@ class BaseDownloader:
             kind = "unexpected status"
         elif isinstance(error, getUrls.VideoInaccessibleError) and "private" in str(error).lower():
             kind = "private"
+        elif isinstance(error, getUrls.VideoUnavailableError):
+            # "Video unavailable": usually deleted, but also seen briefly for working videos
+            kind = "unavailable"
         else:
             return False
         self._unconfirmed_reports[kind] = self._unconfirmed_reports.get(kind, 0) + 1

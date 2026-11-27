@@ -7,6 +7,7 @@ never blocks a download, and messages for a video arrive in the order they were 
 import queue
 import re
 import threading
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
@@ -18,6 +19,9 @@ from getConfig import ConfigHandler
 # If Discord is unreachable for a long time, drop new messages instead of using more and more memory
 MAX_QUEUED_MESSAGES = 200
 WEBHOOK_TIMEOUT = 30
+# On shutdown, queued messages are still sent for this long (the worker waits for jobs to stop for
+# a similar time, see gunicorn.conf.py), so "done"/"error" messages of stopping jobs aren't lost
+SHUTDOWN_SEND_SECONDS = 8
 
 _ANSI_ESCAPE = re.compile(r'\x1B[@-_][0-?]*[ -/]*[@-~]')
 
@@ -80,9 +84,18 @@ def _ensure_worker() -> None:
 
 
 def _worker_loop() -> None:
-    while not common.kill_all.is_set():
+    """
+    Send queued notifications. On shutdown (kill_all), keep sending what is queued (including
+    messages from jobs that are just stopping) for up to SHUTDOWN_SEND_SECONDS, then exit.
+    """
+    shutdown_deadline: Optional[float] = None
+    while True:
+        if common.kill_all.is_set() and shutdown_deadline is None:
+            shutdown_deadline = time.monotonic() + SHUTDOWN_SEND_SECONDS
+        if shutdown_deadline is not None and time.monotonic() >= shutdown_deadline:
+            return
         try:
-            notification = _queue.get(timeout=5)
+            notification = _queue.get(timeout=1 if shutdown_deadline is not None else 5)
         except queue.Empty:
             continue
         try:

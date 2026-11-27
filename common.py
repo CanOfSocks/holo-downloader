@@ -1,7 +1,7 @@
 """
-Shared state and helpers used by the web app, the channel scans and the downloaders: shutdown
-handling (kill_all), logging, small utilities, YouTube oEmbed requests and base yt-dlp options.
-Channel scanning itself is in scan.py.
+Shared state and helpers used by the web app, the channel scans and the downloaders: the
+shutdown event (kill_all, from shutdown.py), logging, small utilities, YouTube oEmbed requests and
+base yt-dlp options. Channel scanning itself is in scan.py.
 """
 import copy
 import enum
@@ -12,12 +12,10 @@ import logging.handlers
 import os
 import random
 import re
-import signal
 import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
-from platform import system
 from typing import Any, Dict, List, Optional, Union
 
 import httpx
@@ -25,34 +23,8 @@ import httpx
 from getConfig import ConfigHandler
 from livestream_dl import getUrls, headers
 from livestream_dl.download_Live import create_http_client
-
-# --- Shutdown handling ---
-
-# Set when the application is shutting down. Every download and wait loop checks it.
-kill_all = threading.Event()
-
-original_sigint = signal.getsignal(signal.SIGINT)
-
-
-def handle_shutdown(signum, frame) -> None:
-    """Signal handler: tell every thread to stop, give them a moment, then run the original handler."""
-    kill_all.set()
-    time.sleep(5)
-    if callable(original_sigint):
-        original_sigint(signum, frame)
-
-
-# Signal handlers can only be installed from the main thread. Under gunicorn this module is first
-# imported by gunicorn.conf.py in the master process; gunicorn then installs its own handlers, and
-# the worker uses gunicorn's hooks (see gunicorn.conf.py) to set kill_all.
-if threading.current_thread() is threading.main_thread():
-    signal.signal(signal.SIGINT, handle_shutdown)
-    if system() == "Windows":
-        # SIGTERM won't fire on Windows, but SIGBREAK will on Ctrl-Break
-        signal.signal(signal.SIGBREAK, handle_shutdown)
-    else:
-        signal.signal(signal.SIGTERM, handle_shutdown)
-
+# Set when the application is shutting down (see shutdown.py); used throughout as common.kill_all
+from shutdown import kill_all  # noqa: F401
 
 # --- Logging ---
 
@@ -359,20 +331,24 @@ def get_embed_info(video_id: str, proxy: Optional[Union[str, dict]] = None) -> D
 LIVE_STATUSES = ("is_live", "post_live")
 
 
-def ytdlp_options(config: ConfigHandler, ytdlp_logger: Any, flat: bool = False) -> dict:
+def ytdlp_options(config: ConfigHandler, ytdlp_logger: Any, flat: bool = False,
+                  defaults: Optional[Dict[str, Any]] = None) -> dict:
     """
-    Base yt-dlp options for an extraction that downloads nothing: cookies, proxy and logger.
+    Base yt-dlp options for an extraction that downloads nothing: cookies, proxy and logger, plus
+    the caller's `defaults`.
     flat=True:  cheap playlist listing (one request per page); the user's `ytdlp_options` are not
                 applied as they are intended for video extraction.
     flat=False: full extraction of a single video, with the user's `ytdlp_options` (e.g. a PO token
-                provider). ignore_no_formats_error lets an upcoming video return its info
-                (live_status / release_timestamp) instead of raising "This live event will begin in...".
+                provider), which override everything else. ignore_no_formats_error lets an upcoming
+                video return its info (live_status / release_timestamp) instead of raising
+                "This live event will begin in...".
     """
     options: dict[str, Any] = {
         'quiet': True,
         'skip_download': True,
         'cookiefile': config.get_cookies_file(),
         'logger': ytdlp_logger,
+        **(defaults or {}),
     }
     proxy = getUrls.proxy_for_ytdlp(config.get_proxy())
     if proxy:

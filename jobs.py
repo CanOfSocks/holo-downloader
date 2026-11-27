@@ -4,6 +4,7 @@ Active jobs: one background thread per download (VideoDownloader) or unarchived 
 when the result is written to the history database and the job is removed.
 """
 import threading
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional, Union
@@ -58,6 +59,18 @@ def snapshot_jobs(kind: Optional[str] = None) -> list[ActiveJob]:
 def get_job(kind: str, video_id: str) -> Optional[ActiveJob]:
     with LOCK:
         return jobs.get(kind, {}).get(video_id)
+
+
+def wait_for_jobs(timeout: float) -> int:
+    """
+    Wait up to `timeout` seconds in total for every job thread to finish (after kill_all is set
+    on shutdown, so they stop their loops and close their files). Returns how many are still running.
+    """
+    deadline = time.monotonic() + timeout
+    for job in snapshot_jobs():
+        if job.thread is not None:
+            job.thread.join(max(0.0, deadline - time.monotonic()))
+    return sum(1 for job in snapshot_jobs() if job.thread is not None and job.thread.is_alive())
 
 
 def stream_total_size(stats: dict) -> int:

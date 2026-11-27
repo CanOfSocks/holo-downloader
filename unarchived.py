@@ -73,7 +73,7 @@ class Refresh(enum.Enum):
     SAVED = "saved"            # Live/post-live: info.json saved with fresh URLs
     UPCOMING = "upcoming"      # Not started yet
     NOT_READY = "not_ready"    # Live but no formats yet
-    PRIVATE = "private"        # Inaccessible (private, members-only, removed...)
+    PRIVATE = "private"        # Inaccessible (private, members-only, removed, deleted...)
     UNCONFIRMED = "unconfirmed"  # Reported private (or an unexpected status) once: checked again first (see report_needs_confirmation)
     PROCESSED = "processed"    # Archive is public, so there is nothing to recover
     UNEXPECTED = "unexpected"  # Upcoming stream confirmed with an unexpected status and no saved URLs: stop (see UnexpectedStatusError)
@@ -235,9 +235,10 @@ class UnarchivedDownloader(BaseDownloader):
         now = time.time()
         try:
             info_dict, live_status = self.extract_info(include_dash=False, include_m3u8=False)
-        except (getUrls.VideoInaccessibleError, getUrls.VideoProcessedError) as e:
-            # A private report, or an upcoming stream reported with an unexpected status, is checked
-            # once more before it is believed (see report_needs_confirmation)
+        except (getUrls.VideoInaccessibleError, getUrls.VideoUnavailableError, getUrls.VideoProcessedError) as e:
+            # A private or unavailable (deleted) report, or an upcoming stream reported with an
+            # unexpected status, is checked once more before it is believed (see report_needs_confirmation).
+            # Private and unavailable videos are then recovered with the saved URLs.
             if self.report_needs_confirmation(e):
                 self.next_url_refresh = now + CONFIRM_DELAY
                 return Refresh.UNCONFIRMED

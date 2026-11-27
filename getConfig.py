@@ -7,6 +7,7 @@ config file (for example through the web UI) apply to the next check without a r
 import json
 import logging
 import os
+import stat
 from pathlib import Path, PurePath
 from typing import Any, Optional, Union
 
@@ -45,7 +46,8 @@ def save_config_text(path: str, content: str) -> tuple[bool, str]:
     Written to a temporary file and then swapped in, so a reader (the stall check, a new download)
     never sees a half-written file and a crash can't leave a truncated config.
     It is written in place instead only when the temporary file can't be created (read-only
-    folder) or can't be swapped in (a config mounted into Docker as a single file: EBUSY/EXDEV).
+    folder), can't be swapped in (a config mounted into Docker as a single file: EBUSY/EXDEV), or
+    the config belongs to another user (swapping would change its owner).
     If writing the temporary file fails (e.g. disk full), config.toml is left untouched.
     """
     try:
@@ -66,7 +68,15 @@ def _replace_with_temp_file(path: str, temp_path: str, content: str) -> bool:
     """
     Write `content` to temp_path and swap it in. Returns False if the temporary file can't be
     created or swapped in (the caller then writes in place). A failed write raises OSError.
+    The new file gets the permissions of the old one (the config holds the webhook URL, so it may
+    be restricted). A file owned by another user is written in place, as its owner can't be kept.
     """
+    try:
+        current = os.stat(path)
+    except FileNotFoundError:
+        current = None
+    if current is not None and hasattr(os, "getuid") and current.st_uid != os.getuid():
+        return False
     try:
         temp_file = open(temp_path, "w", encoding="utf-8", newline="")
     except OSError:
@@ -75,6 +85,8 @@ def _replace_with_temp_file(path: str, temp_path: str, content: str) -> bool:
         with temp_file:
             temp_file.write(content)
         try:
+            if current is not None:
+                os.chmod(temp_path, stat.S_IMODE(current.st_mode))
             os.replace(temp_path, path)
         except OSError:
             return False

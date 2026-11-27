@@ -173,8 +173,10 @@ def set_cache_headers(response):
 
 def _render_jobs_table(kind: str):
     response = make_response(render_template('downloads_table.html', jobs=jobs_data(kind), kind=kind))
-    if history.changed_recently():
-        # Tells htmx to fire the 'historyUpdated' event, which reloads the history table
+    # The page sends the version of the history table it shows (see index.html). If a job has
+    # finished since, htmx is told to fire 'historyUpdated', which reloads the history table once.
+    shown = request.args.get('history_version')
+    if shown and shown != str(history.version()):
         response.headers['HX-Trigger'] = 'historyUpdated'
     return response
 
@@ -191,7 +193,11 @@ def data_unarchived():
 
 @app.route('/data/history')
 def data_history():
-    return render_template('history_table.html', history=history.get_all())
+    # Version read before the query: a change in between at worst causes one extra reload
+    version = history.version()
+    response = make_response(render_template('history_table.html', history=history.get_all()))
+    response.headers['X-History-Version'] = str(version)
+    return response
 
 
 @app.route('/data/scheduler')
