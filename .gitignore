@@ -7,5 +7,7 @@ __pycache__
 venv/
 # Created by the web app when run locally
 stream_history.db*
-# YouTube account cookies: mount them into the container, never commit them
-cookies.txt
+# cookies.txt is tracked as a blank placeholder so `docker compose` always has a file to mount.
+# Never commit real cookies: after pasting them in, run
+#   git update-index --skip-worktree cookies.txt
+# so git ignores local changes to it (.gitignore can't do this for a tracked file).

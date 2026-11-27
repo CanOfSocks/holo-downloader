@@ -25,8 +25,10 @@ The program supports standard streams, members-only content, unarchived (private
 
 The recommended way to run this application is via Docker. You will need to create a `config.toml`, a temporary folder, a final download folder, and a `cookies.txt` file (if using Members/Unarchived features).
 
-> **Note:** `cookies.txt` holds your YouTube account session. It is ignored by git and by Docker builds (`.gitignore` / `.dockerignore`), so it is never committed or baked into an image; mount it into the container as shown below. The image contains an empty placeholder.
-> Create the file on the host **before** the first start (e.g. `touch cookies.txt`, then paste your cookies in). If it doesn't exist, Docker creates a *directory* with that name instead; the app then logs a warning and continues without cookies.
+> **Note:** `cookies.txt` holds your YouTube account session; mount it into the container as shown below.
+> * The repository includes a blank `cookies.txt` (so `compose.yml` always has a file to mount) and the image contains a blank `/app/cookies.txt`. Docker builds exclude any local `cookies.txt` (`.dockerignore`), so real cookies are never baked into an image.
+> * After pasting your cookies into a clone of the repository, run `git update-index --skip-worktree cookies.txt` so git ignores the change and it can't be committed by accident.
+> * With `docker run`, create the file on the host **before** the first start (e.g. `touch cookies.txt`). If the mounted file doesn't exist, Docker creates a *directory* with that name instead; the app then logs a warning and continues without cookies.
 
 ### Run Command
 
